@@ -12,6 +12,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@ai-portal/shared-types": "workspace:*",
+    "dd-icons": "^2.0.2",
+    "dingtalk-design-desktop": "^3.0.0",
+    "dingtalk-theme": "8.0.0-beta.8",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.30.1"

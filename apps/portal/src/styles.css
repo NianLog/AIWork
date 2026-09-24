@@ -1,90 +1,542 @@
-body { margin: 0; }
+/*
+ * AI 中台门户的版式补充样式。
+ *
+ * 视觉语言来自钉钉组件库：颜色、圆角、间距、字号由 dingtalk-design-mobile 与
+ * dingtalk-theme 决定，本文件只处理页面骨架（品牌头部、内容排布、底部导航定位）
+ * 与组件之间的连接处，颜色一律引用主题变量，不另造色板。
+ */
 
-.portal-root {
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--common_bg_color, #f2f2f6);
+  color: var(--common_level1_base_color, #171a1d);
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue",
+    "Microsoft YaHei", sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--common_blue1_color, #007fff);
+  text-decoration: none;
+}
+
+/* 键盘用户跳过导航直达内容 */
+.portal-skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+}
+
+.portal-skip-link:focus {
+  left: 12px;
+  top: 12px;
+  z-index: 1001;
+  padding: 8px 12px;
+  background: var(--common_bg_z1_color, #fff);
+  border-radius: var(--common_border_radius_m, 6px);
+  box-shadow: var(--common_box_shadow_m__box, 0 4px 16px rgba(0, 0, 0, 0.08));
+}
+
+/* 仅供读屏软件的文本 */
+.portal-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---------------- 外壳：品牌头部 / 提示条 / 内容区 / 底部导航 ---------------- */
+
+.portal-shell {
+  display: flex;
+  flex-direction: column;
   min-height: 100vh;
-  color: #24334b;
-  background: #f3f6fb;
-  font: 14px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
-  overflow-wrap: break-word;
 }
 
-.portal-root .portal-shell { display: grid; grid-template-columns: 224px minmax(0, 1fr); min-height: 100vh; }
-.portal-root .portal-sidebar { display: flex; flex-direction: column; padding: 30px 18px; background: #17283f; color: #fff; }
-.portal-root .portal-brand { display: flex; align-items: center; margin-bottom: 40px; }
-.portal-root .portal-mark { display: grid; place-items: center; width: 42px; height: 42px; margin-right: 12px; border-radius: 12px; background: #4268ce; font-weight: 700; letter-spacing: 1px; flex-shrink: 0; }
-.portal-root .portal-brand-name { margin: 0; font-size: 19px; font-weight: 650; }
-.portal-root .portal-brand-caption { margin: 2px 0 0; font-size: 11px; color: #b6c5d9; }
-.portal-root .portal-nav-caption { margin: 0 12px 12px; color: #afbed1; font-size: 12px; letter-spacing: 2px; }
-.portal-root .portal-nav { display: flex; flex-direction: column; }
-.portal-root .portal-nav-link { display: block; padding: 11px 16px; margin-bottom: 6px; border-radius: 8px; color: #c9d4e4; text-decoration: none; }
-.portal-root .portal-nav-link:hover { background: #223a57; color: #fff; }
-.portal-root .portal-nav-link[aria-current="page"] { background: #304f78; color: #fff; box-shadow: inset 3px 0 #8aafff; }
-.portal-root .portal-sidebar-footer { margin: auto 12px 0; padding-top: 36px; color: #afbed1; font-size: 12px; }
-.portal-root .portal-workspace { min-width: 0; }
-.portal-root .portal-topbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; min-height: 68px; padding: 10px 32px; box-sizing: border-box; background: #fff; border-bottom: 1px solid #e1e7f0; }
-.portal-root .portal-topbar-title { font-weight: 600; }
-.portal-root .portal-preview-note { display: flex; flex-direction: column; padding: 14px 32px; background: #fff6e3; border-bottom: 1px solid #eadbbc; color: #765217; font-size: 13px; }
-.portal-root .portal-content { width: 100%; max-width: 1180px; padding: 32px; box-sizing: border-box; }
-.portal-root .portal-eyebrow { margin: 0 0 8px; color: #52678a; font-size: 12px; font-weight: 600; letter-spacing: 1px; }
-.portal-root .portal-title { margin: 0 0 10px; font-size: 28px; line-height: 1.35; letter-spacing: -0.5px; }
-.portal-root .portal-copy { margin: 10px 0; color: #56677e; }
-.portal-root .portal-panel { margin-top: 24px; background: #fff; border: 1px solid #e0e7f1; border-radius: 12px; box-shadow: 0 4px 18px rgba(31, 54, 85, 0.025); }
-.portal-root .portal-panel-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; padding: 18px 24px; border-bottom: 1px solid #edf0f6; }
-.portal-root .portal-section-title { margin: 0; font-size: 16px; font-weight: 650; }
-.portal-root .portal-badge { padding: 3px 10px; border-radius: 5px; background: #eff2f7; color: #56677e; font-size: 12px; }
-.portal-root .portal-empty { padding: 44px 24px; text-align: center; }
-.portal-root .portal-empty-symbol { display: inline-grid; place-items: center; width: 52px; height: 52px; border: 1px dashed #b4c4db; border-radius: 12px; background: #f6f8fc; color: #61789a; font-size: 26px; }
-.portal-root .portal-empty-title { margin: 20px 0 8px; font-size: 17px; }
-.portal-root .portal-footnote { margin: 12px 0 0; color: #64748b; font-size: 12px; }
-.portal-root .portal-summary { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; padding: 22px 24px; }
-.portal-root .portal-link { display: inline-block; padding: 6px 0; color: #315abe; text-decoration: underline; text-underline-offset: 3px; }
-.portal-root .portal-status-list { margin: 0; padding: 0 24px; }
-.portal-root .portal-status-row { display: grid; grid-template-columns: minmax(170px, 1fr) minmax(0, 2fr); padding: 20px 0; border-bottom: 1px solid #edf0f6; }
-.portal-root .portal-status-row:last-child { border-bottom: 0; }
-.portal-root .portal-status-name { font-weight: 600; }
-.portal-root .portal-status-description { margin: 0; color: #56677e; }
-.portal-root .portal-entry { display: grid; place-items: center; min-height: 100vh; padding: 32px 20px; box-sizing: border-box; background: radial-gradient(ellipse at top left, #e7eefb, transparent 65%); }
-.portal-root .portal-login-card { width: 100%; max-width: 460px; padding: 36px; box-sizing: border-box; border: 1px solid #e0e7f1; border-radius: 16px; background: #fff; box-shadow: 0 16px 56px rgba(33, 61, 102, 0.07); }
-.portal-root .portal-notice { margin: 24px 0; padding: 16px; border: 1px solid #eadbbc; border-radius: 8px; background: #fff8e9; color: #765217; font-size: 13px; }
-.portal-root .portal-form { display: flex; flex-direction: column; margin: 24px 0; }
-.portal-root .portal-label { margin-bottom: 8px; font-weight: 600; }
-.portal-root .portal-input { width: 100%; height: 44px; margin-bottom: 18px; padding: 0 12px; box-sizing: border-box; border: 1px solid #dbe2ed; border-radius: 7px; font: inherit; }
-.portal-root .portal-input:disabled { background: #f5f7fa; color: #64748b; opacity: 1; cursor: not-allowed; -webkit-text-fill-color: #64748b; }
-.portal-root .portal-input::placeholder { color: #64748b; opacity: 1; }
-.portal-root .portal-button { min-height: 44px; padding: 10px 16px; border: 0; border-radius: 7px; font: inherit; font-weight: 600; }
-.portal-root .portal-button:disabled { background: #e4e9f1; color: #53647c; cursor: not-allowed; opacity: 1; }
-.portal-root .portal-preview-link { display: block; padding: 10px 16px; border: 1px solid #c5d3ed; border-radius: 7px; background: #f4f7fd; color: #315abe; text-align: center; text-decoration: none; font-weight: 600; }
-.portal-root .portal-preview-link:hover { background: #eaf0fc; }
-.portal-root .portal-actions { display: flex; flex-direction: column; align-items: stretch; text-align: center; }
-.portal-root .portal-actions .portal-link { margin-top: 12px; }
-.portal-root .portal-skip { position: absolute; left: 16px; top: -100px; padding: 10px 16px; z-index: 1; border-radius: 6px; background: #fff; color: #24334b; }
-.portal-root .portal-skip:focus { top: 12px; }
-.portal-root .portal-link:focus,
-.portal-root .portal-nav-link:focus,
-.portal-root .portal-preview-link:focus,
-.portal-root .portal-skip:focus { outline: 3px solid #6c92e6; outline-offset: 3px; }
-
-@media (max-width: 760px) {
-  .portal-root .portal-shell { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; }
-  .portal-root .portal-sidebar { padding: 20px 16px 12px; }
-  .portal-root .portal-brand { margin-bottom: 18px; }
-  .portal-root .portal-nav-caption,
-  .portal-root .portal-sidebar-footer { display: none; }
-  .portal-root .portal-nav { flex-direction: row; flex-wrap: wrap; }
-  .portal-root .portal-nav-link { margin-right: 8px; }
-  .portal-root .portal-topbar { padding: 12px 20px; }
-  .portal-root .portal-preview-note { padding: 14px 20px; }
-  .portal-root .portal-content { padding: 24px 20px; }
-  .portal-root .portal-title { font-size: 25px; }
-  .portal-root .portal-status-row { grid-template-columns: minmax(0, 1fr); }
-  .portal-root .portal-status-description { margin-top: 8px; }
+@media (min-width: 768px) {
+  .portal-shell {
+    max-width: 480px;
+    margin: 0 auto;
+    background: var(--common_bg_color, #f2f2f6);
+    box-shadow: 0 0 24px rgba(0, 0, 0, 0.06);
+  }
 }
 
-@media (max-width: 400px) {
-  .portal-root .portal-entry { padding: 20px 12px; }
-  .portal-root .portal-login-card { padding: 24px 20px; }
-  .portal-root .portal-content { padding: 24px 14px; }
-  .portal-root .portal-panel-header,
-  .portal-root .portal-summary { padding: 18px; }
-  .portal-root .portal-empty { padding: 32px 18px; }
+.portal-topbar {
+  padding: 14px 16px 20px;
+  color: #fff;
+  background: linear-gradient(
+    180deg,
+    var(--common_blue1_color, #007fff) 0%,
+    var(--common_blue1_hover_color, #389bff) 100%
+  );
+}
+
+.portal-topbar__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.portal-topbar__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.portal-topbar__logo {
+  display: inline-flex;
+  font-size: 22px;
+}
+
+.portal-topbar__meta {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.portal-topbar__user {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 12px;
+  color: #fff;
+  font-size: 12px;
+}
+
+.portal-topbar__title {
+  margin: 14px 0 0;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.portal-topbar__subtitle {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.portal-notice {
+  padding: 8px 12px 0;
+}
+
+.portal-main {
+  flex: 1;
+  padding: 12px 12px 120px;
+}
+
+/* 底部导航：钉钉 TabBar 为浮动胶囊样式，这里只负责把它固定在视口底部 */
+.portal-tabbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 100;
+}
+
+@media (min-width: 768px) {
+  .portal-tabbar {
+    left: 50%;
+    right: auto;
+    width: 480px;
+    transform: translateX(-50%);
+  }
+}
+
+.portal-tabbar .dtm-tabbar {
+  padding-bottom: calc(16px + env(safe-area-inset-bottom));
+}
+
+/* ---------------- 通用区块 ---------------- */
+
+.portal-section {
+  margin-top: 16px;
+}
+
+.portal-section:first-child {
+  margin-top: 4px;
+}
+
+.portal-section__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 4px 8px;
+}
+
+.portal-section__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.portal-section__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 13px;
+}
+
+.portal-card {
+  padding: 12px;
+  background: var(--common_bg_z1_color, #fff);
+  border-radius: var(--common_border_radius_l, 8px);
+}
+
+.portal-note-text {
+  margin: 8px 4px 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--common_gray1_color, #878f95);
+}
+
+/* 应用图标：钉钉工作台风格的圆角图标瓦片，配色跟随应用自身的色调 */
+.portal-appicon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  font-size: 24px;
+  color: var(--common_blue1_color, #007fff);
+  background: var(--common_blue3_color, rgba(0, 127, 255, 0.12));
+  border-radius: var(--common_border_radius_l, 8px);
+}
+
+.portal-appicon--sm {
+  width: 36px;
+  height: 36px;
+  font-size: 20px;
+}
+
+.portal-appicon--violet {
+  color: #7b5bf5;
+  background: rgba(123, 91, 245, 0.12);
+}
+
+.portal-appicon--cyan {
+  color: #12a5b8;
+  background: rgba(18, 165, 184, 0.12);
+}
+
+.portal-appicon--emerald {
+  color: #12a66a;
+  background: rgba(18, 166, 106, 0.12);
+}
+
+.portal-appicon--amber {
+  color: #e08119;
+  background: rgba(224, 129, 25, 0.12);
+}
+
+.portal-appicon--rose {
+  color: #e5484d;
+  background: rgba(229, 72, 77, 0.12);
+}
+
+.portal-appicon--slate {
+  color: #6e7b87;
+  background: rgba(110, 123, 135, 0.12);
+}
+
+/* 工作台问候卡 */
+.portal-greeting {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.portal-greeting__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.portal-greeting__title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.portal-greeting__sub {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--common_gray1_color, #878f95);
+}
+
+/* 应用列表项：名称 + 一句话介绍 */
+.portal-approw__name {
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.portal-approw__brief {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--common_gray1_color, #878f95);
+}
+
+/* ---------------- 应用市场 ---------------- */
+
+/* 搜索条自带 8px 内边距，这里让它铺满内容区宽度，视觉上更接近原生搜索头 */
+.portal-market__toolbar {
+  margin: 0 -12px;
+}
+
+.portal-market__filters {
+  display: flex;
+  padding: 10px 12px 0;
+}
+
+.portal-market__count {
+  margin: 12px 4px 0;
+  font-size: 12px;
+  color: var(--common_gray1_color, #878f95);
+}
+
+/* ---------------- 应用详情抽屉 ---------------- */
+
+.portal-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 16px 24px;
+}
+
+.portal-detail__note {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.portal-detail__note-text {
+  margin: 0;
+  padding: 0 4px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--common_gray1_color, #878f95);
+}
+
+.portal-detail__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.portal-detail__head-name {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.portal-detail__head-sub {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--common_gray1_color, #878f95);
+}
+
+.portal-detail__section-title {
+  margin: 4px 4px 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.portal-detail__foot {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+/* ---------------- 功能进展 ---------------- */
+
+.portal-progress__lead {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--common_gray1_color, #878f95);
+}
+
+/* ---------------- 登录页 ---------------- */
+
+.portal-login {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--common_bg_color, #f2f2f6);
+}
+
+.portal-login__hero {
+  padding: 44px 24px 60px;
+  color: #fff;
+  background: linear-gradient(
+    180deg,
+    var(--common_blue1_color, #007fff) 0%,
+    var(--common_blue1_hover_color, #389bff) 100%
+  );
+}
+
+.portal-login__logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  font-size: 32px;
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 16px;
+}
+
+.portal-login__brand {
+  margin: 16px 0 4px;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.portal-login__slogan {
+  margin: 0;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.portal-login__points {
+  display: grid;
+  gap: 10px;
+  margin: 20px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.portal-login__points li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.portal-login__panel {
+  margin: -36px 12px 24px;
+  padding: 20px 16px 16px;
+  background: var(--common_bg_z1_color, #fff);
+  border-radius: var(--common_border_radius_l, 8px);
+  box-shadow: var(--common_box_shadow_s__box, 0 2px 8px rgba(0, 0, 0, 0.06));
+}
+
+.portal-login__title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.portal-login__desc {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--common_gray1_color, #878f95);
+}
+
+.portal-login__notice {
+  margin-top: 12px;
+}
+
+.portal-login__form {
+  margin-top: 8px;
+}
+
+.portal-login__divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 16px 0 12px;
+  font-size: 12px;
+  color: var(--common_gray1_color, #878f95);
+}
+
+.portal-login__divider::before,
+.portal-login__divider::after {
+  flex: 1;
+  height: 1px;
+  background: var(--common_line_light_color, rgba(126, 134, 142, 0.16));
+  content: "";
+}
+
+.portal-login__preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 0;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.portal-login__foot {
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--common_gray1_color, #878f95);
+  text-align: center;
+}
+
+/* ---------------- 兜底页 ---------------- */
+
+.portal-fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  min-height: 100vh;
+  padding: 48px 24px;
+  background: var(--common_bg_color, #f2f2f6);
+}
+
+.portal-fallback__title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.portal-fallback__copy {
+  margin: 0;
+  max-width: 400px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--common_gray1_color, #878f95);
+  text-align: center;
+}
+
+.portal-fallback__actions {
+  display: flex;
+  gap: 10px;
+}
+
+.portal-fallback__note {
+  width: 100%;
+  max-width: 400px;
 }
