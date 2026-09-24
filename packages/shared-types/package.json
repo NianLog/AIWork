@@ -1,0 +1,14 @@
+{
+  "name": "@ai-portal/shared-types",
+  "version": "0.1.0",
+  "private": true,
+  "description": "权限码、应用清单、SDK 接口的 TS 类型定义（单一真源）",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  }
+}

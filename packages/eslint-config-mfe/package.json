@@ -1,0 +1,15 @@
+{
+  "name": "@ai-portal/eslint-config-mfe",
+  "version": "0.1.0",
+  "private": true,
+  "description": "子应用宿主边界与敏感操作的基础 ESLint 规则",
+  "main": "index.cjs",
+  "exports": "./index.cjs",
+  "scripts": {
+    "lint": "eslint index.cjs tests --ext .cjs",
+    "test": "node --test tests/config.test.cjs"
+  },
+  "peerDependencies": {
+    "eslint": "^8.57.0"
+  }
+}

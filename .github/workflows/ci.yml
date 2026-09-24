@@ -1,0 +1,79 @@
+name: 工程校验
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: 校验 / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: 检出源码
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: 记录锁文件状态
+        id: lockfile
+        env:
+          HAS_LOCKFILE: ${{ hashFiles('pnpm-lock.yaml') != '' }}
+        run: printf 'present=%s\n' "$HAS_LOCKFILE" >> "$GITHUB_OUTPUT"
+
+      - name: 配置 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: 配置固定版本 pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: 按锁文件安装
+        if: steps.lockfile.outputs.present == 'true'
+        run: pnpm install --frozen-lockfile
+
+      - name: 首次安装并生成待提交锁文件
+        if: steps.lockfile.outputs.present != 'true'
+        run: |
+          echo "::warning::尚未提交 pnpm-lock.yaml，本轮依赖不可严格复现；请验证并提交导出的锁文件。"
+          pnpm install --no-frozen-lockfile
+
+      - name: 类型检查
+        run: pnpm typecheck
+
+      - name: ESLint 检查
+        run: pnpm lint
+
+      - name: 单元测试
+        run: pnpm test
+
+      - name: 构建双前端
+        run: pnpm build
+
+      - name: 导出首次生成的锁文件
+        if: ${{ always() && steps.lockfile.outputs.present != 'true' && hashFiles('pnpm-lock.yaml') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: pnpm-lock-${{ matrix.os }}
+          path: pnpm-lock.yaml
+          if-no-files-found: error
+          retention-days: 7
