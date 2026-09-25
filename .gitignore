@@ -45,3 +45,9 @@ id_ed25519
 # 本地会话导出不进入协作仓库
 /读取开发引导文档并确认开放项_*.json
 /.superpowers/
+
+# DDE 看板生成产物（模板在 assets/agent-notes-board.html，勿提交生成副本）
+/board.html
+
+# Claude Code 本机技能软链等本地配置
+/.claude/
