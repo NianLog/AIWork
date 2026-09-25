@@ -1,0 +1,11 @@
+{
+  "name": "@ai-portal/ui-tokens",
+  "version": "0.1.0",
+  "private": true,
+  "description": "门户与后台共用的版式、间距与动效规范（CSS 自定义属性单一真源）",
+  "exports": {
+    "./tokens.css": "./tokens.css",
+    "./base.css": "./base.css",
+    "./components.css": "./components.css"
+  }
+}

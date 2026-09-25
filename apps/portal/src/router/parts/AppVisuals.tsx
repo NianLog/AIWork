@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react';
-import { Tag } from 'dingtalk-design-mobile';
 import {
-  FaceOutlined,
+  AppletOutlined,
   FolderOpenOutlined,
   PictureOutlined,
   RadarOutlined,
@@ -24,25 +23,30 @@ const APP_ICONS: Record<DemoApp['iconKey'], ReactNode> = {
   radar: <RadarOutlined />,
   sparkles: <WriteEditOutlined />,
   layers: <FolderOpenOutlined />,
-  zap: <FaceOutlined />,
+  zap: <AppletOutlined />,
 };
 
+/** 色调映射：与 ui-tokens/components.css 里的 .ui-tone-* 一一对应，色值只在令牌里写一次。 */
 const TONE_CLASS: Record<DemoApp['tileTone'], string> = {
   brand: '',
-  violet: 'portal-appicon--violet',
-  cyan: 'portal-appicon--cyan',
-  emerald: 'portal-appicon--emerald',
-  amber: 'portal-appicon--amber',
-  rose: 'portal-appicon--rose',
-  slate: 'portal-appicon--slate',
+  violet: 'ui-tone-violet',
+  cyan: 'ui-tone-cyan',
+  emerald: 'ui-tone-emerald',
+  amber: 'ui-tone-amber',
+  rose: 'ui-tone-rose',
+  slate: 'ui-tone-slate',
 };
 
-export function AppIconTile({ app, size = 'md' }: { app: DemoApp; size?: 'md' | 'sm' }) {
+export function AppIconTile({
+  app,
+  size = 'm',
+}: {
+  app: DemoApp;
+  size?: 's' | 'm' | 'l';
+}) {
   return (
     <span
-      className={`portal-appicon ${TONE_CLASS[app.tileTone]} ${
-        size === 'sm' ? 'portal-appicon--sm' : ''
-      }`.trim()}
+      className={`ui-tile ui-tile--${size} ${TONE_CLASS[app.tileTone]}`.trim()}
       aria-hidden="true"
     >
       {APP_ICONS[app.iconKey]}
@@ -53,22 +57,10 @@ export function AppIconTile({ app, size = 'md' }: { app: DemoApp; size?: 'md' | 
 /** 状态标签：把发布通道翻译成业务用户能直接看懂的三种描述。 */
 export function AppStatusTag({ app }: { app: DemoApp }) {
   if (app.status !== 1 || app.channel === 'paused') {
-    return (
-      <Tag size="small" color="default">
-        已停用
-      </Tag>
-    );
+    return <span className="ui-badge">已停用</span>;
   }
   if (app.channel === 'canary') {
-    return (
-      <Tag size="small" color="warning" fill="outline">
-        试运行
-      </Tag>
-    );
+    return <span className="ui-badge ui-badge--warning">试运行</span>;
   }
-  return (
-    <Tag size="small" color="success" fill="outline">
-      正式版
-    </Tag>
-  );
+  return <span className="ui-badge ui-badge--success">正式版</span>;
 }

@@ -3,6 +3,7 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import App from './App';
+import { WIDE_QUERY } from './shell/useMediaQuery';
 import { DEMO_DISCLOSURE, DEMO_SESSION_LABEL } from './store/demoCatalog';
 
 /**
@@ -145,9 +146,9 @@ describe('门户体验界面', () => {
     }
   });
 
-  it('底部导航覆盖工作台、应用市场与功能进展，切换后披露仍在场', () => {
+  it('主导航覆盖工作台、应用市场与功能进展，切换后披露仍在场', () => {
     openPortal('/preview');
-    const navigation = screen.getByRole('navigation', { name: '底部导航' });
+    const navigation = screen.getByRole('navigation', { name: '主导航' });
 
     expect(
       within(navigation)
@@ -162,7 +163,7 @@ describe('门户体验界面', () => {
     ];
 
     for (const [tabName, headingName] of tabs) {
-      const currentNav = screen.getByRole('navigation', { name: '底部导航' });
+      const currentNav = screen.getByRole('navigation', { name: '主导航' });
       fireEvent.click(within(currentNav).getByText(tabName));
       expect(screen.getByRole('heading', { level: 1, name: headingName })).toBeTruthy();
       expect(allNotes().join('\n')).toContain(DEMO_SESSION_LABEL);
@@ -240,25 +241,62 @@ describe('演示应用不可被当成真实子应用', () => {
     expect(window.location.pathname).toBe('/preview/market');
   });
 
-  it('应用详情抽屉只读，打开应用的按钮永久禁用', () => {
+  it('应用详情浮层可打开应用工作区，工作区里没有任何门户导航', () => {
     openPortal('/preview/market');
     const listRegion = screen.getByRole('region', { name: '应用列表' });
 
     fireEvent.click(within(listRegion).getByText('AI 商品图生成'));
 
-    const drawer = screen.getByRole('dialog', { name: 'AI 商品图生成 应用详情' });
-    expect(drawer.textContent).toContain(DEMO_DISCLOSURE);
-    expect(drawer.textContent).toContain('视觉算法组');
-    expect(drawer.textContent).toContain('创建生图任务');
-    expect(within(drawer).queryAllByRole('link')).toHaveLength(0);
+    const panel = screen.getByRole('dialog', { name: 'AI 商品图生成 应用详情' });
+    expect(panel.getAttribute('aria-modal')).toBe('true');
+    expect(panel.textContent).toContain(DEMO_DISCLOSURE);
+    expect(panel.textContent).toContain('视觉算法组');
+    expect(panel.textContent).toContain('创建生图任务');
+    // 浮层内不出现链接：打开应用靠按钮跳转，避免与遮罩状态冲突的「新标签打开」
+    expect(within(panel).queryAllByRole('link')).toHaveLength(0);
 
-    const openApp = within(drawer).getByRole('button', { name: /打开应用/ });
-    expect(openApp.getAttribute('aria-disabled')).toBe('true');
-    fireEvent.click(openApp);
-    expect(window.location.pathname).toBe('/preview/market');
+    /*
+     * 「打开应用」由 2026-09-25 的决策改为可用：子应用工作区已经存在，
+     * 原来「不存在任何通往子应用的路径」这条前提不再成立。
+     * 保护的性质换了一条，但没有丢：现在要断言的是**工作区里没有任何门户导航**，
+     * 即子应用打开后确实是全屏接管，而不是嵌在门户框架里。
+     */
+    fireEvent.click(within(panel).getByRole('button', { name: /打开应用/ }));
+    expect(window.location.pathname).toBe('/apps/ai-image-gen');
 
-    fireEvent.click(within(drawer).getByRole('button', { name: '关闭' }));
+    // 全屏工作区：只有一条返回入口，门户的三个导航入口一个都不在
+    expect(screen.queryByRole('navigation', { name: '主导航' })).toBeNull();
+    expect(screen.getByRole('heading', { level: 1, name: 'AI 商品图生成' })).toBeTruthy();
+    expect(externalHrefs()).toEqual([]);
+    expectBusinessLanguage();
+  });
+
+  it('应用工作区可以退回工作台，关闭浮层后详情不再存在', () => {
+    openPortal('/preview/market');
+    const listRegion = screen.getByRole('region', { name: '应用列表' });
+
+    fireEvent.click(within(listRegion).getByText('AI 商品图生成'));
+    const panel = screen.getByRole('dialog', { name: 'AI 商品图生成 应用详情' });
+
+    expect(panel.textContent).toContain('视觉算法组');
+    /*
+     * 浮层有两个关闭入口：标题栏右上角的图标按钮（可访问名「关闭」）与底部的文字按钮。
+     * 这是有意的——图标是熟手的快捷方式，文字按钮是明确出口。测试点底部那个。
+     */
+    fireEvent.click(within(panel.querySelector('.overlay__foot') as HTMLElement).getByRole('button', { name: '关闭' }));
     expect(screen.queryByRole('dialog')).toBeNull();
+    expect(window.location.pathname).toBe('/preview/market');
+  });
+
+  it('未知应用编号落在应用工作区的兜底页，不自动跳进任何应用', () => {
+    openPortal('/apps/这个应用不存在');
+
+    expect(screen.getByRole('heading', { level: 1, name: '这个应用不存在' })).toBeTruthy();
+    expect(allNotes().join('\n')).toContain(DEMO_DISCLOSURE);
+    expectBusinessLanguage();
+
+    fireEvent.click(screen.getByRole('link', { name: '返回工作台' }));
+    expect(window.location.pathname).toBe('/preview');
   });
 
   it('全站不存在外部链接，演示 entry 不可能被导航到', () => {
@@ -289,5 +327,52 @@ describe('未知地址', () => {
     fireEvent.click(screen.getByRole('button', { name: '返回登录页' }));
     expect(window.location.pathname).toBe('/login');
     expect(screen.getByRole('heading', { name: '登录 AI 中台' })).toBeTruthy();
+  });
+});
+
+/**
+ * 宽屏分支（电脑版钉钉 / 宽窗口）。
+ *
+ * 默认垫片的 matchMedia 恒为 false，前面所有用例都跑在窄屏分支；这里是唯一把媒体查询
+ * 切成宽屏的用例，锁两条渲染约定：顶栏只渲染三个入口；当前入口不得出现第二份。
+ *
+ * 版式重构后宽屏导航不再用组件库 Tabs（它收到 children 时会把当前项再吐一份到内容面板，
+ * 所以过去要断言 .dtm-tab-content 为空）。现在两种形态都是同一个 <nav> 里的 <Link> 列表，
+ * 结构上不可能再有内容面板，于是这里改成断言「每个入口恰好一个可点元素」——
+ * 保护的性质没变，只是不再绑组件库的内部类名。
+ */
+describe('宽屏顶栏导航', () => {
+  const nativeMatchMedia = window.matchMedia;
+
+  afterEach(() => {
+    window.matchMedia = nativeMatchMedia;
+  });
+
+  it('三个入口各出现一次，导航里没有内容面板的重复项', () => {
+    // 只把宽屏断点置为命中，其余查询（组件库的响应式观察）保持不命中
+    window.matchMedia = ((query: string) =>
+      ({
+        media: query,
+        matches: query === WIDE_QUERY,
+        onchange: null,
+        addListener: () => {},
+        removeListener: () => {},
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        dispatchEvent: () => false,
+      }) as unknown as MediaQueryList) as typeof window.matchMedia;
+
+    openPortal('/preview');
+
+    const navigation = screen.getByRole('navigation', { name: '主导航' });
+    expect(within(navigation).getAllByText(/^(工作台|应用市场|功能进展)$/)).toHaveLength(3);
+    // 每个入口恰好一个可点元素：多出来的那一份会是内容面板里重复渲染的当前项
+    expect(within(navigation).getAllByRole('link')).toHaveLength(3);
+
+    // 切页后入口仍然只有一份
+    fireEvent.click(within(navigation).getByText('应用市场'));
+    expect(window.location.pathname).toBe('/preview/market');
+    expect(within(navigation).getAllByText(/^(工作台|应用市场|功能进展)$/)).toHaveLength(3);
+    expect(within(navigation).getAllByRole('link')).toHaveLength(3);
   });
 });

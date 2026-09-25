@@ -1,579 +1,626 @@
 /*
  * AI 中台管理后台的版式补充样式。
  *
- * 视觉语言来自钉钉组件库：颜色、圆角、字号、组件外观由 dingtalk-design-desktop
- * 与 dingtalk-theme（pc 令牌）决定，本文件只处理后台独有的骨架——侧栏、顶栏、
- * 页面标题区、统计卡、工具条、表单栅格与登录页。凡涉及颜色一律引用主题变量，
- * 不另造色板。
+ * 分工：重置、字体、焦点、动效底座在 ui-tokens/base.css；跨应用共用的结构件在
+ * ui-tokens/components.css；本文件只写后台独有的骨架——侧栏、顶栏、披露条与页标题行、
+ * 统计卡、工具条、表单栅格、登录页、窄屏抽屉。
  *
- * 排版间距这里使用 flex/grid 的 gap：钉钉桌面组件库自身的样式也依赖 gap，
- * 沿用它可以和组件保持同一套节奏（这一取舍取代了早期「禁用 flex gap」的兼容红线，
- * 理由见 .agents/notes 里的架构笔记）。
+ * 颜色一律取 ui-tokens/tokens.css 里的 --ui-* 令牌，本文件不出现任何色值字面量。
+ *
+ * 密度目标（「外框架极具紧凑感、信息密度高、占位小」）：
+ *   侧栏 200px、顶栏 48px、披露条与页标题共用一行 36px、内容区上留白 16px。
+ *   上一版是侧栏 240px + 顶栏 56px + 提示条 64px + 页头 56px，内容从第 176px 才开始。
  */
 
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-}
-
-html,
-body,
-#root {
-  min-height: 100%;
-}
-
-body {
-  margin: 0;
-  background: var(--common_bg_color, #f2f2f6);
-  color: var(--common_level1_base_color, #171a1d);
-  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue",
-    "Microsoft YaHei", sans-serif;
-  font-size: 14px;
-  line-height: 1.5;
-  -webkit-font-smoothing: antialiased;
-}
-
-a {
-  color: var(--common_blue1_color, #007fff);
-  text-decoration: none;
-}
-
-/* 键盘用户跳过导航直达内容 */
-.admin-skip-link {
-  position: absolute;
-  left: -9999px;
-  top: 0;
-}
-
-.admin-skip-link:focus {
-  left: 12px;
-  top: 12px;
-  z-index: 1001;
-  padding: 8px 12px;
-  background: var(--common_bg_z1_color, #fff);
-  border-radius: var(--common_border_radius_m, 6px);
-  box-shadow: var(--common_box_shadow_m__box-shadow, 0 8px 24px rgba(0, 0, 0, 0.16));
-}
-
-/* 仅供读屏软件的文本 */
-.admin-visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  padding: 0;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
 /* ======================================================================
-   后台骨架：侧栏 + 主区
+   骨架
    ====================================================================== */
 
-.admin-layout {
+.admin-shell {
+  display: flex;
   min-height: 100vh;
-  background: var(--common_bg_color, #f2f2f6);
+  background: var(--ui-surface-sunken);
 }
 
 .admin-main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
   min-width: 0;
 }
 
-/* Sider 的宽度走组件内联样式，这里只负责定位与分隔线 */
-.admin-sider {
-  position: sticky;
-  top: 0;
-  height: 100vh;
-  overflow-y: auto;
-  background: var(--common_bg_z1_color, #fff);
-  border-right: 1px solid var(--common_line_light_color, rgba(126, 134, 142, 0.16));
-}
+/* ======================================================================
+   侧栏
+   ====================================================================== */
 
-.admin-sider .dtd-menu {
-  padding: 4px 8px 20px;
-  border-right: 0;
-  background: transparent;
+.admin-sider {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  /*
+   * 200px 而不是常用的 240px：后台的菜单项最长是「应用发布」四个字，
+   * 200px 足够放下图标 + 四字 + 左右内边距，还多出 40px 留给内容区。
+   */
+  width: 200px;
+  background: var(--ui-surface);
+  border-right: 1px solid var(--ui-line);
 }
 
 .admin-brand {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 18px 20px 14px;
-  border-bottom: 1px solid var(--common_line_light_color, rgba(126, 134, 142, 0.16));
+  gap: var(--ui-space-3);
+  flex: none;
+  min-height: 48px;
+  padding: var(--ui-space-2) var(--ui-space-4);
+  border-bottom: 1px solid var(--ui-line);
 }
 
 .admin-brand__logo {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   flex: none;
-  width: 36px;
-  height: 36px;
-  border-radius: var(--common_border_radius_l, 8px);
-  background: linear-gradient(135deg, var(--common_blue1_color, #007fff), #4facfe);
-  color: var(--common_white1_color, #fff);
-  font-size: 20px;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--ui-radius-m);
+  background: var(--ui-brand);
+  color: var(--ui-brand-ink);
+  font-size: var(--ui-font-base);
+  line-height: var(--ui-leading-none);
 }
 
 .admin-brand__text {
   display: flex;
   flex-direction: column;
+  /* 品牌名与副行之间 2px：两行都是小字，靠字重与颜色区分层次，不靠间距 */
+  gap: 2px;
   min-width: 0;
 }
 
 .admin-brand__name {
-  font-size: 15px;
-  font-weight: 600;
-  line-height: 1.4;
-  color: var(--common_level1_base_color, #171a1d);
+  font-size: var(--ui-font-sm);
+  font-weight: var(--ui-weight-semibold);
+  /* 原来是 line-height: normal，11~13px 的字行盒只有 1.15 倍，两行会粘住。
+     统一抬到 1.4（见 tokens.css 的行高底线）。 */
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-strong);
+  white-space: nowrap;
 }
 
 .admin-brand__desc {
-  margin-top: 2px;
-  font-size: 12px;
-  line-height: 1.4;
-  color: var(--common_level3_base_color, rgba(23, 26, 29, 0.4));
+  font-size: var(--ui-font-2xs);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-/* 侧栏收窄时只留图标 */
-.dtd-layout-sider-collapsed .admin-brand {
-  padding: 18px 0 14px;
+/* 侧栏关闭按钮只在窄屏抽屉形态下出现 */
+.admin-sider__close {
+  display: none;
+  align-items: center;
   justify-content: center;
+  flex: none;
+  margin-left: auto;
+  width: var(--ui-control-m);
+  height: var(--ui-control-m);
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: var(--ui-radius-m);
+  cursor: pointer;
+  color: var(--ui-text-soft);
+  font-size: var(--ui-font-md);
+  line-height: var(--ui-leading-none);
+  transition: var(--ui-transition-colors);
 }
 
-.dtd-layout-sider-collapsed .admin-brand__text {
+/* 状态审计（hover-debug）实测这个按钮原本悬停零反馈：它是窄屏唯一的关抽屉入口，必须看得见 */
+@media (any-hover: hover) {
+  .admin-sider__close:hover {
+    background: var(--ui-surface-hover);
+    color: var(--ui-text-strong);
+  }
+}
+
+.admin-menu {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--ui-space-2) var(--ui-space-2) var(--ui-space-4);
+}
+
+/*
+ * 收敛组件库 Menu 的度量：默认分组标题与条目之间、条目与条目之间都是 8~12px，
+ * 在 200px 宽的侧栏里显得松散。这里收到 2px / 4px，并把行高压到 34px。
+ */
+.admin-menu .dtd-menu-item-group-title {
+  padding: var(--ui-space-3) var(--ui-space-3) var(--ui-space-1);
+  font-size: var(--ui-font-2xs);
+  font-weight: var(--ui-weight-medium);
+  /* 全大写/小号标签需要字距才不显挤 */
+  letter-spacing: var(--ui-tracking-wide);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-soft);
+}
+
+.admin-menu .dtd-menu-item {
+  height: 34px;
+  margin: 2px 0;
+  border-radius: var(--ui-radius-m);
+  font-size: var(--ui-font-sm);
+  line-height: var(--ui-leading-tight);
+}
+
+.admin-menu .dtd-menu-item-selected {
+  background: var(--ui-brand-soft);
+  color: var(--ui-brand-strong);
+  font-weight: var(--ui-weight-medium);
+}
+
+.admin-sider__foot {
+  flex: none;
+  margin: 0;
+  padding: var(--ui-space-3) var(--ui-space-4);
+  border-top: 1px solid var(--ui-line);
+  font-size: var(--ui-font-2xs);
+  line-height: var(--ui-leading-base);
+  color: var(--ui-text-soft);
+}
+
+/* 窄屏抽屉的遮罩：宽屏不存在 */
+.admin-scrim {
   display: none;
 }
 
-/* ---------- 顶栏 ---------- */
+/* ======================================================================
+   顶栏
+   ====================================================================== */
 
 .admin-header {
   display: flex;
   align-items: center;
-  gap: 16px;
-  height: 56px;
-  padding: 0 16px;
-  line-height: 1.5;
-  background: var(--common_bg_z1_color, #fff);
-  border-bottom: 1px solid var(--common_line_light_color, rgba(126, 134, 142, 0.16));
+  justify-content: space-between;
+  gap: var(--ui-space-4);
+  flex: none;
+  position: sticky;
+  top: 0;
+  z-index: var(--ui-z-sticky);
+  min-height: var(--ui-appbar-h);
+  padding-inline: var(--ui-space-5);
+  background: var(--ui-surface);
+  border-bottom: 1px solid var(--ui-line);
 }
 
-.admin-header__crumb {
-  flex: 1;
+.admin-header__left {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-3);
   min-width: 0;
-  font-size: 14px;
+}
+
+/* 导航开关只在窄屏出现 */
+.admin-header__navtoggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: var(--ui-control-l);
+  height: var(--ui-control-l);
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: var(--ui-radius-m);
+  cursor: pointer;
+  color: var(--ui-text);
+  font-size: var(--ui-font-md);
+  line-height: var(--ui-leading-none);
+}
+
+.admin-header__navtoggle:hover {
+  background: var(--ui-surface-hover);
+}
+
+/* 面包屑已经说明了「在哪」，字号压到 12px，不与内容标题抢层级 */
+.admin-header__crumb {
+  font-size: var(--ui-font-xs);
+  line-height: var(--ui-leading-tight);
 }
 
 .admin-header__tools {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--ui-space-3);
   flex: none;
 }
 
 .admin-header__search {
-  width: 220px;
+  width: 200px;
+}
+
+.admin-header__env {
+  flex: none;
+}
+
+.admin-header__divider {
+  flex: none;
+  width: 1px;
+  height: 20px;
+  background: var(--ui-line-strong);
 }
 
 .admin-operator {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 4px 8px 4px 4px;
-  border-radius: var(--common_border_radius_m, 6px);
-  color: inherit;
+  gap: var(--ui-space-2);
+  min-width: 0;
+  /*
+   * 纵向不留内边距：操作人是两行小字（姓名 + 角色）共约 36px，已经够触控高度。
+   * 再加 4px 上下内边距就变成 44px，会把声明 40px 的顶栏顶到 45px——
+   * 「外框占位小」正是被这种逐处几像素的松动累积破坏的。
+   */
+  padding: 0 var(--ui-space-2);
+  /* 两行小字自然高度是 35.99px（行高 1.4 × 13px + 2px + 1.4 × 11px），
+     差 0.01px 就会在触控审计里挂上「矮于 36px」。显式声明最小高度，别让它靠算出来。 */
+  min-height: var(--ui-control-l);
+  border-radius: var(--ui-radius-m);
+  color: var(--ui-text);
+  transition: var(--ui-transition-colors);
 }
 
 .admin-operator:hover {
-  background: var(--common_overlay_area_color, rgba(126, 134, 142, 0.08));
-}
-
-.admin-operator__avatar {
-  flex: none;
-  background: var(--common_blue3_color, rgba(0, 127, 255, 0.12));
-  color: var(--common_blue1_color, #007fff);
-  font-weight: 600;
+  background: var(--ui-surface-hover);
+  color: var(--ui-text-strong);
 }
 
 .admin-operator__text {
   display: flex;
   flex-direction: column;
-  line-height: 1.35;
+  /* 姓名与角色之间 2px：11px 的副行紧贴 13px 主行会糊成一块 */
+  gap: 2px;
+  min-width: 0;
 }
 
 .admin-operator__name {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--common_level1_base_color, #171a1d);
+  font-size: var(--ui-font-sm);
+  font-weight: var(--ui-weight-medium);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-strong);
+  white-space: nowrap;
 }
 
 .admin-operator__role {
-  font-size: 12px;
-  color: var(--common_level3_base_color, rgba(23, 26, 29, 0.4));
-}
-
-/* ---------- 披露条 / 内容 / 页脚 ---------- */
-
-.admin-banner {
-  margin: 12px 16px 0;
-}
-
-.admin-content {
-  width: 100%;
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 16px;
-}
-
-.admin-content:focus {
-  outline: none;
-}
-
-.admin-footnote {
-  margin: 0;
-  padding: 0 16px 24px;
-  font-size: 12px;
-  line-height: 1.7;
-  color: var(--common_level3_base_color, rgba(23, 26, 29, 0.4));
+  font-size: var(--ui-font-2xs);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-soft);
+  white-space: nowrap;
 }
 
 /* ======================================================================
-   页面通用结构
+   内容区：披露条与页标题共用一行
    ====================================================================== */
 
-.admin-pagehead__row {
+.admin-body {
+  flex: 1;
+  min-width: 0;
+  /* 顶栏已经有一条分隔线，这里再堆大留白就是白吃掉首屏 */
+  padding-block: var(--ui-space-4) var(--ui-space-6);
+}
+
+.admin-body__inner {
   display: flex;
-  align-items: flex-start;
-  gap: 16px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: var(--ui-page-gap);
+  width: 100%;
+  max-width: var(--ui-container);
+  margin-inline: auto;
+  padding-inline: var(--ui-gutter);
+}
+
+/*
+ * 披露条 + 页主标题一行。标题靠右、不换行；披露条占剩余宽度，可能折行。
+ * 两者基线对齐，视觉上是一条信息带而不是两个模块。
+ */
+.admin-topline {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--ui-space-4);
+  min-height: 36px;
+  padding-bottom: var(--ui-space-3);
+  border-bottom: 1px solid var(--ui-line);
 }
 
 .admin-pagehead__title {
   margin: 0;
-  font-size: 20px;
-  font-weight: 600;
-  line-height: 1.4;
-  color: var(--common_level1_base_color, #171a1d);
+  flex: none;
+  order: 2;
+  font-size: var(--ui-font-md);
+  font-weight: var(--ui-weight-semibold);
+  line-height: var(--ui-leading-tight);
+  letter-spacing: var(--ui-tracking-tight);
+  color: var(--ui-text-strong);
+  white-space: nowrap;
 }
 
-.admin-pagehead__lead {
-  margin: 6px 0 0;
-  max-width: 760px;
-  font-size: 13px;
-  line-height: 1.7;
-  color: var(--common_level2_base_color, rgba(23, 26, 29, 0.6));
-}
-
-.admin-pagehead__actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-left: auto;
-  flex-wrap: wrap;
-}
-
-.admin-section {
-  margin-top: 16px;
-}
-
-.admin-section__title {
-  margin: 0 0 8px;
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--common_level1_base_color, #171a1d);
-}
-
-/* 统计卡：一行四个，窄屏降级 */
-.admin-stats {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 16px;
-}
-
-.admin-stat__label {
+/*
+ * 披露条：去掉组件库 NoticeBar 的图标、边框、底色与大内边距，收成一行小字。
+ *
+ * 类名前缀是 -notice-bar 而不是 -alert：dingtalk-design-desktop 的 Alert 就是
+ * NoticeBar 的再导出（es/index.js 里 `export { default as Alert } from './notice-bar'`），
+ * DOM 上出现的全是 dtd-notice-bar-*。上一版按 .dtd-alert-* 写，选择器一条都没命中，
+ * 于是提示条保留着组件库的 15px 内边距与卡片底色，390px 下高达 96px——
+ * 这才是「披露条与页标题上下重叠」的真正原因（审计里那个 -126px 的负 gap）。
+ *
+ * 它的语义（role="note" + DEMO_DISCLOSURE + DEMO_EXPLANATION）必须完整保留，
+ * 压缩的只是观感——测试按 role="note" 与两段文案断言它持续在场。
+ */
+.admin-banner {
+  order: 1;
+  flex: 1;
+  min-width: 0;
   margin: 0;
-  font-size: 12px;
-  line-height: 1.6;
-  color: var(--common_level3_base_color, rgba(23, 26, 29, 0.4));
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
 }
 
-.admin-stat__value {
-  margin: 4px 0 0;
-  font-size: 24px;
-  font-weight: 600;
-  line-height: 1.3;
-  color: var(--common_level1_base_color, #171a1d);
-}
-
-/* 卡片内的工具条：搜索 + 状态切换 + 计数 */
-.admin-toolbar {
+.admin-banner.dtd-notice-bar {
   display: flex;
-  align-items: center;
-  gap: 12px;
+  align-items: flex-start;
+  padding: 0;
+}
+
+/* 图标撤掉：一行文字带上图标就会高出 8px，且这里不需要靠图标表达「这是提示」 */
+.admin-banner .dtd-notice-bar-icon {
+  display: none;
+}
+
+.admin-banner .dtd-notice-bar-content {
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  gap: var(--ui-space-2);
   flex-wrap: wrap;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--common_line_light_color, rgba(126, 134, 142, 0.16));
+  padding: 0;
 }
 
-.admin-toolbar__search {
-  width: 260px;
+/*
+ * 解除说明文字的截断。
+ *
+ * 组件库那条规则是 `.dtd-notice-bar-with-description .dtd-notice-bar-description`
+ * （两个类，0,2,0），并且带 display:-webkit-box；只把 -webkit-line-clamp 改回初值是不够的，
+ * 必须把 display 也改回 block，否则内容仍被限制在两行的 -webkit-box 里
+ * （审计报「内容高过盒子且被裁 38<58」就是这个）。
+ * 披露文案被截断等于没披露，所以这里不是「好看一点」，是语义要求。
+ */
+.admin-banner .dtd-notice-bar-message {
+  flex: none;
+  font-size: var(--ui-font-xs);
+  font-weight: var(--ui-weight-medium);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-strong);
 }
 
-.admin-toolbar__count {
-  margin-left: auto;
-  font-size: 12px;
-  color: var(--common_level3_base_color, rgba(23, 26, 29, 0.4));
-}
-
-.admin-toolbar__hint {
-  width: 100%;
-  margin: 0;
-  font-size: 12px;
-  line-height: 1.6;
-  color: var(--common_level3_base_color, rgba(23, 26, 29, 0.4));
-}
-
-/* 表格单元格里的两行文本 */
-.admin-cell-title {
+.admin-banner .dtd-notice-bar-description {
   display: block;
-  font-weight: 500;
-  color: var(--common_level1_base_color, #171a1d);
+  overflow: visible;
+  text-overflow: clip;
+  word-break: break-word;
+  font-size: var(--ui-font-xs);
+  line-height: var(--ui-leading-base);
+  color: var(--ui-text-soft);
 }
 
-.admin-cell-sub {
-  display: block;
-  margin-top: 2px;
-  font-size: 12px;
-  color: var(--common_level3_base_color, rgba(23, 26, 29, 0.4));
-}
-
-/* 一组标签（角色、可用功能） */
-.admin-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-
-.admin-chips .dtd-tag {
-  margin-right: 0;
-}
-
-.admin-num {
-  font-variant-numeric: tabular-nums;
-}
-
-.admin-empty-note {
-  margin: 0;
-  padding: 24px 16px;
-  text-align: center;
-  font-size: 13px;
-  color: var(--common_level3_base_color, rgba(23, 26, 29, 0.4));
-}
-
-/* ======================================================================
-   表单
-   ====================================================================== */
-
-.admin-form-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-}
-
-.admin-field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+.admin-content {
   min-width: 0;
 }
 
-.admin-field--full {
-  grid-column: 1 / -1;
+.admin-content__inner {
+  min-width: 0;
 }
 
-.admin-field__label {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--common_level1_base_color, #171a1d);
+.admin-content:focus,
+.admin-content:focus-visible {
+  outline: none;
 }
 
-.admin-field__label span {
-  margin-left: 6px;
-  font-weight: 400;
-  color: var(--common_level3_base_color, rgba(23, 26, 29, 0.4));
-}
-
-/* 下拉框与数字框默认按内容宽度，放进栅格后要撑满所在列 */
-.admin-field .dtd-select,
-.admin-field .dtd-input-number,
-.admin-field .dtd-input-number-group-wrapper {
-  width: 100%;
-}
-
-.admin-field .dtd-radio-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.admin-form-hint {
-  margin: 0;
-  font-size: 12px;
-  line-height: 1.7;
-  color: var(--common_level3_base_color, rgba(23, 26, 29, 0.4));
-}
-
-.admin-form-actions {
+/* 工具条行：一句说明 + 右侧操作，替代原来的页头 */
+.admin-toolbar-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: space-between;
+  gap: var(--ui-space-4);
   flex-wrap: wrap;
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid var(--common_line_light_color, rgba(126, 134, 142, 0.16));
 }
 
-.admin-form-actions__note {
+.admin-toolbar-row .ui-pagehead__lead {
+  flex: 1;
+  min-width: 240px;
   margin: 0;
-  font-size: 12px;
-  color: var(--common_level3_base_color, rgba(23, 26, 29, 0.4));
 }
 
-/* 可用功能行：功能名称 + 一句话说明 */
+/*
+ * 表格里「从未登录」这类占位值：正常字重 + 次级色，
+ * 与相邻的等宽数字（.ui-num，中等字重 + 主文字色）形成对比——
+ * 一眼能看出哪个是真时间、哪个是「还没有」。
+ * 成员页的最近登录列用三元的 className 切换，所以这个类不会出现在样式表以外的地方。
+ */
+.admin-cell-muted {
+  font-weight: var(--ui-weight-regular);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-soft);
+}
+
+/* ======================================================================
+   权限与范围卡片（角色页、组织页）
+   ====================================================================== */
+
+.admin-perm-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--ui-space-4);
+}
+
+.admin-perm-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-3);
+  padding: var(--ui-space-4);
+  background: var(--ui-surface-deep);
+  border-radius: var(--ui-radius-m);
+}
+
+/* 功能名 + 权限条数：同一行，条数靠右 */
+.admin-perm-card__title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--ui-space-2);
+  margin: 0;
+  font-size: var(--ui-font-sm);
+  font-weight: var(--ui-weight-medium);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-strong);
+}
+
+.admin-perm-card__count {
+  flex: none;
+  font-size: var(--ui-font-sm);
+  color: var(--ui-text-soft);
+}
+
+/* 范围规则：图标 + 标题一行，说明另起一行 */
+.admin-scope-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--ui-space-4);
+}
+
+.admin-scope-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-2);
+  padding: var(--ui-space-4);
+  background: var(--ui-surface-deep);
+  border-radius: var(--ui-radius-m);
+}
+
+.admin-scope-item__head {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+  font-size: var(--ui-font-sm);
+  font-weight: var(--ui-weight-medium);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-strong);
+}
+
+.admin-scope-item__desc {
+  margin: 0;
+  font-size: var(--ui-font-xs);
+  line-height: var(--ui-leading-base);
+  color: var(--ui-text-soft);
+}
+
+/* ======================================================================
+   发布流程与说明
+   ====================================================================== */
+
+/* Steps 用组件库的，这里只把纵向步骤的行距收紧一档 */
+.admin-steps.dtd-steps {
+  font-size: var(--ui-font-xs);
+}
+
+.admin-steps .dtd-steps-item-title {
+  font-size: var(--ui-font-sm);
+  line-height: var(--ui-leading-tight);
+}
+
+.admin-steps .dtd-steps-item-description {
+  font-size: var(--ui-font-xs);
+  line-height: var(--ui-leading-base);
+  color: var(--ui-text-soft);
+}
+
+/* 发布方式说明：标题 + 说明两条一组，组与组之间 16px */
+.admin-explain {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-explain__item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-1);
+}
+
+.admin-explain__title {
+  margin: 0;
+  font-size: var(--ui-font-sm);
+  font-weight: var(--ui-weight-medium);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-strong);
+}
+
+.admin-explain__desc {
+  margin: 0;
+  font-size: var(--ui-font-xs);
+  line-height: var(--ui-leading-base);
+  color: var(--ui-text-soft);
+}
+
+.admin-publish-hint {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-3);
+  padding: var(--ui-space-3) var(--ui-space-4);
+  background: var(--ui-tone-info-bg);
+  border-radius: var(--ui-radius-m);
+  font-size: var(--ui-font-xs);
+  line-height: var(--ui-leading-base);
+  color: var(--ui-tone-info-fg);
+}
+
+/* 发布页：表单与侧栏说明并排 */
+.admin-publish-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: var(--ui-space-5);
+  align-items: start;
+}
+
+/* 侧栏说明区：两张卡片上下排，间距与主区域一致 */
+.admin-publish-side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-5);
+  min-width: 0;
+}
+
+/*
+ * 一行功能：功能名 + 说明 + 删除按钮。
+ * 前两栏等宽（两个输入框，等宽才读得出是并列关系），末栏 auto 让按钮只占自身宽度。
+ */
 .admin-func-editor {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--ui-space-3);
 }
 
 .admin-func-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
-  gap: 8px;
-}
-
-.admin-func-editor .dtd-btn {
-  align-self: flex-start;
-}
-
-/* ======================================================================
-   应用发布页
-   ====================================================================== */
-
-.admin-publish-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
-  gap: 16px;
-  align-items: start;
-  margin-top: 16px;
-}
-
-.admin-publish-side {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.admin-steps {
-  padding: 4px 0;
-}
-
-.admin-explain {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.admin-explain li {
-  padding: 8px 0;
-  font-size: 13px;
-  line-height: 1.7;
-  color: var(--common_level2_base_color, rgba(23, 26, 29, 0.6));
-  border-bottom: 1px solid var(--common_line_light_color, rgba(126, 134, 142, 0.16));
-}
-
-.admin-explain li:last-child {
-  border-bottom: 0;
-}
-
-.admin-explain strong {
-  display: block;
-  margin-bottom: 2px;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--common_level1_base_color, #171a1d);
-}
-
-/* 角色页：按应用分组的可用功能 */
-.admin-perm-group {
-  padding: 12px 0;
-  border-bottom: 1px solid var(--common_line_light_color, rgba(126, 134, 142, 0.16));
-}
-
-.admin-perm-group:last-child {
-  border-bottom: 0;
-}
-
-.admin-perm-group__title {
-  margin: 0 0 8px;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--common_level1_base_color, #171a1d);
-}
-
-/* 组织页：数据范围说明 */
-.admin-scope-list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.admin-scope-list li {
-  padding: 10px 0;
-  border-bottom: 1px solid var(--common_line_light_color, rgba(126, 134, 142, 0.16));
-}
-
-.admin-scope-list li:last-child {
-  border-bottom: 0;
-}
-
-.admin-scope-list p {
-  margin: 4px 0 0;
-  font-size: 12px;
-  line-height: 1.7;
-  color: var(--common_level3_base_color, rgba(23, 26, 29, 0.4));
-}
-
-/* ======================================================================
-   兜底页
-   ====================================================================== */
-
-.admin-fallback {
-  display: flex;
-  flex-direction: column;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: var(--ui-space-3);
   align-items: center;
-  gap: 16px;
-  min-height: 100vh;
-  padding: 64px 24px;
-  background: var(--common_bg_color, #f2f2f6);
-}
-
-.admin-fallback__card {
-  width: 100%;
-  max-width: 560px;
-  padding: 24px 16px;
-  background: var(--common_bg_z1_color, #fff);
-  border-radius: var(--common_border_radius_l, 8px);
-}
-
-.admin-fallback__note {
-  width: 100%;
-  max-width: 560px;
 }
 
 /* ======================================================================
@@ -581,213 +628,321 @@ a {
    ====================================================================== */
 
 .admin-login {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  min-height: 100vh;
-  background: var(--common_bg_color, #f2f2f6);
-}
-
-.admin-login__panel {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 40px 24px;
+  gap: var(--ui-space-8);
+  min-height: 100vh;
+  padding: var(--ui-space-6) var(--ui-gutter);
+  background: var(--ui-surface-sunken);
 }
 
-.admin-login__card {
-  width: 100%;
-  max-width: 400px;
-}
-
-.admin-login__title {
-  margin: 0;
-  font-size: 22px;
-  font-weight: 600;
-  line-height: 1.4;
-  color: var(--common_level1_base_color, #171a1d);
-}
-
-.admin-login__desc {
-  margin: 8px 0 20px;
-  font-size: 13px;
-  line-height: 1.7;
-  color: var(--common_level2_base_color, rgba(23, 26, 29, 0.6));
-}
-
-.admin-login__notice {
-  margin-bottom: 16px;
-}
-
-.admin-login__form {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.admin-login__field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.admin-login__label {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--common_level1_base_color, #171a1d);
-}
-
-.admin-login__divider {
-  margin: 4px 0;
-}
-
-/* 唯一可用的入口：指向后台内部页面，不做任何外部跳转 */
-.admin-login__skip {
-  display: block;
-  padding: 8px 0;
-  text-align: center;
-  font-size: 14px;
-  color: var(--common_blue1_color, #007fff);
-  border-radius: var(--common_border_radius_m, 6px);
-}
-
-.admin-login__skip:hover {
-  color: var(--common_blue1_hover_color, #389bff);
-  background: var(--common_overlay_area_color, rgba(126, 134, 142, 0.08));
-}
-
-.admin-login__foot {
-  margin: 16px 0 0;
-  font-size: 12px;
-  line-height: 1.7;
-  color: var(--common_level3_base_color, rgba(23, 26, 29, 0.4));
-}
-
-/* 右侧介绍区 */
 .admin-login__hero {
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  gap: 16px;
-  padding: 48px 56px;
-  background: linear-gradient(150deg, var(--common_blue1_color, #007fff), #2f6bff 55%, #4facfe);
-  color: var(--common_white1_color, #fff);
+  gap: var(--ui-space-3);
+  max-width: 380px;
 }
 
 .admin-login__logo {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 48px;
-  height: 48px;
-  border-radius: var(--common_border_radius_l, 8px);
-  background: var(--common_white4_color, rgba(255, 255, 255, 0.16));
-  font-size: 26px;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--ui-radius-l);
+  background: var(--ui-brand);
+  color: var(--ui-brand-ink);
+  font-size: var(--ui-font-xl);
+  line-height: var(--ui-leading-none);
 }
 
 .admin-login__brand {
   margin: 0;
-  font-size: 26px;
-  font-weight: 600;
-  line-height: 1.4;
+  font-size: var(--ui-font-xl);
+  font-weight: var(--ui-weight-semibold);
+  line-height: var(--ui-leading-tight);
+  letter-spacing: var(--ui-tracking-tight);
+  color: var(--ui-text-strong);
 }
 
 .admin-login__slogan {
   margin: 0;
-  max-width: 420px;
-  font-size: 14px;
-  line-height: 1.8;
-  color: var(--common_white1_color, #fff);
+  font-size: var(--ui-font-sm);
+  line-height: var(--ui-leading-base);
+  color: var(--ui-text-soft);
 }
 
 .admin-login__points {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  margin: 8px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-3);
+  margin: var(--ui-space-2) 0 0;
   padding: 0;
   list-style: none;
-  max-width: 460px;
 }
 
 .admin-login__points li {
-  padding: 12px 14px;
-  border-radius: var(--common_border_radius_l, 8px);
-  background: var(--common_white4_color, rgba(255, 255, 255, 0.16));
-  font-size: 13px;
-  line-height: 1.6;
+  display: flex;
+  flex-direction: column;
+  /* 每条里「小标题」与「说明」两行之间 4px */
+  gap: var(--ui-space-1);
+  font-size: var(--ui-font-sm);
+  line-height: var(--ui-leading-base);
+  color: var(--ui-text-soft);
 }
 
-.admin-login__points strong {
-  display: block;
-  margin-bottom: 2px;
-  font-size: 14px;
-  font-weight: 600;
+.admin-login__points li strong {
+  font-size: var(--ui-font-sm);
+  font-weight: var(--ui-weight-medium);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-strong);
 }
 
-.admin-login__preview {
+.admin-login__env {
+  margin: var(--ui-space-2) 0 0;
+  font-size: var(--ui-font-xs);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-soft);
+}
+
+.admin-login__panel {
+  width: 100%;
+  max-width: 400px;
+}
+
+.admin-login__card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-5);
+}
+
+/*
+ * 标题 + 说明自成一个块，块内间距 8px。
+ * 卡片用的是 flex gap，要给「标题与其说明」比「各块之间」更小的间距，只能把这一对
+ * 包起来另设 gap——不要用负外边距去抵消父级的 gap。
+ */
+.admin-login__head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-2);
+}
+
+.admin-login__title {
   margin: 0;
-  font-size: 12px;
-  line-height: 1.7;
-  color: var(--common_white2_color, rgba(255, 255, 255, 0.4));
+  font-size: var(--ui-font-lg);
+  font-weight: var(--ui-weight-semibold);
+  line-height: var(--ui-leading-tight);
+  letter-spacing: var(--ui-tracking-tight);
+  color: var(--ui-text-strong);
+}
+
+.admin-login__desc {
+  margin: 0;
+  font-size: var(--ui-font-sm);
+  line-height: var(--ui-leading-base);
+  color: var(--ui-text-soft);
+}
+
+/*
+ * 登录页的披露条：与后台顶栏那条不同，这里带图标、有底色，
+ * 因为登录页没有别的披露渠道，它需要被看见。
+ */
+.admin-login__notice {
+  margin: 0;
+}
+
+/* 登录表单：账号、密码、提交按钮三者之间 16px */
+.admin-login__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-4);
+}
+
+.admin-login__divider {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-3);
+  margin: 0;
+  font-size: var(--ui-font-xs);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-soft);
+}
+
+.admin-login__divider::before,
+.admin-login__divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--ui-line);
+}
+
+.admin-login__skip {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-3);
+  padding: var(--ui-space-4);
+  border: 1px solid var(--ui-brand-line);
+  border-radius: var(--ui-radius-l);
+  background: var(--ui-brand-soft);
+  color: var(--ui-brand-strong);
+  transition: var(--ui-transition-surface);
+}
+
+.admin-login__skip:hover {
+  background: var(--ui-brand-soft-weak);
+  color: var(--ui-brand-strong);
+  box-shadow: var(--ui-shadow-card);
+}
+
+/*
+ * 跳过登录入口的两行文字。
+ *
+ * 这里必须是块级/弹性容器，不能让两个 <span> 留在行内格式化上下文里：
+ * 行内元素换行时上下两行的盒子在几何上是相互重叠的（第一行折行后与第二行同 y），
+ * 审计脚本把它报成 -19px 的真重叠。上一版没给这个类写样式，问题就一直藏着。
+ */
+.admin-login__skip-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-1);
+  flex: 1;
+  min-width: 0;
+}
+
+.admin-login__skip-text strong {
+  font-size: var(--ui-font-base);
+  font-weight: var(--ui-weight-semibold);
+  line-height: var(--ui-leading-tight);
+}
+
+.admin-login__skip-text span {
+  font-size: var(--ui-font-xs);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-soft);
 }
 
 /* ======================================================================
-   窄屏降级
+   窄屏：侧栏变成滑出抽屉，表格横向滚动
    ====================================================================== */
 
-@media (max-width: 1200px) {
-  .admin-stats {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+@media (max-width: 1023px) {
+  .admin-header__navtoggle {
+    display: inline-flex;
+  }
+
+  .admin-sider {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: var(--ui-z-overlay);
+    /*
+     * 抽屉在视口外，用 transform 而不是 display:none——
+     * 这样滑出有过渡，且菜单 DOM 始终是同一份。
+     */
+    transform: translateX(-100%);
+    transition: transform var(--ui-dur-base) var(--ui-ease-standard);
+    box-shadow: var(--ui-shadow-overlay);
+  }
+
+  .is-nav-open .admin-sider {
+    transform: none;
+  }
+
+  .admin-sider__close {
+    display: inline-flex;
+  }
+
+  .admin-scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: calc(var(--ui-z-overlay) - 1);
+    background: var(--ui-overlay);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--ui-dur-base) var(--ui-ease-standard);
+  }
+
+  .is-nav-open .admin-scrim {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* 表格列多，窄屏整体横滚比挤成两行好读 */
+  .ui-card .dtd-table {
+    overflow-x: auto;
   }
 
   .admin-publish-layout {
     grid-template-columns: minmax(0, 1fr);
   }
-}
 
-@media (max-width: 900px) {
-  .admin-login {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .admin-login__hero {
-    padding: 32px 24px;
-  }
-
-  .admin-login__points {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-@media (max-width: 720px) {
-  .admin-form-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
+  /* 功能行在窄屏改成竖排：两栏并排会把输入框压到看不清内容 */
   .admin-func-row {
     grid-template-columns: minmax(0, 1fr);
   }
+}
 
+@media (max-width: 767px) {
+  /*
+   * 手机顶栏要同时解决两件事，少一件它就会从 40px 涨到 85px：
+   *
+   * 1. 面包屑必须撤掉。390px 下导航开关占 36px、工具区要 400px 以上，左侧被挤到
+   *    30px 宽，「平台管理 / 应用列表」竖着折成三行、高 84px —— 顶栏高度就被它顶到 85px。
+   *    手机上面包屑本来也是冗余的：页面自己的 h1 就在下面一行。
+   * 2. 退出登录按钮撤掉。它是永久禁用的（没有登录态就没有退出动作），文案却长达
+   *    「退出登录（尚未登录）」≈172px。在手机上为它留位置是纯浪费；未登录这件事
+   *    由环境标签与操作人的「未分配角色」共同表达，披露语义不靠这个按钮。
+   */
+  .admin-header__crumb,
   .admin-header__search,
-  .admin-operator__text {
+  .admin-header__divider,
+  .admin-header__logout {
     display: none;
   }
 
-  .admin-content {
-    padding: 12px;
+  .admin-header {
+    padding-inline: var(--ui-space-4);
+  }
+
+  /*
+   * 披露条与页标题改成上下两行：手机宽度下并排会把两者都压到断行，
+   * 反而更难看。标题在前、披露在后，符合「先知道这是哪一页」的阅读顺序。
+   */
+  .admin-topline {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--ui-space-2);
+  }
+
+  .admin-pagehead__title {
+    order: 1;
   }
 
   .admin-banner {
-    margin: 12px 12px 0;
+    order: 2;
+  }
+
+  .admin-banner .dtd-notice-bar-content {
+    flex-direction: column;
+    gap: var(--ui-space-1);
   }
 }
 
-@media (max-width: 560px) {
-  .admin-stats {
-    grid-template-columns: minmax(0, 1fr);
-  }
+/* ======================================================================
+   宽屏版心
+   ====================================================================== */
 
-  .admin-toolbar__search {
-    width: 100%;
+@media (min-width: 1024px) {
+  .admin-shell {
+    --ui-container: 1120px;
+  }
+}
+
+@media (min-width: 1440px) {
+  .admin-shell {
+    --ui-container: 1320px;
   }
 }

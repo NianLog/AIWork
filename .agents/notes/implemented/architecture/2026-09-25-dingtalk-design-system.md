@@ -20,7 +20,9 @@ Last-verified: 2026-09-25
 - 门户（移动端形态）只用 `dingtalk-design-mobile`，后台（桌面端形态）只用 `dingtalk-design-desktop`，两端共用 `dd-icons`。组件选型、间距、圆角、配色、图标一律取组件库既有规范，不再自行拼凑近似样式。
 - 主题令牌不再自研。`dingtalk-theme` 的 `dingtalk-x/mob.css`（门户）与 `dingtalk-x/pc.css`（后台）在 `main.tsx` 里**先于** `styles.css` 引入——组件库的配色与圆角都依赖这些 CSS 变量，顺序反了会拿到未定义的令牌。
 - `styles.css` 的职责收窄为骨架版式：侧栏、顶栏、页面标题区、统计卡、工具条、表单栅格、登录页分栏。凡涉及颜色 must 引用 `--common_*` 变量，never 另造色板。
-- 计划中的 `packages/shared-theme` 取消，未落盘即撤（它从未进入 git 历史，工作区只留下一个空目录，已清除）。两个前端不再共享样式包：钉钉组件库本身就是共享的视觉真值来源，再套一层自研令牌只会把它稀释掉。
+- 同日受控例外（见 [品牌色 ED7D33 与主题令牌覆盖](2026-09-25-warm-brand-palette.md)）：主题色被指定为 `#ED7D33`，而钉钉令牌体系里没有这个色值。`packages/ui-tokens/tokens.css` 因此新增一个 `:root:root` 覆盖块**重定义**钉钉既有语义位的值（品牌位、警示位、危险位、成功位等）。这不是把「自研色板」放回来：不新增语义位、不手搓组件，只改既有位的取值；组件库仍然是唯一的组件来源与唯一的语义位定义者。
+- 计划中的 `packages/shared-theme` 取消，未落盘即撤（它从未进入 git 历史，工作区只留下一个空目录，已清除）。两个前端不再各自定义视觉令牌：钉钉组件库与 `dingtalk-theme` 是唯一的视觉真值来源。
+- 同日追加（见 [两端共用的结构样式层](2026-09-25-shared-structural-style-layer.md)）：两端共用的**结构**样式层 `packages/ui-tokens`（`tokens.css` + `base.css` + `components.css`）落地，`--ui-*` 是 `--common_*` 的别名，本层不新增任何视觉语言。前一版决定的「取消 shared-theme」针对的是自研色板与手搓组件，这一点未变——判据是本层不出现 `--common_*` 之外的色值。
 - 布局间距使用 flex / grid 的 `gap`，取代早期「iOS 12 禁 flex gap」的兼容红线。理由见下节。
 
 ## 关于 gap 与 browserslist 的取舍
@@ -76,5 +78,5 @@ Last-verified: 2026-09-25
 **缺口**
 
 - desktop 的 SegmentedControl 缺 `role` 与 `tabindex`，键盘不可达。为了让筛选器在无障碍树里不至于彻底消失，页面自己包了一层 `<div role="group" aria-label="…">`——这是绕组件库缺陷的补丁，不是设计，组件库补齐后应当撤掉。
-- 版式正确性无法在 jsdom 里断言（`matchMedia` / `ResizeObserver` 全是桩，一律 `matches: false`）。视觉验收只能靠浏览器人工过，测试只锁语义。这条边界与它的执行方式见[测试笔记](../testing/2026-09-25-vitest-dingtalk-esm-and-semantic-tests.md)。
+- 版式正确性无法在 jsdom 里断言（`matchMedia` / `ResizeObserver` 全是桩，一律 `matches: false`）。测试只锁语义；版式验收改用真实 Chrome 逐页审计，见[版式审计笔记](../testing/2026-09-25-layout-audit-in-real-browser.md)（该笔记同时修正了本条原先「只能靠人工过」的结论）。
 - 界面文案的业务化改造是另一条独立决定，见[文案笔记](../feature/2026-09-25-business-language-ui-copy.md)。

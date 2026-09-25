@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button, Card, Input, SegmentedControl, Space, Table, Tag } from 'dingtalk-design-desktop';
+import { Button, Card, Input, SegmentedControl, Table, Tag } from 'dingtalk-design-desktop';
 import type { TableColumnsType } from 'dingtalk-design-desktop';
 import { DeleteOutlined, RefreshOutlined, SettingOutlined, WriteEditOutlined } from 'dd-icons';
 import { CHANNEL_META, DEMO_APPLICATIONS } from '../../store/demoDirectory';
@@ -12,6 +12,16 @@ import type { DemoApplicationRecord } from '../../store/demoDirectory';
  * 只展示业务用户看得懂的信息（名称、负责团队、版本、发布状态、最近更新时间），
  * 不渲染任何部署细节。所有写操作按钮永久禁用——没有后台服务就没有写路径，
  * 「能点但保存不了」比「不能点」更容易被误当成真实能力。
+ *
+ * 版式取舍：
+ * - 概览从四张并排空卡改成一组统计卡：顶部一条语义色短线区分「正常 / 需要注意 / 已停用」，
+ *   数字用 tabular-nums，扫一眼就能比出量级；
+ * - 「全部应用」卡片里，检索、筛选、计数收进一条工具条，表格占满卡片剩余宽度，
+ *   不再让工具条单独占一行留出大片空白；
+ * - 操作列的三个图标按钮包在 .ui-actions 里给足间隔：禁用态下小图标挤在一起会糊成一块。
+ *
+ * 页头（h1）由外壳统一渲染：后台五个页面同构，标题写在 route handle 里，
+ * 页面只负责标题下面的操作与内容。
  */
 
 type ChannelFilter = 'all' | DemoApplicationRecord['channel'];
@@ -50,10 +60,10 @@ export default function ApplicationsPage() {
     const countBy = (target: ChannelFilter) =>
       DEMO_APPLICATIONS.filter((app) => resolveChannel(app) === target).length;
     return [
-      { label: '应用总数', value: DEMO_APPLICATIONS.length },
-      { label: '已开放使用', value: DEMO_APPLICATIONS.filter((app) => app.status === 1).length },
-      { label: '试运行中', value: countBy('canary') },
-      { label: '已停用', value: countBy('paused') },
+      { label: '应用总数', value: DEMO_APPLICATIONS.length, tone: 'brand' },
+      { label: '已开放使用', value: DEMO_APPLICATIONS.filter((app) => app.status === 1).length, tone: 'success' },
+      { label: '试运行中', value: countBy('canary'), tone: 'warning' },
+      { label: '已停用', value: countBy('paused'), tone: 'neutral' },
     ];
   }, []);
 
@@ -64,8 +74,8 @@ export default function ApplicationsPage() {
       key: 'name',
       render: (_, record) => (
         <span>
-          <span className="admin-cell-title">{record.name}</span>
-          <span className="admin-cell-sub">由 {record.ownerTeam} 负责</span>
+          <span className="ui-cell-title">{record.name}</span>
+          <span className="ui-cell-sub">由 {record.ownerTeam} 负责</span>
         </span>
       ),
     },
@@ -74,12 +84,12 @@ export default function ApplicationsPage() {
       dataIndex: 'version',
       key: 'version',
       width: 100,
-      render: (value: string) => <span className="admin-num">{value}</span>,
+      render: (value: string) => <span className="ui-num">{value}</span>,
     },
     {
       title: '发布状态',
       key: 'channel',
-      width: 120,
+      width: 116,
       render: (_, record) => {
         const meta = CHANNEL_META[resolveChannel(record)];
         return (
@@ -93,15 +103,15 @@ export default function ApplicationsPage() {
       title: '最近更新',
       dataIndex: 'publishedAt',
       key: 'publishedAt',
-      width: 160,
-      render: (value: string) => <span className="admin-num">{value}</span>,
+      width: 156,
+      render: (value: string) => <span className="ui-num">{value}</span>,
     },
     {
       title: '操作',
       key: 'actions',
       width: 132,
       render: (_, record) => (
-        <Space size={4}>
+        <span className="ui-actions">
           <Button
             size="small"
             type="text"
@@ -123,7 +133,7 @@ export default function ApplicationsPage() {
             disabled
             aria-label={`下架 ${record.name}（暂不可用）`}
           />
-        </Space>
+        </span>
       ),
     },
   ];
@@ -131,53 +141,46 @@ export default function ApplicationsPage() {
   const activeIndex = CHANNEL_OPTIONS.findIndex((option) => option.value === channel);
 
   return (
-    <>
-      <div className="admin-pagehead">
-        <div className="admin-pagehead__row">
-          <div>
-            <h1 className="admin-pagehead__title">应用列表</h1>
-            <p className="admin-pagehead__lead">
-              这里列出所有已经上架到应用市场的应用，以及它们当前的版本和发布状态。
-            </p>
-          </div>
-          <div className="admin-pagehead__actions">
-            <Button icon={<RefreshOutlined />} disabled>
-              刷新列表（暂不可用）
-            </Button>
-            <Button type="primary" onClick={() => navigate('/preview/publish')}>
-              发布新应用
-            </Button>
-          </div>
+    <div className="ui-page">
+      <div className="admin-toolbar-row">
+        <p className="ui-pagehead__lead">这里列出所有已经上架到应用市场的应用，以及它们当前的版本和发布状态。</p>
+        <div className="ui-pagehead__actions">
+          <Button icon={<RefreshOutlined />} disabled>
+            刷新列表（暂不可用）
+          </Button>
+          <Button type="primary" onClick={() => navigate('/preview/publish')}>
+            发布新应用
+          </Button>
         </div>
       </div>
 
-      <section className="admin-stats" aria-label="应用概览">
+      <section className="ui-stats" aria-label="应用概览">
         {stats.map((item) => (
-          <Card key={item.label} size="small" className="admin-stat">
-            <p className="admin-stat__label">{item.label}</p>
-            <p className="admin-stat__value admin-num">{item.value}</p>
-          </Card>
+          <div className={`ui-stat ui-stat--${item.tone}`} key={item.label}>
+            <p className="ui-stat__label">{item.label}</p>
+            <p className="ui-stat__value ui-num">{item.value}</p>
+          </div>
         ))}
       </section>
 
-      <section className="admin-section" aria-label="应用明细">
-        <Card title="全部应用" bodyStyle={{ padding: 0 }}>
-          <div className="admin-toolbar">
+      <section className="ui-section" aria-label="应用明细">
+        <Card className="ui-card ui-card--flush" title="全部应用">
+          <div className="ui-toolbar">
             <Input
-              className="admin-toolbar__search"
+              className="ui-toolbar__search"
               allowClear
               placeholder="搜索应用名称、负责团队或版本"
               value={keyword}
               onChange={(event) => setKeyword(event.target.value)}
             />
-            <div role="group" aria-label="按发布状态筛选">
+            <div className="ui-segments" role="group" aria-label="按发布状态筛选">
               <SegmentedControl
                 texts={CHANNEL_OPTIONS.map((option) => option.label)}
                 activeIndex={activeIndex}
                 onChange={(index) => setChannel(CHANNEL_OPTIONS[index].value)}
               />
             </div>
-            <span className="admin-toolbar__count">共 {rows.length} 个应用</span>
+            <span className="ui-toolbar__count">共 {rows.length} 个应用</span>
           </div>
           <Table<DemoApplicationRecord>
             rowKey="appId"
@@ -188,6 +191,6 @@ export default function ApplicationsPage() {
           />
         </Card>
       </section>
-    </>
+    </div>
   );
 }

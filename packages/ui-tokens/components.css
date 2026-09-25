@@ -1,0 +1,1084 @@
+/*
+ * AI 中台门户与后台共用的结构件层。
+ *
+ * 为什么存在：两个应用要用同一种「骨架」。凡是两边都要写一遍的东西——卡片、区块头、
+ * 统计卡、工具条、徽标、键值行、列表行、空状态、浮层遮罩、入场动效——都放这里；
+ * 只有一处用的留在各自 styles.css。判据很简单：同一段样式在两个应用里都要写一遍，
+ * 就搬过来。
+ *
+ * 引入顺序：dingtalk-theme → tokens.css → 本文件 → 应用自己的 styles.css。
+ * 覆盖组件库默认样式时统一用「双类」选择器（如 .ui-card.dtd-card），
+ * 靠特指度压过组件库的单类规则，不依赖打包顺序。
+ *
+ * 命名：结构件用 .ui-<block>__<element>，修饰用 .ui-<block>--<variant>，
+ * 状态用 .is-<state>。
+ *
+ * ============================================================================
+ * 纵向节奏：这一层最主要的存在理由
+ * ============================================================================
+ *
+ * 反馈「组件样式上下重叠、紧靠严重，几乎存在全部页面」。用 scripts/qc/spacing-audit.mjs
+ * 把每个页面的同级元素间距量出来之后，原因有三类，都在这一层里治：
+ *
+ * 1. 组件库的负外边距造成真重叠。dingtalk-design-desktop 给 .dtd-card-head 写了
+ *    margin-bottom: -1px，于是卡片标题栏与卡片正文在每个后台页面上都重叠 1px。
+ *    这里改回 0，用 border-bottom 分隔（见 .ui-card.dtd-card > .dtd-card-head）。
+ *
+ * 2. 行高等于字号。.ui-badge 原来写 line-height: 1，12px 的字装在 12px 的行盒里，
+ *    中文字形上下相碰；.portal-tab__label、.ui-num 同理。现在所有单行 UI 文字
+ *    至少 --ui-leading-tight（1.4）。
+ *
+ * 3. 为了扩大触控区而加的负外边距。.ui-section__link 原来 margin: -8px -4px，
+ *    在标题行里能把相邻元素吃掉。现在改用 min-height（窄屏 40px）撑触控区，
+ *    不带负外边距。
+ *
+ * 验收方式：改完跑 scripts/qc/spacing-audit.mjs，「真重叠 gap<0」必须为 0；
+ * 「紧靠 0~5px」只允许出现在图标与其文字标签之间这类本来就是一体的组合里。
+ */
+
+/* ======================================================================
+   版心底座
+   每个应用的最外层容器挂 .ui-shell，并各自按断点覆盖 --ui-container。
+   顶栏、内容、页脚共用同一条左右基准线，靠这三个类保证，不靠各自算 padding。
+   ====================================================================== */
+
+.ui-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--ui-surface-sunken);
+}
+
+.ui-container {
+  width: 100%;
+  max-width: var(--ui-container);
+  margin-inline: auto;
+  padding-inline: var(--ui-gutter);
+}
+
+/*
+ * 顶栏外壳：sticky + 一条分隔线，高度由 --ui-appbar-h 决定。
+ *
+ * display: flex 与 min-height 都写在这里而不是交给应用：顶栏的高度是**框架契约**
+ * （「外框架占位小」是靠它兑现的），如果由应用的内部容器决定，任何一个应用忘了给
+ * 内部容器写 flex 布局，顶栏就会退化成「每个子元素各占一行」的纵向堆叠——
+ * 门户实测曾因此从 40px 涨到 95px，肉眼只觉得「有点高」。
+ * 内部容器仍然由应用负责（门户是 .portal-appbar__inner，负责版心与横向间距）。
+ */
+.ui-appbar {
+  display: flex;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: var(--ui-z-sticky);
+  min-height: var(--ui-appbar-h);
+  background: var(--ui-surface);
+  border-bottom: 1px solid var(--ui-line);
+}
+
+/*
+ * 顶栏内部的横排容器。这里不再定义 .ui-appbar__inner——门户用的是
+ * .portal-appbar__inner（版心 + 间距由应用的 styles.css 出），
+ * 同一个概念留着两个名字只会让人挑错那一个。
+ */
+.ui-main {
+  flex: 1;
+  min-width: 0;
+}
+
+/*
+ * 内容区的上下留白。外框架要「占位小」，所以上留白只给 12px——顶栏自己已经有
+ * 一条分隔线，再堆 16px 就是白白吃掉子应用的纵向空间。
+ */
+.ui-main__inner {
+  padding-block: var(--ui-space-3) var(--ui-space-6);
+}
+
+.ui-footnote {
+  margin: var(--ui-space-6) 0 0;
+  padding-top: var(--ui-space-4);
+  border-top: 1px solid var(--ui-line);
+  font-size: var(--ui-font-xs);
+  line-height: var(--ui-leading-loose);
+  color: var(--ui-text-soft);
+}
+
+/* .ui-main 上的 tabindex="-1" 只为「跳到主要内容」能落焦，不画焦点环 */
+.ui-main:focus,
+.ui-main:focus-visible {
+  outline: none;
+}
+
+/* ======================================================================
+   页头：标题 + 说明 + 右侧操作
+   页面主标题是 h1，放在内容区而不是顶栏：标题跟着内容走，既保证每页恰好一个 h1，
+   也让顶栏在任何形态下都只有一行。
+   ====================================================================== */
+
+/*
+ * 页标题与说明的「一行工具条」。
+ *
+ * 这里刻意**没有** .ui-pagehead / .ui-pagehead__title：页面主标题（h1）改由各自外壳
+ * 渲染——门户放在 28px 标题行里，后台放在披露条同一行的右端。两处都不是「标题 + 说明
+ * 各占一行」的页头，留着那组规则只会让人以为还有第三种用法。
+ * 也只有 .ui-pagehead__lead / __actions 继续被两端的工具条行复用：
+ * 曾经另有一组 .ui-toolbar__lead / .ui-toolbar__actions 表达同一件事，已删除。
+ */
+.ui-pagehead__lead {
+  margin: 0;
+  max-width: 720px;
+  font-size: var(--ui-font-sm);
+  line-height: var(--ui-leading-base);
+  color: var(--ui-text-soft);
+}
+
+.ui-pagehead__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+
+/* ======================================================================
+   区块与卡片
+   一页的最外层挂 .ui-page：区块之间的纵向间距统一由它出（gap，不是 margin），
+   区块自己不带上下外边距——margin 会折叠，gap 不会，这是「间距不可预测」的根因。
+   ====================================================================== */
+
+.ui-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-page-gap);
+}
+
+.ui-section {
+  min-width: 0;
+}
+
+.ui-section__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-space-3);
+  margin-bottom: var(--ui-space-3);
+  padding-inline: var(--ui-space-1);
+}
+
+.ui-section__text {
+  min-width: 0;
+}
+
+.ui-section__title {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+  margin: 0;
+  font-size: var(--ui-font-md);
+  font-weight: var(--ui-weight-semibold);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-strong);
+}
+
+.ui-section__lead {
+  margin: var(--ui-space-2) 0 0;
+  font-size: var(--ui-font-xs);
+  line-height: var(--ui-leading-base);
+  color: var(--ui-text-soft);
+}
+
+.ui-section__count {
+  flex: none;
+  font-size: var(--ui-font-xs);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-soft);
+}
+
+/*
+ * 区块头右侧的文字链接。
+ * 原来用 margin: -8px -4px 把触控区撑到 40px 高——负外边距在标题行里会把相邻元素
+ * 吃掉（审计脚本能查到）。改成 min-height 撑高，不带负外边距。
+ */
+.ui-section__link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-space-1);
+  flex: none;
+  min-height: var(--ui-control-m);
+  padding-inline: var(--ui-space-2);
+  margin-inline-end: calc(var(--ui-space-2) * -1);
+  font-size: var(--ui-font-sm);
+  line-height: var(--ui-leading-tight);
+}
+
+.ui-card {
+  padding: var(--ui-space-5);
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-line);
+  border-radius: var(--ui-radius-l);
+  box-shadow: var(--ui-shadow-card);
+}
+
+/* 表格、列表这类自带内边距的内容：卡片只出外壳，内边距交给内部块 */
+.ui-card--flush {
+  padding: 0;
+  overflow: hidden;
+}
+
+.ui-card--center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+/* 卡片内的补充说明：比正文轻一档，且不抢标题注意力 */
+.ui-note {
+  margin: var(--ui-space-3) 0 0;
+  font-size: var(--ui-font-xs);
+  line-height: var(--ui-leading-loose);
+  color: var(--ui-text-soft);
+}
+
+.ui-note--tight {
+  margin-top: var(--ui-space-2);
+}
+
+/* 标题 + 副标题的通用两行结构（列表行、单元格都用它） */
+.ui-cell-title {
+  display: block;
+  font-size: var(--ui-font-base);
+  font-weight: var(--ui-weight-medium);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-strong);
+}
+
+.ui-cell-sub {
+  display: block;
+  margin-top: var(--ui-space-1);
+  font-size: var(--ui-font-xs);
+  line-height: var(--ui-leading-base);
+  color: var(--ui-text-soft);
+}
+
+/* ======================================================================
+   徽标、状态标签、色块
+   ====================================================================== */
+
+.ui-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-space-1);
+  flex: none;
+  min-height: 24px;
+  padding: 0 var(--ui-space-2);
+  font-size: var(--ui-font-xs);
+  font-weight: var(--ui-weight-medium);
+  /* 原来是 line-height: 1 —— 12px 的字装在 12px 行盒里，中文上下相碰。见文件头第 2 条。 */
+  line-height: var(--ui-leading-tight);
+  white-space: nowrap;
+  border-radius: var(--ui-radius-pill);
+  background: var(--ui-tone-neutral-bg);
+  color: var(--ui-tone-neutral-fg);
+}
+
+.ui-badge--success {
+  background: var(--ui-tone-success-bg);
+  color: var(--ui-tone-success-fg);
+}
+
+.ui-badge--warning {
+  background: var(--ui-tone-warning-bg);
+  color: var(--ui-tone-warning-fg);
+}
+
+.ui-badge--danger {
+  background: var(--ui-tone-danger-bg);
+  color: var(--ui-tone-danger-fg);
+}
+
+.ui-badge--info {
+  background: var(--ui-tone-info-bg);
+  color: var(--ui-tone-info-fg);
+}
+
+.ui-badge--brand {
+  background: var(--ui-tone-brand-bg);
+  color: var(--ui-tone-brand-fg);
+}
+
+.ui-badge--outline {
+  background: transparent;
+  border: 1px solid var(--ui-line-strong);
+  color: var(--ui-text-soft);
+}
+
+/* 图标瓦片：应用图标、列表前置图标、步骤序号的统一底座 */
+.ui-tile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  border-radius: var(--ui-radius-m);
+  background: var(--ui-tone-neutral-bg);
+  color: var(--ui-tone-neutral-fg);
+  /* 图标容器不承载文字，行高归零以便垂直居中 */
+  line-height: var(--ui-leading-none);
+}
+
+.ui-tile--s {
+  width: 24px;
+  height: 24px;
+  font-size: var(--ui-font-sm);
+}
+
+.ui-tile--m {
+  width: 32px;
+  height: 32px;
+  font-size: var(--ui-font-md);
+}
+
+.ui-tile--l {
+  width: 40px;
+  height: 40px;
+  font-size: var(--ui-font-xl);
+  border-radius: var(--ui-radius-l);
+}
+
+.ui-tile--xl {
+  width: 52px;
+  height: 52px;
+  font-size: var(--ui-font-2xl);
+  border-radius: var(--ui-radius-l);
+}
+
+.ui-tone-violet {
+  background: var(--ui-tone-violet-bg);
+  color: var(--ui-tone-violet-fg);
+}
+
+.ui-tone-cyan {
+  background: var(--ui-tone-cyan-bg);
+  color: var(--ui-tone-cyan-fg);
+}
+
+.ui-tone-emerald {
+  background: var(--ui-tone-emerald-bg);
+  color: var(--ui-tone-emerald-fg);
+}
+
+.ui-tone-amber {
+  background: var(--ui-tone-amber-bg);
+  color: var(--ui-tone-amber-fg);
+}
+
+.ui-tone-rose {
+  background: var(--ui-tone-rose-bg);
+  color: var(--ui-tone-rose-fg);
+}
+
+.ui-tone-slate {
+  background: var(--ui-tone-slate-bg);
+  color: var(--ui-tone-slate-fg);
+}
+
+.ui-tone-brand {
+  background: var(--ui-tone-brand-bg);
+  color: var(--ui-tone-brand-fg);
+}
+
+.ui-tone-neutral {
+  background: var(--ui-tone-neutral-bg);
+  color: var(--ui-tone-neutral-fg);
+}
+
+/* ======================================================================
+   列表行（.ui-items / .ui-item）与键值行（.ui-facts / .ui-fact）
+   ====================================================================== */
+
+.ui-items {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/*
+ * 行与行之间靠 padding 撑开，不靠 margin：这样相邻两行的可点区域是连续的，
+ * 鼠标不需要穿过缝隙。20px 的上下内边距是「两个块状元素不粘在一起」的下限。
+ */
+.ui-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ui-space-3);
+  padding-block: var(--ui-space-4);
+  border-bottom: 1px solid var(--ui-line);
+}
+
+.ui-item:first-child {
+  padding-top: var(--ui-space-2);
+}
+
+.ui-item:last-child {
+  padding-bottom: var(--ui-space-2);
+  border-bottom: 0;
+}
+
+.ui-item__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.ui-item__title {
+  display: block;
+  font-size: var(--ui-font-base);
+  font-weight: var(--ui-weight-medium);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-strong);
+}
+
+.ui-item__desc {
+  display: block;
+  margin-top: var(--ui-space-2);
+  font-size: var(--ui-font-sm);
+  line-height: var(--ui-leading-base);
+  color: var(--ui-text-soft);
+}
+
+.ui-item__extra {
+  flex: none;
+  margin-left: auto;
+  font-size: var(--ui-font-sm);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-soft);
+}
+
+.ui-facts {
+  margin: 0;
+}
+
+.ui-fact {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--ui-space-4);
+  padding-block: var(--ui-space-3);
+  border-bottom: 1px solid var(--ui-line);
+}
+
+.ui-fact:first-child {
+  padding-top: 0;
+}
+
+.ui-fact:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.ui-fact__label {
+  flex: none;
+  margin: 0;
+  font-size: var(--ui-font-sm);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-soft);
+}
+
+.ui-fact__value {
+  margin: 0;
+  text-align: right;
+  font-size: var(--ui-font-base);
+  font-weight: var(--ui-weight-medium);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-strong);
+  overflow-wrap: anywhere;
+}
+
+/* ======================================================================
+   统计卡
+   ====================================================================== */
+
+.ui-stats {
+  display: grid;
+  gap: var(--ui-space-4);
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+}
+
+.ui-stat {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--ui-space-2);
+  min-height: 82px;
+  padding: var(--ui-space-4) var(--ui-space-5);
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-line);
+  border-radius: var(--ui-radius-l);
+  box-shadow: var(--ui-shadow-card);
+}
+
+.ui-stat__label {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+  font-size: var(--ui-font-xs);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-soft);
+}
+
+/* 左侧状态点：用颜色区分统计口径，不写死颜色，取语义色调 */
+.ui-stat__label::before {
+  content: '';
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--ui-radius-pill);
+  background: var(--ui-tone-neutral-fg);
+}
+
+.ui-stat--success .ui-stat__label::before {
+  background: var(--ui-tone-success-fg);
+}
+
+.ui-stat--warning .ui-stat__label::before {
+  background: var(--ui-tone-warning-fg);
+}
+
+.ui-stat--danger .ui-stat__label::before {
+  background: var(--ui-tone-danger-fg);
+}
+
+.ui-stat--brand .ui-stat__label::before {
+  background: var(--ui-brand-strong);
+}
+
+/*
+ * .ui-num 只是「数字排版」的修饰类：等宽数字 + 不换行 + 收紧字距。
+ *
+ * 这里刻意**不设 font-size**。设了会出大问题：版本号、日期这类单元格也带 .ui-num，
+ * 一旦类里写死 28px，表格里每个版本号都会撑成标题那么大——实测就是这么坏的
+ * （审计脚本把表格行报成 font=28px 才暴露出来）。字号归调用方：统计卡用
+ * .ui-stat__value 给大号，表格单元格继承表格自己的字号。
+ */
+.ui-num {
+  font-variant-numeric: tabular-nums;
+  line-height: var(--ui-leading-num);
+  letter-spacing: var(--ui-tracking-tight);
+}
+
+/* 统计卡的数值：唯一需要大号数字的地方 */
+.ui-stat__value {
+  margin: 0;
+  font-size: var(--ui-font-2xl);
+  font-weight: var(--ui-weight-semibold);
+  line-height: var(--ui-leading-num);
+  color: var(--ui-text-strong);
+}
+
+/* ======================================================================
+   工具条、分段控件、筹码
+   ====================================================================== */
+
+.ui-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-space-3);
+  flex-wrap: wrap;
+}
+
+/*
+ * 卡片工具条里的检索框与计数。
+ * 检索框吃掉剩余宽度，计数靠右——两者与分段控件同高，才不会在一条线上高低不齐。
+ */
+.ui-toolbar__search {
+  flex: 1;
+  min-width: 200px;
+  max-width: 320px;
+}
+
+.ui-toolbar__count {
+  flex: none;
+  margin-left: auto;
+  font-size: var(--ui-font-xs);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-soft);
+}
+
+/* 窄屏让分段控件独占一行：与旁边的文字挤在一起会各自换行、看着像没对齐 */
+@media (max-width: 767px) {
+  .ui-toolbar {
+    align-items: stretch;
+  }
+}
+
+.ui-segments {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-3);
+  flex-wrap: wrap;
+}
+
+.ui-chips {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+  flex-wrap: wrap;
+}
+
+/* ======================================================================
+   兜底页（404）：两个应用共用同一套结构，只有出口按钮不同
+   ====================================================================== */
+
+.ui-fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--ui-space-4);
+  max-width: 520px;
+  margin-inline: auto;
+  padding: var(--ui-space-9) var(--ui-space-6);
+  text-align: center;
+}
+
+.ui-fallback__code {
+  font-size: var(--ui-font-3xl);
+  font-weight: var(--ui-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--ui-leading-num);
+  letter-spacing: var(--ui-tracking-tight);
+  color: var(--ui-brand-strong);
+}
+
+/*
+ * 兜底页的卡片：与 .ui-fallback 的居中列布局配合——卡片自己吃掉内边距，
+ * 外层的 padding 只负责与视口边缘的距离。
+ */
+.ui-fallback__card {
+  width: 100%;
+  padding: var(--ui-space-6);
+}
+
+.ui-fallback__title {
+  margin: 0;
+  font-size: var(--ui-font-lg);
+  font-weight: var(--ui-weight-semibold);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-strong);
+}
+
+.ui-fallback__desc {
+  margin: 0;
+  font-size: var(--ui-font-sm);
+  line-height: var(--ui-leading-base);
+  color: var(--ui-text-soft);
+}
+
+.ui-fallback__actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ui-space-3);
+  flex-wrap: wrap;
+  margin-top: var(--ui-space-2);
+}
+
+.ui-fallback__note {
+  margin: var(--ui-space-4) 0 0;
+  padding-top: var(--ui-space-4);
+  border-top: 1px solid var(--ui-line);
+  font-size: var(--ui-font-xs);
+  line-height: var(--ui-leading-loose);
+  color: var(--ui-text-soft);
+}
+
+/* ======================================================================
+   入场动效
+   遮罩淡入用 ui-fade-in；位移入场一律复用 base.css 的 ui-enter，
+   本文件不再定义近似的位移关键帧（曾同时存在 ui-enter 与 ui-rise-in）。
+   ====================================================================== */
+
+@keyframes ui-fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+/* ======================================================================
+   组件库收敛：度量对齐 4px 阶梯
+   组件库的 32px 内边距、8px 单元格、直角分隔线与本项目的阶梯不是一套节奏。
+   这里只收敛度量，不改组件行为。
+   ====================================================================== */
+
+.ui-card.dtd-card {
+  overflow: hidden;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-line);
+  border-radius: var(--ui-radius-l);
+  box-shadow: var(--ui-shadow-card);
+}
+
+.ui-card.dtd-card > .dtd-card-head {
+  min-height: 0;
+  padding: 0 var(--ui-space-5);
+  border-bottom: 1px solid var(--ui-line);
+  /*
+   * 组件库给 .dtd-card-head 写了 margin-bottom: -1px（它自己的做法是让标题栏的
+   * 下边框与卡片边框重叠一格，省掉 1px 的双线）。后果是卡片标题栏与卡片正文
+   * 在几何上真的重叠 1px——审计脚本在每个后台页面上都量到了 -1px，
+   * 视觉上表现为标题栏把正文第一行往上啃掉一点。
+   * 这里改回正常流，用 border-bottom 分隔。
+   */
+  margin-bottom: 0;
+}
+
+.ui-card.dtd-card > .dtd-card-head .dtd-card-head-title {
+  padding: var(--ui-space-4) 0;
+  font-size: var(--ui-font-md);
+  font-weight: var(--ui-weight-semibold);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-strong);
+}
+
+.ui-card.dtd-card > .dtd-card-head .dtd-card-extra {
+  padding: var(--ui-space-4) 0;
+}
+
+.ui-card.dtd-card > .dtd-card-body {
+  padding: var(--ui-space-5);
+}
+
+.ui-card--flush.dtd-card > .dtd-card-body {
+  padding: 0;
+}
+
+/* 表格：首末列缩进对齐卡片标题，让整张卡的左右边缘成一条竖线 */
+.ui-card .dtd-table .dtd-table-thead > tr > th,
+.ui-card .dtd-table .dtd-table-tbody > tr > td {
+  padding: var(--ui-space-3) var(--ui-space-4);
+}
+
+.ui-card .dtd-table .dtd-table-thead > tr > th:first-child,
+.ui-card .dtd-table .dtd-table-tbody > tr > td:first-child {
+  padding-left: var(--ui-space-5);
+}
+
+.ui-card .dtd-table .dtd-table-thead > tr > th:last-child,
+.ui-card .dtd-table .dtd-table-tbody > tr > td:last-child {
+  padding-right: var(--ui-space-5);
+}
+
+.ui-card .dtd-table .dtd-table-thead > tr > th {
+  height: 42px;
+  background: var(--ui-surface-deep);
+  border-bottom: 1px solid var(--ui-line);
+  font-size: var(--ui-font-xs);
+  font-weight: var(--ui-weight-medium);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-soft);
+  white-space: nowrap;
+}
+
+/*
+ * 表格单元格：11px 的上下内边距 + 1.4 行高，让「标题 + 副标题」两行之间至少
+ * 有 4px 视觉间隙。原来靠 8px 内边距与默认行高，两行会粘在一起。
+ */
+.ui-card .dtd-table .dtd-table-tbody > tr > td {
+  border-bottom: 1px solid var(--ui-line);
+  line-height: var(--ui-leading-tight);
+}
+
+.ui-card .dtd-table .dtd-table-tbody > tr:last-child > td {
+  border-bottom: 0;
+}
+
+@media (any-hover: hover) {
+  .ui-card .dtd-table .dtd-table-tbody > tr.dtd-table-row:hover > td {
+    background: var(--ui-surface-hover);
+  }
+}
+
+.ui-card .dtd-table-placeholder {
+  padding: var(--ui-space-6) var(--ui-space-5);
+  color: var(--ui-text-soft);
+}
+
+/* ======================================================================
+   组件库收敛：状态观感（禁用 / 悬停）
+   状态审计（scripts/qc/state-audit.mjs）实测出来的组件库默认态缺陷，集中修在这里。
+   ====================================================================== */
+
+/*
+ * 移动端 Button 的禁用态用整钮 opacity 0.4 压暗。对短标签无害，对本项目的长句致命：
+ * 「申请上架新应用（暂未开放）」实测对比度 1.65:1——「暂未开放」这句话本身就是
+ * 要让人读的披露，压到看不见等于把安全声明藏起来了。
+ * 改法：撤掉 opacity，文字换 --ui-text-soft（四种底上均 ≥4.9:1），
+ * 「禁用感」交给 cursor: not-allowed、无悬停反馈、以及下面的中性底。
+ */
+.dtm-button.dtm-button-disabled,
+.dtm-button[aria-disabled='true'] {
+  opacity: 1;
+}
+
+.dtm-button.dtm-button-disabled .dtm-button-inner,
+.dtm-button[aria-disabled='true'] .dtm-button-inner {
+  color: var(--ui-text-soft);
+}
+
+/*
+ * 主按钮禁用时不能留品牌底：留底又要压暗文字保「不可点」，两者在 #ED7D33 族里
+ * 无解（白字 2.77、ink 灰化也不够弱）。所以主按钮一禁用就转中性底——
+ * 「橙色的 CTA 变灰了」本身就是最直白的禁用语言。
+ */
+.dtm-button-primary.dtm-button-disabled,
+.dtm-button-primary[aria-disabled='true'] {
+  background: var(--ui-surface-deep);
+  border-color: var(--ui-line);
+}
+
+/*
+ * 桌面库同款问题，两边走的是另一条路：.dtd-btn[disabled] 把文字色写成
+ * rgba(23,26,29,.24)（实测 1.66:1）。
+ *
+ * 这里的 color 全部带 !important，原因是实测出来的结构性事实：组件库的组件样式
+ * 由 JS 模块图在运行时注入 <style>（es/ 目录每组件自带 css），**源序在我们的
+ * components.css 之后**——同特异度对拼（比如 `.dtd-radio-disabled + span` 我们
+ * 一字不差写过）每次都输。状态色是无障碍底线（禁用说明必须读得出来），
+ * 值得用 !important 焊死，与焦点环同一处先例。
+ * 「禁用感」由 cursor、无悬停、中性底承担，不靠把字压到看不见。
+ */
+.dtd-btn[disabled],
+.dtd-btn[disabled] > *,
+.dtd-btn.dtd-btn-disabled,
+.dtd-btn.dtd-btn-disabled > * {
+  color: var(--ui-text-soft) !important;
+  opacity: 1;
+}
+
+.dtd-btn-primary[disabled],
+.dtd-btn-primary.dtd-btn-disabled {
+  background: var(--ui-surface-deep) !important;
+  border-color: var(--ui-line) !important;
+  box-shadow: none !important;
+}
+
+/* 输入框同理：占位说明（「登录开通后可用」）必须可读，按 ::placeholder 着色修。
+   带前后缀的输入框（顶栏全局搜索）可见容器是 affix-wrapper，不是 input 本体。 */
+.dtd-input[disabled],
+.dtd-input-disabled,
+.dtd-input[disabled]::placeholder,
+.dtd-input-disabled::placeholder,
+.dtd-input-affix-wrapper-disabled,
+.dtd-input-affix-wrapper-disabled input,
+.dtd-input-affix-wrapper-disabled input::placeholder {
+  color: var(--ui-text-soft) !important;
+  -webkit-text-fill-color: var(--ui-text-soft) !important;
+  opacity: 1;
+}
+
+.dtd-input-affix-wrapper-disabled,
+.dtd-input[disabled],
+.dtd-input-disabled {
+  background: var(--ui-surface-deep);
+}
+
+.dtm-input-item .dtm-input-item-input:disabled,
+.dtm-input-item .dtm-input-item-input:disabled::placeholder {
+  color: var(--ui-text-soft) !important;
+  -webkit-text-fill-color: var(--ui-text-soft) !important;
+  opacity: 1;
+}
+
+/* Select / InputNumber / Radio 的禁用态统一走「中性底 + 可读文字」 */
+.dtd-select-disabled .dtd-select-selection-item,
+.dtd-select-disabled .dtd-select-selection-placeholder,
+.dtd-input-number-disabled .dtd-input-number-input,
+.dtd-radio-disabled + span,
+.dtd-radio-disabled + span * {
+  color: var(--ui-text-soft) !important;
+  -webkit-text-fill-color: var(--ui-text-soft) !important;
+}
+
+/*
+ * 移动端分段筛选器（市场页的发布状态切换）：组件库对未选中项没有任何悬停反馈。
+ * 它是 div + onClick（无 role、无 tabindex，组件库自身的无障碍缺口，DDE 笔记有载），
+ * 悬停无变化时用户无法确认「这一格是能点的」。补一层轻底。
+ */
+@media (any-hover: hover) {
+  .dtm-segment-item:not(.dtm-segment-item-selected):hover {
+    background: var(--ui-surface-hover);
+  }
+}
+
+/* ======================================================================
+   表单栅格与字段
+   后台的发布页整页由它构成，登录页也用它包账号与密码两栏。
+   ====================================================================== */
+
+.ui-form-grid {
+  display: grid;
+  /* 两栏起步，容器窄了自动退成一栏——比按断点手算列数稳 */
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--ui-space-4) var(--ui-space-5);
+}
+
+/* 字段：标签在上、控件在下，两者之间 8px */
+.ui-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-2);
+  /* label 默认 inline，作为 grid 项会被拉伸；显式声明更稳 */
+  min-width: 0;
+}
+
+/* 独占整行的字段（多行文本、单选组、功能编辑器） */
+.ui-field--full {
+  grid-column: 1 / -1;
+}
+
+.ui-field__label {
+  display: flex;
+  align-items: baseline;
+  gap: var(--ui-space-2);
+  font-size: var(--ui-font-xs);
+  font-weight: var(--ui-weight-medium);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text);
+}
+
+/* 标签里的补充说明：比标签本身轻一档，不换行到看不出来 */
+.ui-field__label span {
+  font-size: var(--ui-font-2xs);
+  font-weight: var(--ui-weight-regular);
+  color: var(--ui-text-soft);
+}
+
+/* 表单底部动作区：按钮靠左排，说明另起一行占满 */
+.ui-form-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-3);
+  flex-wrap: wrap;
+  margin-top: var(--ui-space-5);
+  padding-top: var(--ui-space-4);
+  border-top: 1px solid var(--ui-line);
+}
+
+.ui-form-actions__note {
+  flex: 1;
+  min-width: 200px;
+  margin: 0;
+  font-size: var(--ui-font-xs);
+  line-height: var(--ui-leading-base);
+  color: var(--ui-text-soft);
+}
+
+/* 字段组下方的一段说明文字 */
+.ui-form-hint {
+  margin: 0 0 var(--ui-space-4);
+  font-size: var(--ui-font-xs);
+  line-height: var(--ui-leading-loose);
+  color: var(--ui-text-soft);
+}
+
+/* 筹码：一组只读标签（权限清单、成员岗位），换行排布 */
+.ui-chips {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+  flex-wrap: wrap;
+}
+
+/* ======================================================================
+   窄屏：把触控目标抬到 40px，且不靠负外边距
+   ====================================================================== */
+
+@media (max-width: 767px) {
+  .ui-badge {
+    min-height: 24px;
+    font-size: var(--ui-font-xs);
+  }
+
+  /*
+   * 组件库在窄屏的默认高度只有 34px，低于 40px 的舒适触控线。
+   * 两个库的类名前缀不同：桌面版 dtd-button（外加部分按钮是 dtd-btn），
+   * 移动版 dtm-button；顶栏是 sticky 的，也一起算进来。
+   */
+  .ui-page .dtd-button,
+  .ui-card .dtd-button,
+  .ui-toolbar .dtd-button,
+  .ui-fallback .dtd-button,
+  .ui-page .dtd-btn,
+  .ui-card .dtd-btn,
+  .ui-toolbar .dtd-btn,
+  .ui-fallback .dtd-btn,
+  .ui-appbar .dtd-button,
+  .ui-appbar .dtd-btn,
+  .admin-header .dtd-button,
+  .admin-header .dtd-btn,
+  .admin-header .dtm-button,
+  .ui-page .dtm-button,
+  .ui-card .dtm-button,
+  .ui-toolbar .dtm-button {
+    min-height: 40px;
+  }
+
+  .ui-section__link,
+  .ui-item__extra,
+  .ui-pagehead__actions a {
+    min-height: 40px;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  /* 窄屏字段一律整行：两栏在 390px 下每栏不足 180px，中文标签会折行 */
+  .ui-form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* 图标按钮：撑成正方形，避免宽度只有 22px 的窄条 */
+  .ui-page .dtd-button:has(> .dtd-button-icon:only-child),
+  .ui-card .dtd-button:has(> .dtd-button-icon:only-child) {
+    min-width: 40px;
+    padding-inline: 0;
+  }
+}
+
+/* ======================================================================
+   行内动作组
+   ====================================================================== */
+
+.ui-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-3);
+  flex-wrap: wrap;
+}
+
+/*
+ * 跳到主内容：平时收在顶栏之上（用负 top 而不是 left:-9999px），
+ * 键盘聚焦时滑下来。负值只作用在纵向的 top 上，不参与任何相邻元素的间距计算。
+ */
+.ui-skip-link {
+  position: absolute;
+  left: var(--ui-space-3);
+  top: calc(var(--ui-appbar-h) * -1);
+  z-index: calc(var(--ui-z-overlay) + 1);
+  padding: var(--ui-space-2) var(--ui-space-4);
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-line-strong);
+  border-radius: var(--ui-radius-m);
+  box-shadow: var(--ui-shadow-raise);
+  font-size: var(--ui-font-sm);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-strong);
+  transition: top var(--ui-dur-base) var(--ui-ease-standard);
+}
+
+.ui-skip-link:focus {
+  top: var(--ui-space-3);
+}

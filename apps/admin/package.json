@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@ai-portal/shared-types": "workspace:*",
+    "@ai-portal/ui-tokens": "workspace:*",
     "dd-icons": "^2.0.2",
     "dingtalk-design-desktop": "^3.0.0",
     "dingtalk-theme": "8.0.0-beta.8",

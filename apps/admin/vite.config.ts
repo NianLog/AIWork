@@ -25,6 +25,17 @@ export default defineConfig({
     port: 5174,
     strictPort: true,
     cors: false,
+    /**
+     * 忽略原子写留下的临时目录（形如 src/.styles.css.<pid>.<uuid>.tmpdir/）。
+     *
+     * 某些编辑器/工具把文件写磁盘的方式是「先写临时文件再替换」，临时目录与目标文件同层。
+     * chokidar 会去 watch 临时文件，而它随时可能被替换或删除，Windows 上直接报
+     * EBUSY: resource busy or locked 并让整个 dev server 退出。这里把这类目录排除掉：
+     * 最终文件名与正式文件同名，只在临时目录里出现，忽略它们不影响任何热更新。
+     */
+    watch: {
+      ignored: ['**/.*.tmpdir/**'],
+    },
   },
   preview: {
     host: '127.0.0.1',
