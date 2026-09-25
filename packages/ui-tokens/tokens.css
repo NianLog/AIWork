@@ -1,0 +1,335 @@
+/*
+ * AI 中台的版式、配色与动效规范 —— 门户与后台共用的单一真源。
+ *
+ * 分工：
+ *   - dingtalk-theme 提供组件外观的**结构**（层级、尺寸、状态语义）；
+ *   - 本文件决定「用什么颜色、怎么排、怎么动」，令牌名是 --ui-*；
+ *   - 品牌色的**取值**在本文件里被改写，改写方式见下面「品牌色」一节。
+ *
+ * 使用纪律：
+ *   1. 间距只允许取 --ui-space-* 里的值，不要在业务样式里写 6px / 10px / 14px 这类中间值；
+ *   2. 字号只允许取 --ui-font-* 里的值；
+ *   3. 需要过渡就直接引用 --ui-transition-colors / --ui-transition-surface，
+ *      不要在业务样式里另写 duration 与 easing；
+ *   4. 语义色只允许取 --ui-tone-*（底色与文字成对），不要在业务样式里另造 rgba(...) 色板；
+ *   5. 端上确有差异的（版心宽度、移动端留白）在各自 styles.css 里覆盖，不在这里分叉；
+ *   6. 需要「品牌色」时按用途取三个令牌之一：--ui-brand / --ui-brand-strong / --ui-brand-ink，
+ *      它们的可用范围是硬约束，理由见下。
+ *
+ * ============================================================================
+ * 品牌色 #ED7D33 与它的伴生色
+ * ============================================================================
+ *
+ * 系统主题色是 #ED7D33。它有三个伴生色，不是随便配的，全部由 scripts/qc/palette-final.mjs
+ * 反解并逐对核验过对比度（结论见 DDE 笔记 2026-09-25-warm-brand-palette）：
+ *
+ *   --ui-brand        #ED7D33   2.77:1 于白底
+ *   --ui-brand-strong #A64A12   4.94:1 于白底 / 4.94:1 白字在其上
+ *   --ui-brand-ink    #2E1408   6.22:1 于 #ED7D33 色块上
+ *   --ui-brand-lift   #F79A5C   品牌色的浅端（7.98:1 ink 在其上），渐变专用
+ *
+ * 硬约束（不是建议，是验收条件）：
+ *   - #ED7D33 在白底上只有 2.77:1，**达不到图形所需的 3:1**，更达不到文字的 4.5:1。
+ *     因此它只允许出现在「大面积色块」上——顶栏品牌条、hero、图标瓦片底、渐变的浅端。
+ *     这类载体靠面积与色相被认出来，不承载信息、不镶细线，WCAG 1.4.11 不适用。
+ *   - 任何「细线 / 小图标 / 文字」一律取 --ui-brand-strong，保证 ≥4.5:1。
+ *     包括当前项指示条这类「看起来是装饰、其实是信息」的 2px 细条。
+ *   - #ED7D33 色块上要放字，只能放 --ui-brand-ink（白字在该底色上只有 2.77:1，禁止）。
+ *   - 品牌渐变只许从 #ED7D33 **往浅走**（到 --ui-brand-lift）。往深走会先把 ink 杀死：
+ *     ink 在 --ui-brand-active(#8F3F0D) 上实测只有 2.37:1（状态审计抓到，hero 曾是受害者）。
+ *
+ * 为什么正文灰阶也跟着改了：重构前用的 muted #A9AEB3 是 2.24:1、subtle #878F95 是 3.28:1，
+ * 两档都不达 AA。现在收敛成三档，最低的 --ui-text-soft 在三种表面上都 ≥4.5:1，
+ * 没有「再浅一档」的选项——需要更弱的层次就用字重与字号，不要用更浅的灰。
+ *
+ * ============================================================================
+ * 语义色为什么要换色相
+ * ============================================================================
+ *
+ * 品牌色变成橙色之后，钉钉原来的警示色 --common_orange1_color #FF9200 与品牌色的
+ * OKLab 感知距离只有 0.066，原危险色 #FF5219 只有 0.079 —— 用户分不出「这是品牌强调」
+ * 还是「这是警示 / 出错」。所以语义色整体换成与品牌橙有足够距离的取值：
+ *
+ *   成功 Δ=0.296   警示 Δ=0.202   危险 Δ=0.180   信息 Δ=0.351   强调 Δ=0.313
+ *
+ * 做法是**改主题令牌的值**（--common_blue1_color、--common_orange1_color 等），
+ * 而不是绕过主题自己造一套。这样组件库里所有读主题令牌的地方（按钮、选中态、下划线、
+ * 复选框、徽标）自动跟着走，不需要逐个组件覆盖。
+ *
+ * 断点阶梯（媒体查询无法读 CSS 变量，JS 里的断点常量必须与此保持一致）：
+ *   sm  < 768px    手机，单列，底部导航
+ *   md  768–1023px 平板 / 窄窗口，单列居中，底部导航
+ *   lg  ≥ 1024px   PC，顶部导航 + 宽版心，多列
+ *   xl  ≥ 1440px   宽屏，版心再放宽，横向留白加大
+ */
+
+/* ============================================================================
+   主题令牌改写：把品牌色与语义色落到钉钉主题自己的令牌名上。
+   选择器写成 :root:root 是刻意的——靠特指度压过主题里的 :root 与
+   :root[data-dingtalk-platform="pc"]，而不是依赖样式表的先后顺序。
+   （主题包另有 setCustomizeThemeColors() 接口，但它把样式插在 head 尾部，
+     主题换肤重新插 link 时会被盖掉，所以不用它。）
+   ============================================================================ */
+:root:root {
+  /* ---- 品牌橙族 ---- */
+  --common_blue1_color: #a64a12;
+  --common_blue1_hover_color: #b5541a;
+  --common_blue1_active_color: #8f3f0d;
+  --common_blue2_color: rgba(166, 74, 18, 0.48);
+  --common_blue3_color: #fdefe7;
+
+  --theme_primary1_color: #a64a12;
+  --theme_primary2_color: rgba(166, 74, 18, 0.48);
+  --theme_primary3_color: #fdefe7;
+  --theme_primary_hover_color: #b5541a;
+  --theme_primary_press_color: #8f3f0d;
+
+  /* ---- 警示：换到金褐色相，与品牌橙拉开距离（Δ 0.066 → 0.202）---- */
+  --common_orange1_color: #8a6100;
+  --common_orange2_color: rgba(138, 97, 0, 0.48);
+  --common_orange3_color: #f6f2eb;
+
+  /* ---- 危险：原 #FF5219 与品牌橙过近（Δ 0.079），换成更冷、更稳的红 ---- */
+  --common_red1_color: #c0342f;
+  --common_red1_hover_color: #d13f3a;
+  --common_red1_active_color: #a32a26;
+  --common_red2_color: rgba(192, 52, 47, 0.48);
+  --common_red3_color: #faefee;
+
+  --theme_danger1_color: #c0342f;
+  --theme_danger2_color: rgba(192, 52, 47, 0.48);
+  --theme_danger3_color: #faefee;
+  --theme_danger_hover_color: #d13f3a;
+  --theme_danger_press_color: #a32a26;
+
+  /* ---- 成功：略压暗，保证在自身淡底上仍有 4.5:1 ---- */
+  --common_green1_color: #0f7b45;
+  --common_green2_color: rgba(15, 123, 69, 0.48);
+  --common_green3_color: #ecf4f0;
+
+  /* ---- 黄：与警示金褐区分开，只作图表色与强调标记 ---- */
+  --common_yellow1_color: #c9a227;
+  --common_yellow2_color: rgba(201, 162, 39, 0.48);
+  --common_yellow3_color: #faf6e9;
+
+  /* ---- 表面与描边：中性灰略带暖调，避免在橙色旁边发青 ---- */
+  --common_bg_color: #f4f5f7;
+  --common_bg_z1_color: #ffffff;
+  --common_bg_z0_color: #eceef1;
+  --common_line_light_color: rgba(23, 26, 29, 0.1);
+  --common_line_hard_color: rgba(23, 26, 29, 0.18);
+  --common_line_element_color: rgba(23, 26, 29, 0.32);
+
+  /* ---- 文本灰阶：三档全部达 AA（旧的两档 2.24 / 3.28 已废弃）---- */
+  --common_level1_base_color: #171a1d;
+  --common_level2_base_color: #4a5157;
+  --common_level3_base_color: #616870;
+}
+
+:root {
+  /* ---------- 间距：4 的倍数阶梯 ---------- */
+  --ui-space-1: 4px;
+  --ui-space-2: 8px;
+  --ui-space-3: 12px;
+  --ui-space-4: 16px;
+  --ui-space-5: 20px;
+  --ui-space-6: 24px;
+  --ui-space-7: 32px;
+  --ui-space-8: 40px;
+  --ui-space-9: 48px;
+  --ui-space-10: 64px;
+
+  /* ---------- 圆角：4 / 8 / 12 / 16 四档 ---------- */
+  --ui-radius-s: var(--common_border_radius_s, 4px);
+  --ui-radius-m: var(--common_border_radius_l, 8px);
+  --ui-radius-l: 12px;
+  --ui-radius-xl: 16px;
+  --ui-radius-pill: 999px;
+
+  /* ---------- 描边：以细线代替重阴影来划分层次 ---------- */
+  --ui-line: var(--common_line_light_color, rgba(23, 26, 29, 0.1));
+  --ui-line-strong: var(--common_line_hard_color, rgba(23, 26, 29, 0.18));
+  --ui-line-element: var(--common_line_element_color, rgba(23, 26, 29, 0.32));
+  --ui-focus-ring: 0 0 0 3px var(--ui-brand-soft);
+
+  /* ---------- 表面 ---------- */
+  --ui-surface: var(--common_bg_z1_color, #ffffff);
+  --ui-surface-sunken: var(--common_bg_color, #f4f5f7);
+  --ui-surface-deep: var(--common_bg_z0_color, #eceef1);
+  --ui-surface-hover: rgba(23, 26, 29, 0.05);
+  --ui-surface-press: rgba(23, 26, 29, 0.09);
+  --ui-overlay: rgba(23, 26, 29, 0.45);
+
+  /* ---------- 文本：三档，最低档在三种表面上都 ≥4.5:1 ---------- */
+  --ui-text-strong: var(--common_level1_base_color, #171a1d);
+  --ui-text: var(--common_level2_base_color, #4a5157);
+  --ui-text-soft: var(--common_level3_base_color, #616870);
+  /* 只用于纯装饰：分隔符、占位图形。禁止承载信息。 */
+  --ui-text-decor: #a9aeb3;
+
+  /* ---------- 品牌色：用途见文件头，不要交叉使用 ---------- */
+  --ui-brand: #ed7d33;          /* 仅大面积色块：品牌条 / hero / 瓦片底 / 渐变浅端 */
+  --ui-brand-strong: #a64a12;   /* 文字、细线、小图标、按钮底（白字 4.94:1） */
+  --ui-brand-hover: #b5541a;    /* 仅限「白字在其上」的按钮底悬停；做文字色不达 AA，禁用 */
+  --ui-brand-active: #8f3f0d;   /* 按钮底按下态 / 链接悬停（往深才有处处 ≥4.5 的余量） */
+  --ui-brand-lift: #f79a5c;     /* 品牌渐变的浅端；ink 在其上 7.98:1 */
+  --ui-brand-ink: #2e1408;      /* 放在 #ED7D33 色块上的文字（6.22:1） */
+  --ui-brand-soft: #fdefe7;     /* 品牌淡底（与 --common_blue3_color 同值） */
+  --ui-brand-soft-weak: #fef5ef;
+  --ui-brand-line: rgba(237, 125, 51, 0.32);
+
+  /* ---------- 语义色：底色与文字成对 ---------- */
+  --ui-tone-success-bg: var(--common_green3_color, #ecf4f0);
+  --ui-tone-success-fg: var(--common_green1_color, #0f7b45);
+  --ui-tone-warning-bg: var(--common_orange3_color, #f6f2eb);
+  --ui-tone-warning-fg: var(--common_orange1_color, #8a6100);
+  --ui-tone-danger-bg: var(--common_red3_color, #faefee);
+  --ui-tone-danger-fg: var(--common_red1_color, #c0342f);
+  --ui-tone-info-bg: #eef3f8;
+  --ui-tone-info-fg: #2563a8;
+  --ui-tone-accent-bg: #ecf5f6;
+  --ui-tone-accent-fg: #0b727f;
+  --ui-tone-neutral-bg: rgba(23, 26, 29, 0.06);
+  --ui-tone-neutral-fg: var(--common_level2_base_color, #4a5157);
+
+  /* ---------- 品牌淡底上的文字（与 tone 同构，方便成对取用）---------- */
+  --ui-tone-brand-bg: var(--ui-brand-soft);
+  --ui-tone-brand-fg: var(--ui-brand-strong);
+
+  /*
+   * ---------- 彩虹装饰色（项目文化主题「让生活更多彩」）----------
+   * 七段：红橙黄绿青蓝紫，橙位就是品牌色本体——品牌是彩虹的一环，不是彩虹之外再添一色。
+   * 七值取相近感知亮度与克制饱和度（radix-9 级），暖色向品牌橙倾斜，避免正光谱的霓虹感。
+   * 硬规则（与品牌色同一纪律，评审按此拦）：
+   *   - 只允许出现在装饰位：loading 骨架 / spinner / 进度条 / 空态点缀；
+   *     never 用于文字、链接、按钮、徽章、焦点环、边框线；
+   *   - 每相以 ≥8px 的色块出现，靠面积识别，不靠线宽；
+   *   - 与语义色（危险红 / 警示金褐）并存时靠形态区分：彩虹=色块，语义=徽章。
+   *     彩虹不进入任何状态展示场景——loading 的瞬时性是它安全的边界。
+   */
+  --ui-rainbow-red: #e5484d;
+  --ui-rainbow-orange: #ed7d33;
+  --ui-rainbow-yellow: #f0b429;
+  --ui-rainbow-green: #46a758;
+  --ui-rainbow-cyan: #00a2c7;
+  --ui-rainbow-blue: #3e63dd;
+  --ui-rainbow-purple: #8e4ec6;
+
+  /*
+   * 应用图标瓦片的色调。所属应用需要一眼区分，所以这六个色相是刻意的例外：
+   * 主题令牌里没有紫色 / 青色 / 琥珀色，各写一次比在每个应用里各抄一遍 rgba 更可控。
+   * 每个色相都核验过「图标色在自身 12% 淡底上 ≥3:1」，且与品牌橙的 OKLab 距离 >0.12。
+   */
+  --ui-tone-violet-bg: rgba(124, 92, 240, 0.12);
+  --ui-tone-violet-fg: #5942ad;
+  --ui-tone-cyan-bg: rgba(14, 154, 173, 0.12);
+  --ui-tone-cyan-fg: #0a6f7d;
+  --ui-tone-emerald-bg: rgba(18, 161, 80, 0.12);
+  --ui-tone-emerald-fg: #0d743a;
+  --ui-tone-amber-bg: rgba(133, 97, 0, 0.12);
+  --ui-tone-amber-fg: #604600;
+  --ui-tone-rose-bg: rgba(217, 69, 92, 0.12);
+  --ui-tone-rose-fg: #9c3242;
+  --ui-tone-slate-bg: rgba(110, 123, 135, 0.12);
+  --ui-tone-slate-fg: #4f5961;
+
+  /* ---------- 阴影：静止的卡片靠描边，只有浮层与悬停才用阴影 ---------- */
+  --ui-shadow-flat: none;
+  --ui-shadow-card: 0 1px 2px rgba(23, 26, 29, 0.04);
+  --ui-shadow-raise: 0 4px 16px rgba(23, 26, 29, 0.08);
+  --ui-shadow-overlay: 0 12px 32px rgba(23, 26, 29, 0.18);
+
+  /* ---------- 字号阶梯 ---------- */
+  --ui-font-2xs: 11px;
+  --ui-font-xs: 12px;
+  --ui-font-sm: 13px;
+  --ui-font-base: 14px;
+  --ui-font-md: 16px;
+  --ui-font-lg: 20px;
+  --ui-font-xl: 24px;
+  --ui-font-2xl: 28px;
+  --ui-font-3xl: 32px;
+
+  /* ---------- 字重 ---------- */
+  --ui-weight-regular: 400;
+  --ui-weight-medium: 500;
+  --ui-weight-semibold: 600;
+
+  /*
+   * 行高。四条底线，任何文字都必须至少落到其中一条：
+   *   - 中文没有西文那样的下伸部，行高等于字号时上下两个字会**视觉相碰**；
+   *   - 所以单行 UI 文字（徽标、标签、数字）最低 1.4，绝不能写 line-height: 1。
+   * 重构前 .ui-badge 写的是 line-height: 1，12px 的字装在 12px 的行盒里，
+   * 这就是「上下紧靠」的第一个来源。
+   */
+  --ui-leading-none: 1;          /* 仅限图标容器、纯装饰块 */
+  --ui-leading-num: 1.15;        /* 大号数字，行盒无需容纳下伸部 */
+  --ui-leading-tight: 1.4;       /* 单行 UI 文字：徽标、标签、按钮 */
+  --ui-leading-base: 1.6;        /* 正文 */
+  --ui-leading-loose: 1.8;       /* 说明文字、脚注 */
+
+  /* ---------- 字距 ---------- */
+  --ui-tracking-tight: -0.01em;
+  --ui-tracking-wide: 0.04em;
+
+  /* ---------- 控件高度 ---------- */
+  --ui-control-s: 28px;
+  --ui-control-m: 32px;
+  --ui-control-l: 36px;
+  --ui-control-xl: 44px;
+
+  /* ---------- 动效 ---------- */
+  --ui-dur-fast: 120ms;
+  --ui-dur-base: 200ms;
+  --ui-dur-slow: 260ms;
+  --ui-ease-standard: cubic-bezier(0.2, 0, 0.2, 1);
+  --ui-ease-emphasized: cubic-bezier(0.4, 0, 0.2, 1);
+  --ui-transition-colors: color var(--ui-dur-fast) var(--ui-ease-standard),
+    background-color var(--ui-dur-fast) var(--ui-ease-standard),
+    border-color var(--ui-dur-fast) var(--ui-ease-standard);
+  --ui-transition-surface: background-color var(--ui-dur-base) var(--ui-ease-standard),
+    border-color var(--ui-dur-base) var(--ui-ease-standard),
+    box-shadow var(--ui-dur-base) var(--ui-ease-standard),
+    transform var(--ui-dur-base) var(--ui-ease-standard);
+
+  /* ---------- 层级 ---------- */
+  --ui-z-sticky: 100;
+  --ui-z-overlay: 1000;
+
+  /*
+   * ---------- 导航尺寸 ----------
+   * 「极具紧凑感、信息密度高、占位小」是明确的诉求：外框架是给子应用让位的，
+   * 所以顶栏压到 40px（只放品牌 + 导航 + 身份，单行），窄屏导航就在这条顶栏里，
+   * 不另设底部导航栏。子应用工作区条更薄：36px，只留返回与标题。
+   */
+  --ui-appbar-h: 40px;
+  --ui-workspacebar-h: 36px;
+
+  /* ---------- 版心与横向留白 ---------- */
+  --ui-gutter: var(--ui-space-3);
+  --ui-container: 100%;
+  --ui-page-gap: var(--ui-space-5);
+}
+
+@media (min-width: 768px) {
+  :root {
+    --ui-gutter: var(--ui-space-5);
+    --ui-page-gap: var(--ui-space-5);
+    --ui-appbar-h: 44px;
+  }
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --ui-gutter: var(--ui-space-6);
+    --ui-page-gap: var(--ui-space-6);
+    --ui-appbar-h: 48px;
+  }
+}
+
+@media (min-width: 1440px) {
+  :root {
+    --ui-gutter: var(--ui-space-8);
+    --ui-page-gap: var(--ui-space-6);
+  }
+}

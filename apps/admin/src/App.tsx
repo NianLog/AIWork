@@ -4,9 +4,7 @@ import AdminRoutes from './router/AdminRoutes';
 export default function App() {
   return (
     <BrowserRouter>
-      <div className="admin-root">
-        <AdminRoutes />
-      </div>
+      <AdminRoutes />
     </BrowserRouter>
   );
 }

@@ -1,0 +1,162 @@
+/*
+ * AI 中台门户与后台共用的基础层：重置、字体、焦点可见性、动效底座。
+ *
+ * 这一层取代了此前在两个应用的 styles.css 里各写一遍的那几十行（重置、跳过导航、
+ * 读屏文本）。同一个规则写两遍迟早会分叉，所以收到这里。
+ *
+ * 引进顺序：dingtalk-theme 的主题令牌 → 本包的 tokens.css → 本文件 → 应用自己的
+ * styles.css。本文件依赖前两者的变量。
+ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+/*
+ * WebView 字体缩放禁令：钉钉 WebView（尤其 Android）会按系统字体设置放大文字，
+ * 版式节奏全部失效。100% 把字号钉在 CSS 声明值上，用户仍可用系统设置放大
+ * 整页（视觉缩放），但文字不再单独重排。
+ */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--ui-surface-sunken);
+  color: var(--ui-text-strong);
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue",
+    "Microsoft YaHei", sans-serif;
+  font-size: var(--ui-font-base);
+  line-height: var(--ui-leading-base);
+  -webkit-font-smoothing: antialiased;
+  /* WebView 触控高亮：组件态有自己的反馈，灰色系统高亮只会叠一层脏色 */
+  -webkit-tap-highlight-color: transparent;
+}
+
+a {
+  /*
+   * 链接一律取 --ui-brand-strong 而不是 --ui-brand。
+   * 状态审计（scripts/qc/state-audit.mjs）实测：#ED7D33 做文字色在页面灰底上只有
+   * 2.54:1——「全部应用」这种区块链接根本读不出来。品牌橙只许出现在大面积色块上
+   * （见 tokens.css 头部第 4 条使用约束）。
+   */
+  color: var(--ui-brand-strong);
+  text-decoration: none;
+  transition: var(--ui-transition-colors);
+}
+
+a:hover {
+  /*
+   * 悬停往**深**走（#8F3F0D）而不是往浅走：浅一档的 #B5541A 在页面灰底 4.53、
+   * 更深底 4.25、品牌淡底 4.40——三档都卡在 4.5 线附近或以下。
+   * 往深是这个色族里唯一处处过线的方向，观感上是「按得更实」而非「变亮」。
+   */
+  color: var(--ui-brand-active);
+}
+
+/*
+ * 键盘焦点统一走这里：鼠标点击不出现焦点环（:focus-visible 的语义），
+ * 键盘 Tab 一定看得见。
+ *
+ * 这里必须带 !important，不是习惯问题而是事实：两个钉钉组件库都在
+ * `button:focus`（0,1,1）/ 类组合选择器里写 `outline: none`，我们按标签写
+ * （button:focus-visible 同为 0,1,1）虽然源序在后能赢一次，但组件库的样式表
+ * 由 JS 在运行时注入 head，「谁在后」不可靠——状态审计实测每个按钮的焦点环
+ * 都被压成了 `0px none`，键盘用户完全看不见焦点。焦点可见性是无障碍底线，
+ * 值得用一个 !important 焊死。（同一处精神先例：降级动效的全局通配规则。）
+ */
+:focus-visible {
+  outline: 2px solid var(--ui-brand-strong) !important;
+  outline-offset: 2px;
+}
+
+/*
+ * 「跳过导航」的实现不在这里——它在 components.css 的 .ui-skip-link
+ * （负 top + 聚焦下滑）。这里曾有一份 left:-9999px 的旧实现，
+ * 两份同名规则靠源序决胜负是最难查的一类冲突，已删。
+ */
+
+/* 仅供读屏软件的文本 */
+.ui-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/*
+ * 路由切换的入场过渡。
+ *
+ * 这里**只动画 opacity，不动 transform**——这是被真实 bug 逼出来的取舍：
+ * transform 只要不是 none，就会让元素成为 fixed 后代的**包含块**并另起一个层叠上下文。
+ * `.portal-content` 带 ui-enter 时，里面 `position:fixed; inset:0` 的应用详情浮层
+ * 量到的矩形是 100,101,1240,490（= .portal-content 的盒子）而不是视口；它的
+ * z-index:1000 被关进局部上下文，被 z-index:100 的顶栏压在下面，关闭按钮点不到。
+ * 而且 animation-fill-mode: both 会把 to 帧永久留在元素上，Chrome 把动画过的
+ * `transform: none` 计算成单位矩阵——**动画尾巴就是地雷**。
+ *
+ * 需要位移层次的叶子（浮层面板、兜底卡，下面不会有 fixed 后代）引用 ui-rise 关键帧
+ * ——它是「带位移的入场」的唯一曲线，只在叶子动画里用，不配套提供 .ui-rise 类：
+ * 类名工具早晚会和别的选择器撞名，关键帧名是全局的、反而安全。
+ */
+@keyframes ui-enter {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes ui-rise {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.ui-enter {
+  animation: ui-enter var(--ui-dur-slow) var(--ui-ease-emphasized) both;
+}
+
+/*
+ * 尊重系统的「减少动态效果」：不是关掉动效，而是把它压缩到不可感知的时长。
+ * 用 !important 是必要的——本文件与组件库的样式都可能声明更具体的选择器。
+ *
+ * 这一条是全站唯一的降级动效策略：它用通配选择器 + !important 覆盖所有元素，
+ * 因此不需要（也不该）在 components.css 里为某个具体类再写一份
+ * ——那份会同时面临「源序在应用 styles.css 之前而失效」的问题。
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+}

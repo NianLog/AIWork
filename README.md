@@ -2,7 +2,9 @@
 
 面向电商 AI 工具的统一入口工程，目标是提供门户、应用市场、统一身份权限和框架无关的子应用运行环境。
 
-> 当前交付是 **P0-1 工程骨架与协作配置**，不是可上线平台。门户和后台只有明确标注的非登录态预览；真实身份服务、容器挂载、网关与钉钉尚未接入。不要将预览页作为认证或权限隔离边界。
+> 当前交付是 **P0-1 工程骨架与协作配置**，不是可上线平台。门户和后台只有明确标注的体验界面；真实身份服务、容器挂载、网关与钉钉尚未接入。不要将体验页作为认证或权限隔离边界。
+>
+> 2026-09-25 起两个前端的界面整体改用钉钉官方组件库重写（门户 `dingtalk-design-mobile`、后台 `dingtalk-design-desktop`），自研主题令牌层取消，界面文案全量改为业务语言。决策依据与被否方案见 [.agents/notes](.agents/notes/)。
 
 - 协作仓库：<https://github.com/NianLog/AIWork>
 - 执行依据：[开发引导文档](docs/AI中台宿主门户_开发引导文档.md)
@@ -12,14 +14,14 @@
 
 | 模块 | 已有内容 | 尚未完成 |
 | --- | --- | --- |
-| Portal | React 工程、登录占位、工作台预览、接入状态、404 | 真实登录、动态菜单、组织切换、宿主 SDK 与容器运行时 |
-| Admin | 独立 React 工程、应用及用户／角色／组织空态 | Yudao Cloud 接口、RBAC CRUD、应用注册与发布 |
+| Portal | React 工程、钉钉移动端组件库界面、登录占位、工作台／应用市场／功能进展、应用详情抽屉、404 | 真实登录、动态菜单、组织切换、宿主 SDK 与容器运行时 |
+| Admin | 独立 React 工程、钉钉桌面端组件库界面、登录占位、应用列表／应用发布／用户／角色／组织、404 | Yudao Cloud 接口、RBAC CRUD、应用注册与发布链路 |
 | shared-sdk | 宿主检测与桥接、独立壳、回调式登录、会话刷新、权限与事件、导航检查、清理句柄 | 真实身份服务及 micro-app 联调；npm 发布 |
 | shared-types | 应用清单、运行时、权限码、网关头、五原语的共享类型 | 后端联调、完整运行时 Schema 校验 |
 | eslint-config-mfe | 子应用窗口访问、持久化存储及直接引入钉钉 SDK 等基础限制 | 别名绕过、资源泄漏、上传包与 CORS 等完整规范检查 |
 | 协作配套 | README、PR 模板、格式约定、Linux／Windows CI、DDE 决策笔记体系、pnpm 锁文件（2026-09-24 生成并本地全量校验） | 首次双系统 CI 运行确认、仓库分支保护设置、笔记校验脚本入库与 CI 接入 |
 
-**验证基线：**2026-09-24 在本机（Node 24.17.0 + pnpm 9.15.9，经 corepack 按根 `packageManager` 固定版本）完成依赖安装与 `pnpm verify` 全量校验：类型检查、lint、140 项单元测试（eslint 规则 30 + portal 6 + admin 8 + SDK 96）、双前端构建全部通过；并完成两应用共 8 条预览路由的浏览器验收。`pnpm-lock.yaml` 由该次安装生成并随本批提交固化。本机 Node 24 与 CI Node 22 存在主版本差异，跨平台结论以 Actions 运行记录为准。
+**验证基线：**2026-09-25 在本机（Node 24.17.0 + pnpm 9.15.9，经 corepack 按根 `packageManager` 固定版本）完成 `pnpm verify` 全量校验：类型检查、lint、165 项单元测试（eslint 规则 30 + portal 16 + admin 23 + SDK 96）、双前端构建（portal 2839 个模块／admin 2086 个模块）全部通过。浏览器验收覆盖两应用共 12 条路由，逐页核对了 DOM 结构、计算样式（无低对比度文字、无溢出、图标无缺字）、控制台消息与导航／检索／筛选交互；因本机浏览器面板不可见，本轮**未产出逐页截图**，像素级视觉对比仍待人工确认。`pnpm-lock.yaml` 于 2026-09-24 由实际安装生成并固化，本轮随依赖变更同步更新。本机 Node 24 与 CI Node 22 存在主版本差异，跨平台结论以 Actions 运行记录为准。
 
 ## 2. 技术选型与边界
 
@@ -28,6 +30,7 @@
 | 层 | 选型 | 当前落地情况 |
 | --- | --- | --- |
 | 主应用／后台 | React 18 + Vite 5 + TypeScript | 已有源码 |
+| UI 组件库 | 门户 dingtalk-design-mobile；后台 dingtalk-design-desktop；共用 dd-icons 图标与 dingtalk-theme 令牌 | 已落地，取代早期自研主题令牌方案 |
 | 状态管理 | Zustand | 已选定，尚未引入依赖或实现业务 store |
 | 微前端容器 | micro-app；qiankun／wujie 仅留未来适配边界 | 尚未实现适配器，未引入运行时依赖 |
 | 网关 | OpenResty / Nginx + Lua | 尚未创建网关工程 |
@@ -54,15 +57,15 @@
 ```text
 AIWork/
 ├── apps/
-│   ├── portal/                 # 门户预览；src/shell、src/router
-│   └── admin/                  # 独立管理后台预览
+│   ├── portal/                 # 门户（钉钉移动端组件库）；src/shell、src/router/{pages,parts}、src/store
+│   └── admin/                  # 管理后台（钉钉桌面端组件库）；src/shell、src/router/pages、src/store
 ├── packages/
 │   ├── shared-sdk/             # 框架无关的子应用接入层与测试
 │   ├── shared-types/           # 共享 TypeScript 契约
 │   └── eslint-config-mfe/      # 子应用静态限制及规则测试
 ├── docs/                       # 开发引导文档
 ├── .agents/
-│   └── notes/                  # DDE 决策笔记（{proposed,implemented,rejected,archived} × 6 class，按需创建）
+│   └── notes/                  # DDE 决策笔记（{proposed,implemented,rejected,archived} × 6 class，按需创建）；当前 4 篇均在 implemented/
 ├── .github/
 │   ├── workflows/ci.yml        # 双系统工程校验
 │   └── pull_request_template.md
@@ -108,10 +111,10 @@ pnpm dev
 
 | 应用 | 地址 | 路由 |
 | --- | --- | --- |
-| Portal | <http://127.0.0.1:5173> | `/login`、`/preview`、`/preview/status` |
-| Admin | <http://127.0.0.1:5174> | `/login`、`/preview/apps`、`/preview/users`、`/preview/roles`、`/preview/organizations` |
+| Portal | <http://127.0.0.1:5173> | `/login`、`/preview`、`/preview/market`、`/preview/status` |
+| Admin | <http://127.0.0.1:5174> | `/login`、`/preview/apps`、`/preview/publish`、`/preview/users`、`/preview/roles`、`/preview/organizations` |
 
-两个服务只监听本机地址，并启用严格端口。端口占用时启动应失败，不会自动换端口。登录表单禁用，没有默认账号或演示密码；点击页面上的“工程预览（非登录态）”查看布局。当前没有需要配置的前端 API 地址，也没有自动代理真实后端。
+两个服务只监听本机地址，并启用严格端口。端口占用时启动应失败，不会自动换端口。登录表单禁用，没有默认账号或演示密码；点击登录页上的“无需登录，先看看界面”进入体验界面。当前没有需要配置的前端 API 地址，也没有自动代理真实后端。
 
 ### 开发与校验命令
 
@@ -175,7 +178,7 @@ CI 结果以实际运行记录为准。尚未完成的钉钉真机回归、权�
 
 按引导文档 P0 → P1 推进，每一步以真实验收为准：
 
-1. 恢复可用开发环境，固化锁文件，并验证 `pnpm dev` 和浏览器预览（2026-09-24 已完成本机部分；首次双系统 CI 以提交锁文件的 PR 的 Actions 记录为准）。
+1. 恢复可用开发环境，固化锁文件，并验证 `pnpm dev` 和浏览器预览（2026-09-24 已完成本机部分；首次双系统 CI 以提交锁文件的 PR 的 Actions 记录为准）。界面重构与文案业务化于 2026-09-25 完成；视觉回归目前只有人工浏览器验收，机械化（Playwright + 截图基线）留待独立 PR。
 2. 补齐门户宿主 SDK／状态／容器边界，接入 Yudao Cloud 真实登录与权限。
 3. 实现接口动态应用配置和 micro-app 装载，验证“不重启门户新增应用”。
 4. 实现 OpenResty 鉴权代理、透传头、后端权限二次校验及限流。

@@ -4,7 +4,7 @@ import PortalRoutes from './router/PortalRoutes';
 export default function App() {
   return (
     <BrowserRouter>
-      <div className="portal-root">
+      <div className="portal-app">
         <PortalRoutes />
       </div>
     </BrowserRouter>

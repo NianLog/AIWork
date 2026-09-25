@@ -1,86 +1,954 @@
-body { margin: 0; }
+/*
+ * AI 中台管理后台的版式补充样式。
+ *
+ * 分工：重置、字体、焦点、动效底座在 ui-tokens/base.css；跨应用共用的结构件在
+ * ui-tokens/components.css；本文件只写后台独有的骨架——侧栏、顶栏、披露条与页标题行、
+ * 统计卡、工具条、表单栅格、登录页、窄屏抽屉。
+ *
+ * 颜色一律取 ui-tokens/tokens.css 里的 --ui-* 令牌，本文件不出现任何色值字面量。
+ *
+ * 密度目标（「外框架极具紧凑感、信息密度高、占位小」）：
+ *   侧栏 200px、顶栏 48px、披露条与页标题共用一行 36px、内容区上留白 16px。
+ *   上一版是侧栏 240px + 顶栏 56px + 提示条 64px + 页头 56px，内容从第 176px 才开始。
+ */
 
-.admin-root {
+/* ======================================================================
+   骨架
+   ====================================================================== */
+
+.admin-shell {
+  display: flex;
   min-height: 100vh;
-  color: #243b3d;
-  background: #f3f7f7;
-  font: 14px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
-  overflow-wrap: break-word;
+  background: var(--ui-surface-sunken);
 }
 
-.admin-root .admin-shell { display: grid; grid-template-columns: 224px minmax(0, 1fr); min-height: 100vh; }
-.admin-root .admin-sidebar { display: flex; flex-direction: column; padding: 30px 18px; background: #193638; color: #fff; }
-.admin-root .admin-brand { display: flex; align-items: center; margin-bottom: 40px; }
-.admin-root .admin-mark { display: grid; place-items: center; width: 42px; height: 42px; margin-right: 12px; border-radius: 12px; background: #267d72; font-weight: 700; letter-spacing: 1px; flex-shrink: 0; }
-.admin-root .admin-brand-name { margin: 0; font-size: 19px; font-weight: 650; }
-.admin-root .admin-brand-caption { margin: 2px 0 0; font-size: 11px; color: #b8d1cf; }
-.admin-root .admin-nav-caption { margin: 0 12px 12px; color: #b8d1cf; font-size: 12px; letter-spacing: 1px; }
-.admin-root .admin-nav { display: flex; flex-direction: column; }
-.admin-root .admin-nav-link { display: block; padding: 11px 16px; margin-bottom: 6px; border-radius: 8px; color: #cde0de; text-decoration: none; }
-.admin-root .admin-nav-link:hover { background: #234a4b; color: #fff; }
-.admin-root .admin-nav-link[aria-current="page"] { background: #2c5957; color: #fff; box-shadow: inset 3px 0 #9ad2c4; }
-.admin-root .admin-sidebar-footer { margin: auto 12px 0; padding-top: 36px; color: #b8d1cf; font-size: 12px; }
-.admin-root .admin-workspace { min-width: 0; }
-.admin-root .admin-topbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; min-height: 68px; padding: 10px 32px; box-sizing: border-box; background: #fff; border-bottom: 1px solid #dfe9e7; }
-.admin-root .admin-topbar-title { font-weight: 600; }
-.admin-root .admin-preview-note { display: flex; flex-direction: column; padding: 14px 32px; background: #fff6e3; border-bottom: 1px solid #eadbbc; color: #765217; font-size: 13px; }
-.admin-root .admin-content { width: 100%; max-width: 1180px; padding: 32px; box-sizing: border-box; }
-.admin-root .admin-eyebrow { margin: 0 0 8px; color: #52756f; font-size: 12px; font-weight: 600; letter-spacing: 1px; }
-.admin-root .admin-title { margin: 0 0 10px; font-size: 28px; line-height: 1.35; letter-spacing: -0.5px; }
-.admin-root .admin-copy { margin: 10px 0; color: #546d6e; }
-.admin-root .admin-panel { margin-top: 24px; background: #fff; border: 1px solid #dfe9e7; border-radius: 12px; box-shadow: 0 4px 18px rgba(31, 63, 62, 0.025); }
-.admin-root .admin-panel-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; padding: 18px 24px; border-bottom: 1px solid #eaf0ef; }
-.admin-root .admin-section-title { margin: 0; font-size: 16px; font-weight: 650; }
-.admin-root .admin-badge { padding: 3px 10px; border-radius: 5px; background: #edf3f2; color: #546d6e; font-size: 12px; }
-.admin-root .admin-table-scroll { overflow-x: auto; }
-.admin-root .admin-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-.admin-root .admin-table-heading { padding: 14px 24px; border-bottom: 1px solid #eaf0ef; background: #f8faf9; color: #546d6e; font-size: 12px; font-weight: 500; text-align: left; }
-.admin-root .admin-empty-cell { padding: 0; }
-.admin-root .admin-empty { padding: 44px 24px; text-align: center; }
-.admin-root .admin-empty-symbol { display: inline-grid; place-items: center; width: 52px; height: 52px; border: 1px dashed #b5cdc7; border-radius: 12px; background: #f4f8f7; color: #588279; font-size: 26px; }
-.admin-root .admin-empty-title { margin: 20px 0 8px; font-size: 17px; font-weight: 650; }
-.admin-root .admin-footnote { margin: 12px 0 0; color: #5e7777; font-size: 12px; }
-.admin-root .admin-link { display: inline-block; padding: 6px 0; color: #176d61; text-decoration: underline; text-underline-offset: 3px; }
-.admin-root .admin-entry { display: grid; place-items: center; min-height: 100vh; padding: 32px 20px; box-sizing: border-box; background: radial-gradient(ellipse at top left, #e2efeb, transparent 65%); }
-.admin-root .admin-login-card { width: 100%; max-width: 460px; padding: 36px; box-sizing: border-box; border: 1px solid #dfe9e7; border-radius: 16px; background: #fff; box-shadow: 0 16px 56px rgba(33, 72, 63, 0.07); }
-.admin-root .admin-notice { margin: 24px 0; padding: 16px; border: 1px solid #eadbbc; border-radius: 8px; background: #fff8e9; color: #765217; font-size: 13px; }
-.admin-root .admin-form { display: flex; flex-direction: column; margin: 24px 0; }
-.admin-root .admin-label { margin-bottom: 8px; font-weight: 600; }
-.admin-root .admin-input { width: 100%; height: 44px; margin-bottom: 18px; padding: 0 12px; box-sizing: border-box; border: 1px solid #d8e4e1; border-radius: 7px; font: inherit; }
-.admin-root .admin-input:disabled { background: #f3f7f6; color: #5e7777; opacity: 1; cursor: not-allowed; -webkit-text-fill-color: #5e7777; }
-.admin-root .admin-input::placeholder { color: #5e7777; opacity: 1; }
-.admin-root .admin-button { min-height: 44px; padding: 10px 16px; border: 0; border-radius: 7px; font: inherit; font-weight: 600; }
-.admin-root .admin-button:disabled { background: #e1eae7; color: #536d67; cursor: not-allowed; opacity: 1; }
-.admin-root .admin-preview-link { display: block; padding: 10px 16px; border: 1px solid #c2d9d2; border-radius: 7px; background: #f0f7f4; color: #176d61; text-align: center; text-decoration: none; font-weight: 600; }
-.admin-root .admin-preview-link:hover { background: #e2f1e9; }
-.admin-root .admin-actions { display: flex; flex-direction: column; align-items: stretch; text-align: center; }
-.admin-root .admin-actions .admin-link { margin-top: 12px; }
-.admin-root .admin-skip { position: absolute; left: 16px; top: -100px; padding: 10px 16px; z-index: 1; border-radius: 6px; background: #fff; color: #243b3d; }
-.admin-root .admin-skip:focus { top: 12px; }
-.admin-root .admin-link:focus,
-.admin-root .admin-nav-link:focus,
-.admin-root .admin-preview-link:focus,
-.admin-root .admin-skip:focus { outline: 3px solid #418a79; outline-offset: 3px; }
-
-@media (max-width: 760px) {
-  .admin-root .admin-shell { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; }
-  .admin-root .admin-sidebar { padding: 20px 16px 12px; }
-  .admin-root .admin-brand { margin-bottom: 18px; }
-  .admin-root .admin-nav-caption,
-  .admin-root .admin-sidebar-footer { display: none; }
-  .admin-root .admin-nav { flex-direction: row; flex-wrap: wrap; }
-  .admin-root .admin-nav-link { margin-right: 6px; }
-  .admin-root .admin-topbar { padding: 12px 20px; }
-  .admin-root .admin-preview-note { padding: 14px 20px; }
-  .admin-root .admin-content { padding: 24px 20px; }
-  .admin-root .admin-title { font-size: 25px; }
-  .admin-root .admin-table-heading { padding: 12px 14px; }
+.admin-main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
 }
 
-@media (max-width: 400px) {
-  .admin-root .admin-entry { padding: 20px 12px; }
-  .admin-root .admin-login-card { padding: 24px 20px; }
-  .admin-root .admin-content { padding: 24px 14px; }
-  .admin-root .admin-panel-header { padding: 18px; }
-  .admin-root .admin-empty { padding: 32px 18px; }
+/* ======================================================================
+   侧栏
+   ====================================================================== */
+
+.admin-sider {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  /*
+   * 200px 而不是常用的 240px：后台的菜单项最长是「应用发布」四个字，
+   * 200px 足够放下图标 + 四字 + 左右内边距，还多出 40px 留给内容区。
+   */
+  width: 200px;
+  background: var(--ui-surface);
+  border-right: 1px solid var(--ui-line);
+}
+
+.admin-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-3);
+  flex: none;
+  min-height: 48px;
+  padding: var(--ui-space-2) var(--ui-space-4);
+  border-bottom: 1px solid var(--ui-line);
+}
+
+.admin-brand__logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--ui-radius-m);
+  background: var(--ui-brand);
+  color: var(--ui-brand-ink);
+  font-size: var(--ui-font-base);
+  line-height: var(--ui-leading-none);
+}
+
+.admin-brand__text {
+  display: flex;
+  flex-direction: column;
+  /* 品牌名与副行之间 2px：两行都是小字，靠字重与颜色区分层次，不靠间距 */
+  gap: 2px;
+  min-width: 0;
+}
+
+.admin-brand__name {
+  font-size: var(--ui-font-sm);
+  font-weight: var(--ui-weight-semibold);
+  /* 原来是 line-height: normal，11~13px 的字行盒只有 1.15 倍，两行会粘住。
+     统一抬到 1.4（见 tokens.css 的行高底线）。 */
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-strong);
+  white-space: nowrap;
+}
+
+.admin-brand__desc {
+  font-size: var(--ui-font-2xs);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 侧栏关闭按钮只在窄屏抽屉形态下出现 */
+.admin-sider__close {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  margin-left: auto;
+  width: var(--ui-control-m);
+  height: var(--ui-control-m);
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: var(--ui-radius-m);
+  cursor: pointer;
+  color: var(--ui-text-soft);
+  font-size: var(--ui-font-md);
+  line-height: var(--ui-leading-none);
+  transition: var(--ui-transition-colors);
+}
+
+/* 状态审计（hover-debug）实测这个按钮原本悬停零反馈：它是窄屏唯一的关抽屉入口，必须看得见 */
+@media (any-hover: hover) {
+  .admin-sider__close:hover {
+    background: var(--ui-surface-hover);
+    color: var(--ui-text-strong);
+  }
+}
+
+.admin-menu {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--ui-space-2) var(--ui-space-2) var(--ui-space-4);
+}
+
+/*
+ * 收敛组件库 Menu 的度量：默认分组标题与条目之间、条目与条目之间都是 8~12px，
+ * 在 200px 宽的侧栏里显得松散。这里收到 2px / 4px，并把行高压到 34px。
+ */
+.admin-menu .dtd-menu-item-group-title {
+  padding: var(--ui-space-3) var(--ui-space-3) var(--ui-space-1);
+  font-size: var(--ui-font-2xs);
+  font-weight: var(--ui-weight-medium);
+  /* 全大写/小号标签需要字距才不显挤 */
+  letter-spacing: var(--ui-tracking-wide);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-soft);
+}
+
+.admin-menu .dtd-menu-item {
+  height: 34px;
+  margin: 2px 0;
+  border-radius: var(--ui-radius-m);
+  font-size: var(--ui-font-sm);
+  line-height: var(--ui-leading-tight);
+}
+
+.admin-menu .dtd-menu-item-selected {
+  background: var(--ui-brand-soft);
+  color: var(--ui-brand-strong);
+  font-weight: var(--ui-weight-medium);
+}
+
+.admin-sider__foot {
+  flex: none;
+  margin: 0;
+  padding: var(--ui-space-3) var(--ui-space-4);
+  border-top: 1px solid var(--ui-line);
+  font-size: var(--ui-font-2xs);
+  line-height: var(--ui-leading-base);
+  color: var(--ui-text-soft);
+}
+
+/* 窄屏抽屉的遮罩：宽屏不存在 */
+.admin-scrim {
+  display: none;
+}
+
+/* ======================================================================
+   顶栏
+   ====================================================================== */
+
+.admin-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-space-4);
+  flex: none;
+  position: sticky;
+  top: 0;
+  z-index: var(--ui-z-sticky);
+  min-height: var(--ui-appbar-h);
+  padding-inline: var(--ui-space-5);
+  background: var(--ui-surface);
+  border-bottom: 1px solid var(--ui-line);
+}
+
+.admin-header__left {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-3);
+  min-width: 0;
+}
+
+/* 导航开关只在窄屏出现 */
+.admin-header__navtoggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: var(--ui-control-l);
+  height: var(--ui-control-l);
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: var(--ui-radius-m);
+  cursor: pointer;
+  color: var(--ui-text);
+  font-size: var(--ui-font-md);
+  line-height: var(--ui-leading-none);
+}
+
+.admin-header__navtoggle:hover {
+  background: var(--ui-surface-hover);
+}
+
+/* 面包屑已经说明了「在哪」，字号压到 12px，不与内容标题抢层级 */
+.admin-header__crumb {
+  font-size: var(--ui-font-xs);
+  line-height: var(--ui-leading-tight);
+}
+
+.admin-header__tools {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-3);
+  flex: none;
+}
+
+.admin-header__search {
+  width: 200px;
+}
+
+.admin-header__env {
+  flex: none;
+}
+
+.admin-header__divider {
+  flex: none;
+  width: 1px;
+  height: 20px;
+  background: var(--ui-line-strong);
+}
+
+.admin-operator {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+  min-width: 0;
+  /*
+   * 纵向不留内边距：操作人是两行小字（姓名 + 角色）共约 36px，已经够触控高度。
+   * 再加 4px 上下内边距就变成 44px，会把声明 40px 的顶栏顶到 45px——
+   * 「外框占位小」正是被这种逐处几像素的松动累积破坏的。
+   */
+  padding: 0 var(--ui-space-2);
+  /* 两行小字自然高度是 35.99px（行高 1.4 × 13px + 2px + 1.4 × 11px），
+     差 0.01px 就会在触控审计里挂上「矮于 36px」。显式声明最小高度，别让它靠算出来。 */
+  min-height: var(--ui-control-l);
+  border-radius: var(--ui-radius-m);
+  color: var(--ui-text);
+  transition: var(--ui-transition-colors);
+}
+
+.admin-operator:hover {
+  background: var(--ui-surface-hover);
+  color: var(--ui-text-strong);
+}
+
+.admin-operator__text {
+  display: flex;
+  flex-direction: column;
+  /* 姓名与角色之间 2px：11px 的副行紧贴 13px 主行会糊成一块 */
+  gap: 2px;
+  min-width: 0;
+}
+
+.admin-operator__name {
+  font-size: var(--ui-font-sm);
+  font-weight: var(--ui-weight-medium);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-strong);
+  white-space: nowrap;
+}
+
+.admin-operator__role {
+  font-size: var(--ui-font-2xs);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-soft);
+  white-space: nowrap;
+}
+
+/* ======================================================================
+   内容区：披露条与页标题共用一行
+   ====================================================================== */
+
+.admin-body {
+  flex: 1;
+  min-width: 0;
+  /* 顶栏已经有一条分隔线，这里再堆大留白就是白吃掉首屏 */
+  padding-block: var(--ui-space-4) var(--ui-space-6);
+}
+
+.admin-body__inner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-page-gap);
+  width: 100%;
+  max-width: var(--ui-container);
+  margin-inline: auto;
+  padding-inline: var(--ui-gutter);
+}
+
+/*
+ * 披露条 + 页主标题一行。标题靠右、不换行；披露条占剩余宽度，可能折行。
+ * 两者基线对齐，视觉上是一条信息带而不是两个模块。
+ */
+.admin-topline {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--ui-space-4);
+  min-height: 36px;
+  padding-bottom: var(--ui-space-3);
+  border-bottom: 1px solid var(--ui-line);
+}
+
+.admin-pagehead__title {
+  margin: 0;
+  flex: none;
+  order: 2;
+  font-size: var(--ui-font-md);
+  font-weight: var(--ui-weight-semibold);
+  line-height: var(--ui-leading-tight);
+  letter-spacing: var(--ui-tracking-tight);
+  color: var(--ui-text-strong);
+  white-space: nowrap;
+}
+
+/*
+ * 披露条：去掉组件库 NoticeBar 的图标、边框、底色与大内边距，收成一行小字。
+ *
+ * 类名前缀是 -notice-bar 而不是 -alert：dingtalk-design-desktop 的 Alert 就是
+ * NoticeBar 的再导出（es/index.js 里 `export { default as Alert } from './notice-bar'`），
+ * DOM 上出现的全是 dtd-notice-bar-*。上一版按 .dtd-alert-* 写，选择器一条都没命中，
+ * 于是提示条保留着组件库的 15px 内边距与卡片底色，390px 下高达 96px——
+ * 这才是「披露条与页标题上下重叠」的真正原因（审计里那个 -126px 的负 gap）。
+ *
+ * 它的语义（role="note" + DEMO_DISCLOSURE + DEMO_EXPLANATION）必须完整保留，
+ * 压缩的只是观感——测试按 role="note" 与两段文案断言它持续在场。
+ */
+.admin-banner {
+  order: 1;
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.admin-banner.dtd-notice-bar {
+  display: flex;
+  align-items: flex-start;
+  padding: 0;
+}
+
+/* 图标撤掉：一行文字带上图标就会高出 8px，且这里不需要靠图标表达「这是提示」 */
+.admin-banner .dtd-notice-bar-icon {
+  display: none;
+}
+
+.admin-banner .dtd-notice-bar-content {
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  gap: var(--ui-space-2);
+  flex-wrap: wrap;
+  padding: 0;
+}
+
+/*
+ * 解除说明文字的截断。
+ *
+ * 组件库那条规则是 `.dtd-notice-bar-with-description .dtd-notice-bar-description`
+ * （两个类，0,2,0），并且带 display:-webkit-box；只把 -webkit-line-clamp 改回初值是不够的，
+ * 必须把 display 也改回 block，否则内容仍被限制在两行的 -webkit-box 里
+ * （审计报「内容高过盒子且被裁 38<58」就是这个）。
+ * 披露文案被截断等于没披露，所以这里不是「好看一点」，是语义要求。
+ */
+.admin-banner .dtd-notice-bar-message {
+  flex: none;
+  font-size: var(--ui-font-xs);
+  font-weight: var(--ui-weight-medium);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-strong);
+}
+
+.admin-banner .dtd-notice-bar-description {
+  display: block;
+  overflow: visible;
+  text-overflow: clip;
+  word-break: break-word;
+  font-size: var(--ui-font-xs);
+  line-height: var(--ui-leading-base);
+  color: var(--ui-text-soft);
+}
+
+.admin-content {
+  min-width: 0;
+}
+
+.admin-content__inner {
+  min-width: 0;
+}
+
+.admin-content:focus,
+.admin-content:focus-visible {
+  outline: none;
+}
+
+/* 工具条行：一句说明 + 右侧操作，替代原来的页头 */
+.admin-toolbar-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-space-4);
+  flex-wrap: wrap;
+}
+
+.admin-toolbar-row .ui-pagehead__lead {
+  flex: 1;
+  min-width: 240px;
+  margin: 0;
+}
+
+/*
+ * 表格里「从未登录」这类占位值：正常字重 + 次级色，
+ * 与相邻的等宽数字（.ui-num，中等字重 + 主文字色）形成对比——
+ * 一眼能看出哪个是真时间、哪个是「还没有」。
+ * 成员页的最近登录列用三元的 className 切换，所以这个类不会出现在样式表以外的地方。
+ */
+.admin-cell-muted {
+  font-weight: var(--ui-weight-regular);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-soft);
+}
+
+/* ======================================================================
+   权限与范围卡片（角色页、组织页）
+   ====================================================================== */
+
+.admin-perm-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--ui-space-4);
+}
+
+.admin-perm-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-3);
+  padding: var(--ui-space-4);
+  background: var(--ui-surface-deep);
+  border-radius: var(--ui-radius-m);
+}
+
+/* 功能名 + 权限条数：同一行，条数靠右 */
+.admin-perm-card__title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--ui-space-2);
+  margin: 0;
+  font-size: var(--ui-font-sm);
+  font-weight: var(--ui-weight-medium);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-strong);
+}
+
+.admin-perm-card__count {
+  flex: none;
+  font-size: var(--ui-font-sm);
+  color: var(--ui-text-soft);
+}
+
+/* 范围规则：图标 + 标题一行，说明另起一行 */
+.admin-scope-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--ui-space-4);
+}
+
+.admin-scope-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-2);
+  padding: var(--ui-space-4);
+  background: var(--ui-surface-deep);
+  border-radius: var(--ui-radius-m);
+}
+
+.admin-scope-item__head {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+  font-size: var(--ui-font-sm);
+  font-weight: var(--ui-weight-medium);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-strong);
+}
+
+.admin-scope-item__desc {
+  margin: 0;
+  font-size: var(--ui-font-xs);
+  line-height: var(--ui-leading-base);
+  color: var(--ui-text-soft);
+}
+
+/* ======================================================================
+   发布流程与说明
+   ====================================================================== */
+
+/* Steps 用组件库的，这里只把纵向步骤的行距收紧一档 */
+.admin-steps.dtd-steps {
+  font-size: var(--ui-font-xs);
+}
+
+.admin-steps .dtd-steps-item-title {
+  font-size: var(--ui-font-sm);
+  line-height: var(--ui-leading-tight);
+}
+
+.admin-steps .dtd-steps-item-description {
+  font-size: var(--ui-font-xs);
+  line-height: var(--ui-leading-base);
+  color: var(--ui-text-soft);
+}
+
+/* 发布方式说明：标题 + 说明两条一组，组与组之间 16px */
+.admin-explain {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-explain__item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-1);
+}
+
+.admin-explain__title {
+  margin: 0;
+  font-size: var(--ui-font-sm);
+  font-weight: var(--ui-weight-medium);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-strong);
+}
+
+.admin-explain__desc {
+  margin: 0;
+  font-size: var(--ui-font-xs);
+  line-height: var(--ui-leading-base);
+  color: var(--ui-text-soft);
+}
+
+.admin-publish-hint {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-3);
+  padding: var(--ui-space-3) var(--ui-space-4);
+  background: var(--ui-tone-info-bg);
+  border-radius: var(--ui-radius-m);
+  font-size: var(--ui-font-xs);
+  line-height: var(--ui-leading-base);
+  color: var(--ui-tone-info-fg);
+}
+
+/* 发布页：表单与侧栏说明并排 */
+.admin-publish-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: var(--ui-space-5);
+  align-items: start;
+}
+
+/* 侧栏说明区：两张卡片上下排，间距与主区域一致 */
+.admin-publish-side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-5);
+  min-width: 0;
+}
+
+/*
+ * 一行功能：功能名 + 说明 + 删除按钮。
+ * 前两栏等宽（两个输入框，等宽才读得出是并列关系），末栏 auto 让按钮只占自身宽度。
+ */
+.admin-func-editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-3);
+}
+
+.admin-func-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: var(--ui-space-3);
+  align-items: center;
+}
+
+/* ======================================================================
+   登录页
+   ====================================================================== */
+
+.admin-login {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ui-space-8);
+  min-height: 100vh;
+  padding: var(--ui-space-6) var(--ui-gutter);
+  background: var(--ui-surface-sunken);
+}
+
+.admin-login__hero {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-3);
+  max-width: 380px;
+}
+
+.admin-login__logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--ui-radius-l);
+  background: var(--ui-brand);
+  color: var(--ui-brand-ink);
+  font-size: var(--ui-font-xl);
+  line-height: var(--ui-leading-none);
+}
+
+.admin-login__brand {
+  margin: 0;
+  font-size: var(--ui-font-xl);
+  font-weight: var(--ui-weight-semibold);
+  line-height: var(--ui-leading-tight);
+  letter-spacing: var(--ui-tracking-tight);
+  color: var(--ui-text-strong);
+}
+
+.admin-login__slogan {
+  margin: 0;
+  font-size: var(--ui-font-sm);
+  line-height: var(--ui-leading-base);
+  color: var(--ui-text-soft);
+}
+
+.admin-login__points {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-3);
+  margin: var(--ui-space-2) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-login__points li {
+  display: flex;
+  flex-direction: column;
+  /* 每条里「小标题」与「说明」两行之间 4px */
+  gap: var(--ui-space-1);
+  font-size: var(--ui-font-sm);
+  line-height: var(--ui-leading-base);
+  color: var(--ui-text-soft);
+}
+
+.admin-login__points li strong {
+  font-size: var(--ui-font-sm);
+  font-weight: var(--ui-weight-medium);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-strong);
+}
+
+.admin-login__env {
+  margin: var(--ui-space-2) 0 0;
+  font-size: var(--ui-font-xs);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-soft);
+}
+
+.admin-login__panel {
+  width: 100%;
+  max-width: 400px;
+}
+
+.admin-login__card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-5);
+}
+
+/*
+ * 标题 + 说明自成一个块，块内间距 8px。
+ * 卡片用的是 flex gap，要给「标题与其说明」比「各块之间」更小的间距，只能把这一对
+ * 包起来另设 gap——不要用负外边距去抵消父级的 gap。
+ */
+.admin-login__head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-2);
+}
+
+.admin-login__title {
+  margin: 0;
+  font-size: var(--ui-font-lg);
+  font-weight: var(--ui-weight-semibold);
+  line-height: var(--ui-leading-tight);
+  letter-spacing: var(--ui-tracking-tight);
+  color: var(--ui-text-strong);
+}
+
+.admin-login__desc {
+  margin: 0;
+  font-size: var(--ui-font-sm);
+  line-height: var(--ui-leading-base);
+  color: var(--ui-text-soft);
+}
+
+/*
+ * 登录页的披露条：与后台顶栏那条不同，这里带图标、有底色，
+ * 因为登录页没有别的披露渠道，它需要被看见。
+ */
+.admin-login__notice {
+  margin: 0;
+}
+
+/* 登录表单：账号、密码、提交按钮三者之间 16px */
+.admin-login__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-4);
+}
+
+.admin-login__divider {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-3);
+  margin: 0;
+  font-size: var(--ui-font-xs);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-soft);
+}
+
+.admin-login__divider::before,
+.admin-login__divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--ui-line);
+}
+
+.admin-login__skip {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-3);
+  padding: var(--ui-space-4);
+  border: 1px solid var(--ui-brand-line);
+  border-radius: var(--ui-radius-l);
+  background: var(--ui-brand-soft);
+  color: var(--ui-brand-strong);
+  transition: var(--ui-transition-surface);
+}
+
+.admin-login__skip:hover {
+  background: var(--ui-brand-soft-weak);
+  color: var(--ui-brand-strong);
+  box-shadow: var(--ui-shadow-card);
+}
+
+/*
+ * 跳过登录入口的两行文字。
+ *
+ * 这里必须是块级/弹性容器，不能让两个 <span> 留在行内格式化上下文里：
+ * 行内元素换行时上下两行的盒子在几何上是相互重叠的（第一行折行后与第二行同 y），
+ * 审计脚本把它报成 -19px 的真重叠。上一版没给这个类写样式，问题就一直藏着。
+ */
+.admin-login__skip-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-1);
+  flex: 1;
+  min-width: 0;
+}
+
+.admin-login__skip-text strong {
+  font-size: var(--ui-font-base);
+  font-weight: var(--ui-weight-semibold);
+  line-height: var(--ui-leading-tight);
+}
+
+.admin-login__skip-text span {
+  font-size: var(--ui-font-xs);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-soft);
+}
+
+/* ======================================================================
+   窄屏：侧栏变成滑出抽屉，表格横向滚动
+   ====================================================================== */
+
+@media (max-width: 1023px) {
+  .admin-header__navtoggle {
+    display: inline-flex;
+  }
+
+  .admin-sider {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: var(--ui-z-overlay);
+    /*
+     * 抽屉在视口外，用 transform 而不是 display:none——
+     * 这样滑出有过渡，且菜单 DOM 始终是同一份。
+     */
+    transform: translateX(-100%);
+    /* transform 不把元素移出 Tab 序：关闭态必须配 visibility，否则键盘用户
+       会 Tab 进屏幕外的菜单，「焦点消失」。延迟到滑出动画结束再藏。 */
+    visibility: hidden;
+    transition: transform var(--ui-dur-base) var(--ui-ease-standard),
+      visibility 0s linear var(--ui-dur-base);
+    box-shadow: var(--ui-shadow-overlay);
+  }
+
+  .is-nav-open .admin-sider {
+    transform: none;
+    visibility: visible;
+    transition: transform var(--ui-dur-base) var(--ui-ease-standard), visibility 0s;
+  }
+
+  .admin-sider__close {
+    display: inline-flex;
+  }
+
+  .admin-scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: calc(var(--ui-z-overlay) - 1);
+    background: var(--ui-overlay);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--ui-dur-base) var(--ui-ease-standard);
+  }
+
+  .is-nav-open .admin-scrim {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* 表格列多，窄屏整体横滚比挤成两行好读 */
+  .ui-card .dtd-table {
+    overflow-x: auto;
+  }
+
+  .admin-publish-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* 功能行在窄屏改成竖排：两栏并排会把输入框压到看不清内容 */
+  .admin-func-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 767px) {
+  /*
+   * 手机顶栏要同时解决两件事，少一件它就会从 40px 涨到 85px：
+   *
+   * 1. 面包屑必须撤掉。390px 下导航开关占 36px、工具区要 400px 以上，左侧被挤到
+   *    30px 宽，「平台管理 / 应用列表」竖着折成三行、高 84px —— 顶栏高度就被它顶到 85px。
+   *    手机上面包屑本来也是冗余的：页面自己的 h1 就在下面一行。
+   * 2. 退出登录按钮撤掉。它是永久禁用的（没有登录态就没有退出动作），文案却长达
+   *    「退出登录（尚未登录）」≈172px。在手机上为它留位置是纯浪费；未登录这件事
+   *    由环境标签与操作人的「未分配角色」共同表达，披露语义不靠这个按钮。
+   */
+  .admin-header__crumb,
+  .admin-header__search,
+  .admin-header__divider,
+  .admin-header__logout {
+    display: none;
+  }
+
+  .admin-header {
+    padding-inline: var(--ui-space-4);
+  }
+
+  /*
+   * 披露条与页标题改成上下两行：手机宽度下并排会把两者都压到断行，
+   * 反而更难看。标题在前、披露在后，符合「先知道这是哪一页」的阅读顺序。
+   */
+  .admin-topline {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--ui-space-2);
+  }
+
+  .admin-pagehead__title {
+    order: 1;
+  }
+
+  .admin-banner {
+    order: 2;
+  }
+
+  .admin-banner .dtd-notice-bar-content {
+    flex-direction: column;
+    gap: var(--ui-space-1);
+  }
+}
+
+/* ======================================================================
+   宽屏版心
+   ====================================================================== */
+
+@media (min-width: 1024px) {
+  .admin-shell {
+    --ui-container: 1120px;
+  }
+}
+
+@media (min-width: 1440px) {
+  .admin-shell {
+    --ui-container: 1320px;
+  }
 }

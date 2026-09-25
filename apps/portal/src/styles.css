@@ -1,90 +1,1594 @@
-body { margin: 0; }
+/*
+ * AI 中台门户的版式补充样式。
+ *
+ * 分工：重置、字体、焦点、动效底座在 ui-tokens/base.css；跨应用共用的结构件在
+ * ui-tokens/components.css；本文件只写门户独有的东西——顶栏、底部导航、工作台宫格、
+ * 应用卡片、详情浮层、子应用工作区、登录页。
+ *
+ * 颜色一律取 ui-tokens/tokens.css 里的 --ui-* 令牌，本文件不出现任何色值字面量。
+ * 品牌色的三条使用约束（--ui-brand / --ui-brand-strong / --ui-brand-ink 各自能出现在
+ * 哪里）写在 tokens.css 文件头，这里是严格遵守方。
+ *
+ * 外框架的尺寸目标：顶栏 40px、底部导航 52px、标题行 28px。门户是给子应用让位的，
+ * 框架每多占一像素，子应用就少一像素。
+ */
 
-.portal-root {
+/* ======================================================================
+   外壳与顶栏
+   ====================================================================== */
+
+/* 应用根节点：顶栏 + 内容纵向排列，至少铺满一屏 */
+.portal-app {
+  display: flex;
+  flex-direction: column;
   min-height: 100vh;
-  color: #24334b;
-  background: #f3f6fb;
-  font: 14px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
-  overflow-wrap: break-word;
+  background: var(--ui-surface-sunken);
 }
 
-.portal-root .portal-shell { display: grid; grid-template-columns: 224px minmax(0, 1fr); min-height: 100vh; }
-.portal-root .portal-sidebar { display: flex; flex-direction: column; padding: 30px 18px; background: #17283f; color: #fff; }
-.portal-root .portal-brand { display: flex; align-items: center; margin-bottom: 40px; }
-.portal-root .portal-mark { display: grid; place-items: center; width: 42px; height: 42px; margin-right: 12px; border-radius: 12px; background: #4268ce; font-weight: 700; letter-spacing: 1px; flex-shrink: 0; }
-.portal-root .portal-brand-name { margin: 0; font-size: 19px; font-weight: 650; }
-.portal-root .portal-brand-caption { margin: 2px 0 0; font-size: 11px; color: #b6c5d9; }
-.portal-root .portal-nav-caption { margin: 0 12px 12px; color: #afbed1; font-size: 12px; letter-spacing: 2px; }
-.portal-root .portal-nav { display: flex; flex-direction: column; }
-.portal-root .portal-nav-link { display: block; padding: 11px 16px; margin-bottom: 6px; border-radius: 8px; color: #c9d4e4; text-decoration: none; }
-.portal-root .portal-nav-link:hover { background: #223a57; color: #fff; }
-.portal-root .portal-nav-link[aria-current="page"] { background: #304f78; color: #fff; box-shadow: inset 3px 0 #8aafff; }
-.portal-root .portal-sidebar-footer { margin: auto 12px 0; padding-top: 36px; color: #afbed1; font-size: 12px; }
-.portal-root .portal-workspace { min-width: 0; }
-.portal-root .portal-topbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; min-height: 68px; padding: 10px 32px; box-sizing: border-box; background: #fff; border-bottom: 1px solid #e1e7f0; }
-.portal-root .portal-topbar-title { font-weight: 600; }
-.portal-root .portal-preview-note { display: flex; flex-direction: column; padding: 14px 32px; background: #fff6e3; border-bottom: 1px solid #eadbbc; color: #765217; font-size: 13px; }
-.portal-root .portal-content { width: 100%; max-width: 1180px; padding: 32px; box-sizing: border-box; }
-.portal-root .portal-eyebrow { margin: 0 0 8px; color: #52678a; font-size: 12px; font-weight: 600; letter-spacing: 1px; }
-.portal-root .portal-title { margin: 0 0 10px; font-size: 28px; line-height: 1.35; letter-spacing: -0.5px; }
-.portal-root .portal-copy { margin: 10px 0; color: #56677e; }
-.portal-root .portal-panel { margin-top: 24px; background: #fff; border: 1px solid #e0e7f1; border-radius: 12px; box-shadow: 0 4px 18px rgba(31, 54, 85, 0.025); }
-.portal-root .portal-panel-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; padding: 18px 24px; border-bottom: 1px solid #edf0f6; }
-.portal-root .portal-section-title { margin: 0; font-size: 16px; font-weight: 650; }
-.portal-root .portal-badge { padding: 3px 10px; border-radius: 5px; background: #eff2f7; color: #56677e; font-size: 12px; }
-.portal-root .portal-empty { padding: 44px 24px; text-align: center; }
-.portal-root .portal-empty-symbol { display: inline-grid; place-items: center; width: 52px; height: 52px; border: 1px dashed #b4c4db; border-radius: 12px; background: #f6f8fc; color: #61789a; font-size: 26px; }
-.portal-root .portal-empty-title { margin: 20px 0 8px; font-size: 17px; }
-.portal-root .portal-footnote { margin: 12px 0 0; color: #64748b; font-size: 12px; }
-.portal-root .portal-summary { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; padding: 22px 24px; }
-.portal-root .portal-link { display: inline-block; padding: 6px 0; color: #315abe; text-decoration: underline; text-underline-offset: 3px; }
-.portal-root .portal-status-list { margin: 0; padding: 0 24px; }
-.portal-root .portal-status-row { display: grid; grid-template-columns: minmax(170px, 1fr) minmax(0, 2fr); padding: 20px 0; border-bottom: 1px solid #edf0f6; }
-.portal-root .portal-status-row:last-child { border-bottom: 0; }
-.portal-root .portal-status-name { font-weight: 600; }
-.portal-root .portal-status-description { margin: 0; color: #56677e; }
-.portal-root .portal-entry { display: grid; place-items: center; min-height: 100vh; padding: 32px 20px; box-sizing: border-box; background: radial-gradient(ellipse at top left, #e7eefb, transparent 65%); }
-.portal-root .portal-login-card { width: 100%; max-width: 460px; padding: 36px; box-sizing: border-box; border: 1px solid #e0e7f1; border-radius: 16px; background: #fff; box-shadow: 0 16px 56px rgba(33, 61, 102, 0.07); }
-.portal-root .portal-notice { margin: 24px 0; padding: 16px; border: 1px solid #eadbbc; border-radius: 8px; background: #fff8e9; color: #765217; font-size: 13px; }
-.portal-root .portal-form { display: flex; flex-direction: column; margin: 24px 0; }
-.portal-root .portal-label { margin-bottom: 8px; font-weight: 600; }
-.portal-root .portal-input { width: 100%; height: 44px; margin-bottom: 18px; padding: 0 12px; box-sizing: border-box; border: 1px solid #dbe2ed; border-radius: 7px; font: inherit; }
-.portal-root .portal-input:disabled { background: #f5f7fa; color: #64748b; opacity: 1; cursor: not-allowed; -webkit-text-fill-color: #64748b; }
-.portal-root .portal-input::placeholder { color: #64748b; opacity: 1; }
-.portal-root .portal-button { min-height: 44px; padding: 10px 16px; border: 0; border-radius: 7px; font: inherit; font-weight: 600; }
-.portal-root .portal-button:disabled { background: #e4e9f1; color: #53647c; cursor: not-allowed; opacity: 1; }
-.portal-root .portal-preview-link { display: block; padding: 10px 16px; border: 1px solid #c5d3ed; border-radius: 7px; background: #f4f7fd; color: #315abe; text-align: center; text-decoration: none; font-weight: 600; }
-.portal-root .portal-preview-link:hover { background: #eaf0fc; }
-.portal-root .portal-actions { display: flex; flex-direction: column; align-items: stretch; text-align: center; }
-.portal-root .portal-actions .portal-link { margin-top: 12px; }
-.portal-root .portal-skip { position: absolute; left: 16px; top: -100px; padding: 10px 16px; z-index: 1; border-radius: 6px; background: #fff; color: #24334b; }
-.portal-root .portal-skip:focus { top: 12px; }
-.portal-root .portal-link:focus,
-.portal-root .portal-nav-link:focus,
-.portal-root .portal-preview-link:focus,
-.portal-root .portal-skip:focus { outline: 3px solid #6c92e6; outline-offset: 3px; }
+/*
+ * 顶栏内部的一条横排：品牌 | 导航 | 身份。
+ *
+ * display: flex 是这里的**要害**，不是装饰。少了它，三个子元素会各自成为一行
+ * （brand 是 inline-flex、nav 是块级、ident 是 inline-flex），顶栏实测会从 40px
+ * 涨到 95px —— 正好是三者高度之和。这一条是靠 css-probe 量出来的，肉眼只看到
+ * 「顶栏有点高」。改动这一节后请重跑 scripts/qc/layout-audit.mjs 的外框高度检查。
+ *
+ * min-height 取 --ui-appbar-h，让「顶栏有多高」由令牌决定而不是由最矮的内容决定。
+ */
+.portal-appbar__inner {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-4);
+  min-height: var(--ui-appbar-h);
+}
 
-@media (max-width: 760px) {
-  .portal-root .portal-shell { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; }
-  .portal-root .portal-sidebar { padding: 20px 16px 12px; }
-  .portal-root .portal-brand { margin-bottom: 18px; }
-  .portal-root .portal-nav-caption,
-  .portal-root .portal-sidebar-footer { display: none; }
-  .portal-root .portal-nav { flex-direction: row; flex-wrap: wrap; }
-  .portal-root .portal-nav-link { margin-right: 8px; }
-  .portal-root .portal-topbar { padding: 12px 20px; }
-  .portal-root .portal-preview-note { padding: 14px 20px; }
-  .portal-root .portal-content { padding: 24px 20px; }
-  .portal-root .portal-title { font-size: 25px; }
-  .portal-root .portal-status-row { grid-template-columns: minmax(0, 1fr); }
-  .portal-root .portal-status-description { margin-top: 8px; }
+/*
+ * 品牌：只有一个 18px 图标 + 13px 字，没有第二行 slogan。
+ * 顶栏只有 40px，放不下两行；subtitle 挪到登录页去讲。
+ */
+.portal-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+  flex: none;
+  /* 窄屏顶栏里这是可点元素，高度不足 36px 就点不准（布局审计会报） */
+  min-height: var(--ui-control-l);
+  color: var(--ui-text-strong);
+  font-size: var(--ui-font-sm);
+  font-weight: var(--ui-weight-semibold);
+  line-height: var(--ui-leading-tight);
+  letter-spacing: var(--ui-tracking-tight);
+}
+
+.portal-brand:hover {
+  color: var(--ui-brand-strong);
+}
+
+/*
+ * 品牌图标：#ED7D33 在这里是「大面积色块」性质——20px 见方的实心块，
+ * 靠面积与色相被识别，不承载信息、不镶细线。这是 tokens.css 允许的用法。
+ */
+.portal-brand__logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--ui-radius-m);
+  background: var(--ui-brand);
+  color: var(--ui-brand-ink);
+  font-size: var(--ui-font-sm);
+  line-height: var(--ui-leading-none);
+}
+
+.portal-brand__name {
+  white-space: nowrap;
+}
+
+/*
+ * 导航占满中间，两边元素各自 flex: none。
+ * align-self: stretch 是必要的：顶栏是 align-items: center 的，导航块默认只会占内容高度，
+ * 那样当前项的下划线（bottom: 0）会飘在文字下方而不是贴在顶栏底边。
+ */
+.portal-nav {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  align-self: stretch;
+}
+
+/* ---------- 宽屏：顶栏横向文字导航，当前项用品牌色下划线 ---------- */
+
+.portal-navlinks {
+  display: flex;
+  align-items: stretch;
+  gap: var(--ui-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  /* 撑满 .portal-nav 的高度（即顶栏高度），下划线才能落到顶栏底边 */
+  height: 100%;
+}
+
+.portal-navlink {
+  display: inline-flex;
+  align-items: center;
+  position: relative;
+  height: 100%;
+  padding-inline: var(--ui-space-3);
+  color: var(--ui-text);
+  font-size: var(--ui-font-sm);
+  font-weight: var(--ui-weight-medium);
+  line-height: var(--ui-leading-tight);
+  white-space: nowrap;
+}
+
+.portal-navlink:hover {
+  color: var(--ui-text-strong);
+}
+
+.portal-navlink.is-active {
+  color: var(--ui-brand-strong);
+  font-weight: var(--ui-weight-semibold);
+}
+
+/*
+ * 当前项下划线：2px 实心条，宽度等于文字块，不是整格。
+ * 取 --ui-brand-strong 而不是 --ui-brand：这是「细线承载信息（当前在哪一页）」，
+ * tokens.css 的硬约束不允许品牌橙出现在细线上——2.77:1 的橙条在白色顶栏上
+ * 几乎看不见，等于没有当前态。
+ */
+.portal-navlink.is-active::after {
+  content: '';
+  position: absolute;
+  left: var(--ui-space-3);
+  right: var(--ui-space-3);
+  bottom: 0;
+  height: 2px;
+  border-radius: var(--ui-radius-pill) var(--ui-radius-pill) 0 0;
+  background: var(--ui-brand-strong);
+}
+
+/* ---------- 窄屏：顶栏里的紧凑文字导航 ---------- */
+
+.portal-tabbar {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-x: auto;
+}
+
+/*
+ * 窄屏导航用「图标 + 文字」横排而不是竖排两行：竖排需要 40px 以上高度，
+ * 顶栏只有 40px，塞两行会把图标和文字压到重叠。横排一行放得下，且仍有图标辅助辨识。
+ */
+.portal-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-space-1);
+  flex: none;
+  min-height: var(--ui-control-l);
+  padding-inline: var(--ui-space-2);
+  border-radius: var(--ui-radius-m);
+  color: var(--ui-text);
+  font-size: var(--ui-font-xs);
+  font-weight: var(--ui-weight-medium);
+  line-height: var(--ui-leading-tight);
+  white-space: nowrap;
+}
+
+.portal-tab__icon {
+  display: inline-flex;
+  font-size: var(--ui-font-base);
+  line-height: var(--ui-leading-none);
+}
+
+.portal-tab.is-active {
+  background: var(--ui-brand-soft);
+  color: var(--ui-brand-strong);
+  font-weight: var(--ui-weight-semibold);
+}
+
+/* 未选中项要有悬停反馈（能点的样子）；选中项点了不跳页，不给反馈是对的 */
+@media (any-hover: hover) {
+  .portal-tab:not(.is-active):hover {
+    background: var(--ui-surface-hover);
+    color: var(--ui-text-strong);
+  }
+}
+
+/* ---------- 身份区 ---------- */
+
+.portal-ident {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+  flex: none;
+  min-width: 0;
+}
+
+/* 组织名在窄屏让位：顶栏只有 40px，身份区优先保住头像 */
+.portal-ident__org {
+  display: none;
+  align-items: center;
+  gap: var(--ui-space-1);
+  font-size: var(--ui-font-xs);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-soft);
+  white-space: nowrap;
+}
+
+.portal-ident__user {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ui-space-2);
+  /* 24px 的头像本身不够当触控目标，靠这个把可点区撑到 36px */
+  min-width: var(--ui-control-l);
+  min-height: var(--ui-control-l);
+  border-radius: var(--ui-radius-pill);
+  transition: var(--ui-transition-colors);
+}
+
+/* 状态审计抓到这个链接原本悬停零反馈：它能点（去登录页），必须看得出能点 */
+@media (any-hover: hover) {
+  .portal-ident__user:hover {
+    background: var(--ui-surface-hover);
+  }
+}
+
+/*
+ * 窄屏顶栏只有 40px：身份区优先保住头像，组织名让位。
+ * 这里没有「用户姓名」的样式位——顶栏放不下姓名，姓名在登录页与浮层里出现。
+ */
+@media (min-width: 768px) {
+  .portal-ident__org {
+    display: inline-flex;
+  }
+}
+
+/* ======================================================================
+   标题行：h1 + 体验披露条压在同一条 28px 线上
+   原来这里是「大标题 + 说明 + 40px 外边距」的页头，再加卡片式披露条，
+   一屏顶部就占掉一百多像素。现在两样东西共用一行，且都是小字号。
+   ====================================================================== */
+
+/*
+ * 内容区包装。ui-enter 负责入场动效（key 挂在它上面，切页时重放），
+ * 这里只声明它是一个正常的纵向块级容器，不需要额外样式——
+ * 页与页之间的节奏由 .ui-page 的 gap 决定。
+ */
+.portal-content {
+  min-width: 0;
+}
+
+.portal-titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-space-3);
+  min-height: 28px;
+  margin-bottom: var(--ui-space-3);
+}
+
+.portal-titlebar__title {
+  margin: 0;
+  flex: none;
+  font-size: var(--ui-font-md);
+  font-weight: var(--ui-weight-semibold);
+  line-height: var(--ui-leading-tight);
+  letter-spacing: var(--ui-tracking-tight);
+  color: var(--ui-text-strong);
+}
+
+/* 披露条：压成一行细字，撑满剩余宽度；窄屏会换行到标题下方 */
+.portal-notice {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* 覆盖组件库 NoticeBar 的卡片观感，收成一行内联文字 */
+.portal-notice .dtm-notice-bar {
+  min-height: 0;
+  padding: 0;
+  background: transparent;
+  font-size: var(--ui-font-xs);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-soft);
+}
+
+.portal-notice .dtm-notice-bar-content {
+  font-size: var(--ui-font-xs);
+  line-height: var(--ui-leading-tight);
+}
+
+@media (max-width: 767px) {
+  .portal-titlebar {
+    align-items: baseline;
+  }
+
+  .portal-notice {
+    justify-content: flex-start;
+  }
+}
+
+/* ======================================================================
+   工作台：问候与关键数字
+   ====================================================================== */
+
+.portal-page--workbench {
+  gap: var(--ui-space-5);
+}
+
+/*
+ * 首屏问候卡是整页唯一的「大面积品牌色」载体。
+ * 渐变只许往浅走（brand → lift）：tokens.css 头部第 4 条硬约束——
+ * 状态审计实测 ink 在 --ui-brand-active(#8F3F0D) 上只有 2.37:1，
+ * 原来 brand → active 的往深渐变把整张 hero 的文字全部打到不及格。
+ * 现在两端分别是 ink 6.22:1 与 7.98:1。
+ * 文字一律 --ui-brand-ink 实色：原来给副标题/统计标签叠的 opacity 0.82
+ * 等效把对比度拉回 3 字头，压暗不是层次，字号字重才是层次。
+ */
+.portal-hero {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-5);
+  flex-wrap: wrap;
+  padding: var(--ui-space-5);
+  border-radius: var(--ui-radius-l);
+  background: linear-gradient(110deg, var(--ui-brand) 0%, var(--ui-brand-lift) 100%);
+  color: var(--ui-brand-ink);
+}
+
+.portal-hero__main {
+  flex: 1;
+  min-width: 200px;
+}
+
+.portal-hero__title {
+  margin: 0;
+  font-size: var(--ui-font-md);
+  font-weight: var(--ui-weight-semibold);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-brand-ink);
+}
+
+.portal-hero__sub {
+  margin: var(--ui-space-2) 0 0;
+  font-size: var(--ui-font-sm);
+  line-height: var(--ui-leading-base);
+  color: var(--ui-brand-ink);
+}
+
+/*
+ * 披露标签压在 hero 色块上。文字取 --ui-brand-ink 实色（不叠 opacity，理由同 hero 副标题）；
+ * 边框用 ink 的半透明——边框是装饰不是信息，允许弱，文字不允许。
+ */
+.portal-hero__badge {
+  flex: none;
+  align-self: flex-start;
+  padding: var(--ui-space-1) var(--ui-space-3);
+  border: 1px solid var(--ui-brand-ink);
+  border-radius: var(--ui-radius-pill);
+  background: transparent;
+  color: var(--ui-brand-ink);
+  font-size: var(--ui-font-2xs);
+  font-weight: var(--ui-weight-medium);
+  line-height: var(--ui-leading-tight);
+}
+
+.portal-hero__stats {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--ui-space-6);
+  margin: 0;
+  flex: none;
+}
+
+.portal-hero__stat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-1);
+}
+
+/* 数据组结构化（批次四）：相邻指标之间一条分隔线（装饰位，ink 的弱化，
+   与角标边框同源；不承载信息），数字大、标签小，扫一眼比出量级 */
+.portal-hero__stat + .portal-hero__stat {
+  padding-left: var(--ui-space-6);
+  border-left: 1px solid rgba(46, 20, 8, 0.25);
+}
+
+.portal-hero__stat dt {
+  font-size: var(--ui-font-xs);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-brand-ink);
+}
+
+.portal-hero__stat dd {
+  margin: 0;
+  font-size: var(--ui-font-xl);
+  font-weight: var(--ui-weight-semibold);
+  line-height: var(--ui-leading-num);
+  color: var(--ui-brand-ink);
+}
+
+/*
+ * 宫格：按容器宽度自适应，每列至少 84px。
+ * 不再按断点手算列数——手算的后果是中间尺寸出现「4 列挤成一团」或「8 列每格空旷」。
+ * 行间距比列间距大：宫格视觉上按行读，行之间需要更明确的分隔。
+ */
+.portal-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  column-gap: var(--ui-space-2);
+  row-gap: var(--ui-space-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.portal-grid__tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--ui-space-2);
+  width: 100%;
+  min-height: 92px;
+  padding: var(--ui-space-3) var(--ui-space-2);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--ui-radius-l);
+  cursor: pointer;
+  font: inherit;
+  color: var(--ui-text-strong);
+  transition: var(--ui-transition-surface);
+}
+
+/* 宫格图标用大瓦片：这是工作台上唯一的视觉锚点，小一号就找不着 */
+.portal-grid__tile .ui-tile {
+  width: 52px;
+  height: 52px;
+  border-radius: var(--ui-radius-l);
+  font-size: var(--ui-font-xl);
+}
+
+.portal-grid__name {
+  display: block;
+  width: 100%;
+  font-size: var(--ui-font-xs);
+  font-weight: var(--ui-weight-medium);
+  /* 应用名可能两行，行高给足；原来是 1.2，两行之间会粘住 */
+  line-height: var(--ui-leading-tight);
+  text-align: center;
+  color: var(--ui-text-strong);
+  overflow-wrap: anywhere;
+}
+
+@media (any-hover: hover) {
+  .portal-grid__tile:hover {
+    background: var(--ui-surface);
+    border-color: var(--ui-line);
+    box-shadow: var(--ui-shadow-card);
+  }
+}
+
+.portal-grid__tile:active {
+  background: var(--ui-surface-hover);
+}
+
+/* 空态说明：收成一行，不再占一张整卡 */
+.portal-empty-note {
+  margin: 0;
+}
+
+/* ======================================================================
+   应用市场：检索条 + 分段筛选 + 计数
+   ====================================================================== */
+
+.portal-page--market {
+  gap: var(--ui-space-5);
+}
+
+/*
+ * 检索区不再是一张卡片：卡片 + 内部工具栏 + 计数需要三层内边距，
+ * 首屏被吃掉 140px 以上。现在是一行工具栏 + 一行计数，直接坐在页面底色上。
+ */
+.portal-market__bar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-3);
+}
+
+.portal-market__toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-3);
+  flex-wrap: wrap;
+}
+
+.portal-market__search {
+  flex: 1;
+  min-width: 220px;
+}
+
+/*
+ * 组件库把搜索框内层固定成 30px，而它的输入元素需要 34px，内容会被裁掉。
+ * 抬到 36px，同时保住外框与分段控件同高。
+ */
+.portal-market__bar .dtm-search-bar-input {
+  height: var(--ui-control-l);
+}
+
+.portal-market__count {
+  margin: 0;
+  font-size: var(--ui-font-xs);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-soft);
+}
+
+/*
+ * 应用卡片网格：窄屏一列，宽屏按容器宽度铺到 2~3 列。
+ * 单列时是「整行卡片」，多列时是「信息卡」，同一份 DOM，靠 auto-fill 切换。
+ */
+.portal-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--ui-space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.portal-appcard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-3);
+  height: 100%;
+  padding: var(--ui-space-4);
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-line);
+  border-radius: var(--ui-radius-l);
+  box-shadow: var(--ui-shadow-card);
+  cursor: pointer;
+  transition: var(--ui-transition-surface);
+}
+
+.portal-appcard:focus-visible {
+  outline: 2px solid var(--ui-brand-strong);
+  outline-offset: 2px;
+}
+
+@media (any-hover: hover) {
+  .portal-appcard:hover {
+    border-color: var(--ui-brand-line);
+    box-shadow: var(--ui-shadow-raise);
+    transform: translateY(-1px);
+  }
+}
+
+.portal-appcard__head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ui-space-3);
+}
+
+.portal-appcard__ident {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  /* 应用名与「分类 · 团队」两行之间至少 6px：两行同字号时靠间距区分层次 */
+  gap: var(--ui-space-2);
+  padding-top: var(--ui-space-1);
+}
+
+.portal-appcard__name {
+  font-size: var(--ui-font-base);
+  font-weight: var(--ui-weight-semibold);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-strong);
+}
+
+.portal-appcard__meta {
+  font-size: var(--ui-font-xs);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-soft);
+}
+
+.portal-appcard__summary {
+  margin: 0;
+  font-size: var(--ui-font-sm);
+  line-height: var(--ui-leading-base);
+  color: var(--ui-text);
+  /* 简介最多三行，超出省略；卡片高度才能对齐成整齐的网格 */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* 上架引导：一行图标 + 文字 + 按钮，横排不占高度 */
+.portal-cta {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-4);
+  flex-wrap: wrap;
+  padding: var(--ui-space-4) var(--ui-space-5);
+  background: var(--ui-surface-deep);
+  border: 1px solid var(--ui-line);
+  border-radius: var(--ui-radius-l);
+}
+
+.portal-cta__text {
+  flex: 1;
+  min-width: 200px;
+}
+
+.portal-cta__title {
+  margin: 0;
+  font-size: var(--ui-font-base);
+  font-weight: var(--ui-weight-medium);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-strong);
+}
+
+.portal-cta__desc {
+  margin: var(--ui-space-2) 0 0;
+  font-size: var(--ui-font-xs);
+  line-height: var(--ui-leading-base);
+  color: var(--ui-text-soft);
+}
+
+/* ======================================================================
+   详情浮层：全视口遮罩 + 居中面板
+   ====================================================================== */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--ui-z-overlay);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--ui-gutter);
+  background: var(--ui-overlay);
+  animation: ui-fade-in var(--ui-dur-base) var(--ui-ease-standard);
+}
+
+.overlay__panel {
+  display: flex;
+  flex-direction: column;
+  width: min(560px, 100%);
+  max-height: min(86vh, 760px);
+  background: var(--ui-surface);
+  border-radius: var(--ui-radius-xl);
+  box-shadow: var(--ui-shadow-overlay);
+  /* 浮层面板是叶子（下面不会有 fixed 后代），可以用带位移的入场曲线 */
+  animation: ui-rise var(--ui-dur-slow) var(--ui-ease-emphasized) both;
+}
+
+.overlay__head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ui-space-3);
+  padding: var(--ui-space-5) var(--ui-space-5) var(--ui-space-4);
+  border-bottom: 1px solid var(--ui-line);
+}
+
+.overlay__ident {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ui-space-3);
+  flex: 1;
+  min-width: 0;
+}
+
+.overlay__ident-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-2);
+  min-width: 0;
+  padding-top: var(--ui-space-1);
+}
+
+.overlay__title {
+  margin: 0;
+  font-size: var(--ui-font-md);
+  font-weight: var(--ui-weight-semibold);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-strong);
+}
+
+.overlay__subtitle {
+  margin: 0;
+  font-size: var(--ui-font-xs);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-soft);
+}
+
+/* 关闭按钮：32px 圆形，触控区够大且不与标题抢注意力 */
+.overlay__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: var(--ui-control-m);
+  height: var(--ui-control-m);
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: var(--ui-radius-pill);
+  cursor: pointer;
+  color: var(--ui-text-soft);
+  font-size: var(--ui-font-md);
+  line-height: var(--ui-leading-none);
+  transition: var(--ui-transition-colors);
+}
+
+.overlay__close:hover {
+  background: var(--ui-surface-hover);
+  color: var(--ui-text-strong);
+}
+
+.overlay__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  /* 滚动链隔离：面板滚到底后不许再带走背景列表，配合浮层打开时的 body 滚动锁 */
+  overscroll-behavior: contain;
+  padding: var(--ui-space-5);
+  display: flex;
+  flex-direction: column;
+  /* 面板内各块之间 20px：块与块之间必须有明显大于块内行距的间隔 */
+  gap: var(--ui-space-5);
+}
+
+.overlay__summary {
+  margin: 0;
+  font-size: var(--ui-font-sm);
+  line-height: var(--ui-leading-base);
+  color: var(--ui-text);
+}
+
+.overlay__state {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-3);
+}
+
+.overlay__state-note {
+  font-size: var(--ui-font-xs);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-soft);
+}
+
+.overlay__facts {
+  padding: var(--ui-space-1) var(--ui-space-4);
+  background: var(--ui-surface-deep);
+  border-radius: var(--ui-radius-m);
+}
+
+.overlay__block-title {
+  margin: 0 0 var(--ui-space-3);
+  font-size: var(--ui-font-sm);
+  font-weight: var(--ui-weight-semibold);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-strong);
+}
+
+/* 浮层里成块的内容（可用功能清单）：浅底 + 内边距，与正文说明拉开层次 */
+.overlay__block {
+  padding: var(--ui-space-4);
+  background: var(--ui-surface-deep);
+  border-radius: var(--ui-radius-m);
+}
+
+.overlay__foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--ui-space-3);
+  padding: var(--ui-space-4) var(--ui-space-5);
+  border-top: 1px solid var(--ui-line);
+}
+
+/*
+ * 窄屏：面板从底部升起，但仍盖住整页（遮罩是全视口的）。
+ * 用 align-items: flex-end 把面板压到底部，圆角只留上面两个角。
+ */
+@media (max-width: 767px) {
+  .overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .overlay__panel {
+    width: 100%;
+    max-height: 88vh;
+    border-radius: var(--ui-radius-xl) var(--ui-radius-xl) 0 0;
+  }
+
+  .overlay__foot {
+    /* 底部按钮并排等宽，拇指区更整 */
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--ui-space-3);
+  }
+}
+
+/* ======================================================================
+   子应用工作区：/apps/:appId
+   不套 PortalShell，铺满整个视口。只有一条 36px 的工作区条。
+   ====================================================================== */
+
+.workspace {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--ui-surface);
+}
+
+/*
+ * 工作区条：36px，只有「返回」与子应用名。
+ * 这是门户能对子应用造成的最小干扰——一条细条，其余全给子应用。
+ */
+.workspace__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-3);
+  flex: none;
+  min-height: var(--ui-workspacebar-h);
+  padding-inline: var(--ui-space-3);
+  background: var(--ui-surface);
+  border-bottom: 1px solid var(--ui-line);
+}
+
+.workspace__back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ui-space-1);
+  flex: none;
+  /* 它是 button 不是链接（见 SubAppWorkspace 的注释）：把 UA 的按钮皮剥掉 */
+  border: 0;
+  background: none;
+  font-family: inherit;
+  cursor: pointer;
+  /* 触控目标：极窄屏会把文字隐藏，只剩箭头，所以宽高都要自己撑够。
+     高度取 --ui-control-l（36px）而不是更大的 44px —— 工作区条本身只有 36px，
+     再高的按钮会把条撑胖，破坏「门户只留一条细条」这个约定。 */
+  min-width: var(--ui-control-l);
+  min-height: var(--ui-control-l);
+  padding-inline: var(--ui-space-2);
+  border-radius: var(--ui-radius-m);
+  color: var(--ui-brand-strong);
+  font-size: var(--ui-font-sm);
+  font-weight: var(--ui-weight-medium);
+  line-height: var(--ui-leading-tight);
+}
+
+.workspace__back:hover {
+  background: var(--ui-brand-soft);
+}
+
+.workspace__back-text {
+  /* 极窄屏只留箭头，把宽度让给子应用名 */
+  display: inline;
+}
+
+.workspace__title {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+  font-size: var(--ui-font-sm);
+  font-weight: var(--ui-weight-semibold);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-strong);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.workspace__meta {
+  flex: none;
+  font-size: var(--ui-font-xs);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-soft);
+}
+
+/* ---- 工作区舞台四态（批次三契约）：加载骨架 / 未接入占位 / 就绪挂载 ---- */
+.workspace__loading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-5);
+  width: min(560px, 100%);
+}
+
+.workspace__loading-head {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-4);
+}
+
+.workspace__loading-note {
+  margin: 0;
+  font-size: var(--ui-font-sm);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-soft);
+}
+
+.workspace__loading-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-4);
+}
+
+.workspace__loading-bar {
+  width: 40%;
+}
+
+/* 未接入占位里的七彩短条：空态点缀（彩虹规范允许的装饰位），比图标更轻 */
+.workspace__placeholder-rainbow {
+  width: 112px;
+}
+
+/* 就绪态：子应用铺满舞台，舞台自己不再留内边距（那条边距属于门户，不属于子应用） */
+.workspace__stage--flat {
+  padding: 0;
+}
+
+.workspace__frame {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: var(--ui-surface);
 }
 
 @media (max-width: 400px) {
-  .portal-root .portal-entry { padding: 20px 12px; }
-  .portal-root .portal-login-card { padding: 24px 20px; }
-  .portal-root .portal-content { padding: 24px 14px; }
-  .portal-root .portal-panel-header,
-  .portal-root .portal-summary { padding: 18px; }
-  .portal-root .portal-empty { padding: 32px 18px; }
+  .workspace__back-text,
+  .workspace__meta {
+    display: none;
+  }
+}
+
+/* 子应用将来占的位置。现在铺满剩余高度，居中放占位说明。 */
+.workspace__stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--ui-space-6) var(--ui-gutter);
+  background: var(--ui-surface-sunken);
+}
+
+.workspace__placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--ui-space-3);
+  max-width: 420px;
+  text-align: center;
+}
+
+.workspace__placeholder-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--ui-radius-l);
+  background: var(--ui-brand-soft);
+  color: var(--ui-brand-strong);
+  font-size: var(--ui-font-xl);
+  line-height: var(--ui-leading-none);
+}
+
+.workspace__placeholder-title {
+  margin: 0;
+  font-size: var(--ui-font-md);
+  font-weight: var(--ui-weight-semibold);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-strong);
+}
+
+.workspace__placeholder-desc {
+  margin: 0;
+  font-size: var(--ui-font-sm);
+  line-height: var(--ui-leading-loose);
+  color: var(--ui-text-soft);
+}
+
+.workspace__placeholder-action,
+.workspace__cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--ui-control-xl);
+  padding-inline: var(--ui-space-5);
+  border-radius: var(--ui-radius-m);
+  background: var(--ui-brand-strong);
+  color: var(--ui-surface);
+  font-size: var(--ui-font-base);
+  font-weight: var(--ui-weight-medium);
+  line-height: var(--ui-leading-tight);
+  transition: var(--ui-transition-colors);
+}
+
+.workspace__placeholder-action:hover,
+.workspace__cta:hover {
+  background: var(--ui-brand-hover);
+  color: var(--ui-surface);
+}
+
+/* 应用不存在：只是换一个底色，版式仍走共用的 .ui-fallback */
+.workspace--missing {
+  justify-content: center;
+  background: var(--ui-surface-sunken);
+}
+
+/* ======================================================================
+   登录页
+   ====================================================================== */
+
+.portal-login {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ui-space-8);
+  min-height: 100vh;
+  padding: var(--ui-space-6) var(--ui-gutter);
+  background: var(--ui-surface-sunken);
+}
+
+/* 品牌侧：只有宽屏出现，窄屏整块让位给表单 */
+.portal-login__hero {
+  display: none;
+  flex-direction: column;
+  gap: var(--ui-space-3);
+  max-width: 380px;
+}
+
+@media (min-width: 1024px) {
+  .portal-login__hero {
+    display: flex;
+  }
+}
+
+.portal-login__logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--ui-radius-l);
+  background: var(--ui-brand);
+  color: var(--ui-brand-ink);
+  font-size: var(--ui-font-xl);
+  line-height: var(--ui-leading-none);
+}
+
+.portal-login__brand {
+  margin: 0;
+  font-size: var(--ui-font-xl);
+  font-weight: var(--ui-weight-semibold);
+  line-height: var(--ui-leading-tight);
+  letter-spacing: var(--ui-tracking-tight);
+  color: var(--ui-text-strong);
+}
+
+.portal-login__slogan {
+  margin: 0;
+  font-size: var(--ui-font-sm);
+  line-height: var(--ui-leading-base);
+  color: var(--ui-text-soft);
+}
+
+.portal-login__points {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-3);
+  margin: var(--ui-space-3) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.portal-login__points li {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-3);
+  font-size: var(--ui-font-sm);
+  line-height: var(--ui-leading-base);
+  color: var(--ui-text);
+}
+
+.portal-login__point-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: var(--ui-control-m);
+  height: var(--ui-control-m);
+  border-radius: var(--ui-radius-m);
+  background: var(--ui-brand-soft);
+  color: var(--ui-brand-strong);
+  font-size: var(--ui-font-base);
+  line-height: var(--ui-leading-none);
+}
+
+.portal-login__panel {
+  width: 100%;
+  max-width: 400px;
+}
+
+.portal-login__card {
+  display: flex;
+  flex-direction: column;
+  /* 卡片内各块 20px：表单、说明、分隔、入口之间层次清楚 */
+  gap: var(--ui-space-5);
+  padding: var(--ui-space-6);
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-line);
+  border-radius: var(--ui-radius-xl);
+  box-shadow: var(--ui-shadow-card);
+}
+
+/*
+ * 标题 + 说明自成一个块，块内间距 8px。
+ * 卡片用的是 flex gap，要给「标题与其说明」比「各块之间」更小的间距，
+ * 只能把这一对包起来另设 gap——不要用负外边距去抵消父级的 gap，
+ * 那正是本文件其它地方刚治掉的坏味道。
+ */
+.portal-login__head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-2);
+}
+
+.portal-login__title {
+  margin: 0;
+  font-size: var(--ui-font-lg);
+  font-weight: var(--ui-weight-semibold);
+  line-height: var(--ui-leading-tight);
+  letter-spacing: var(--ui-tracking-tight);
+  color: var(--ui-text-strong);
+}
+
+.portal-login__desc {
+  margin: 0;
+  font-size: var(--ui-font-sm);
+  line-height: var(--ui-leading-base);
+  color: var(--ui-text-soft);
+}
+
+.portal-login__notice {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-2);
+}
+
+.portal-login__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-4);
+}
+
+/* 分隔语：两侧细线 + 中间小字，不用大标题，避免与卡片标题抢层次 */
+.portal-login__divider {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-3);
+  margin: 0;
+  font-size: var(--ui-font-xs);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-soft);
+}
+
+.portal-login__divider::before,
+.portal-login__divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--ui-line);
+}
+
+/* 唯一可用的入口：整块主行动区，有底色、有悬停、有箭头 */
+.portal-login__preview {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-3);
+  padding: var(--ui-space-4);
+  border: 1px solid var(--ui-brand-line);
+  border-radius: var(--ui-radius-l);
+  background: var(--ui-brand-soft);
+  color: var(--ui-brand-strong);
+  transition: var(--ui-transition-surface);
+}
+
+.portal-login__preview:hover {
+  background: var(--ui-brand-soft-weak);
+  color: var(--ui-brand-strong);
+  box-shadow: var(--ui-shadow-card);
+}
+
+.portal-login__preview-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-1);
+  flex: 1;
+  min-width: 0;
+}
+
+.portal-login__preview-text strong {
+  font-size: var(--ui-font-base);
+  font-weight: var(--ui-weight-semibold);
+  line-height: var(--ui-leading-tight);
+}
+
+.portal-login__preview-text span {
+  font-size: var(--ui-font-xs);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-soft);
+}
+
+@media (max-width: 400px) {
+  .portal-login__card {
+    padding: var(--ui-space-5);
+  }
+}
+
+/* ======================================================================
+   功能进展：宽屏横向时间轴看板
+   三列 = 三个阶段，每列一根竖轨把节点串起来。视线横着扫就能读出推进关系。
+   ====================================================================== */
+
+.portal-page--progress {
+  gap: var(--ui-space-5);
+}
+
+.portal-progress__lead {
+  margin: 0;
+  max-width: 72ch;
+  font-size: var(--ui-font-sm);
+  line-height: var(--ui-leading-loose);
+  color: var(--ui-text-soft);
+}
+
+/*
+ * 看板：宽屏三列。用 auto-fit + minmax(260px) 而不是写死 3 列——
+ * 平板宽度下自动退成两列，第三列换行，比三列硬挤好看；宽屏自然是三列。
+ */
+.progress-board {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--ui-space-5);
+  align-items: start;
+}
+
+.progress-lane {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-4);
+  min-width: 0;
+  padding: var(--ui-space-4);
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-line);
+  border-radius: var(--ui-radius-l);
+  box-shadow: var(--ui-shadow-card);
+}
+
+.progress-lane__head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ui-space-3);
+}
+
+.progress-lane__headtext {
+  flex: 1;
+  min-width: 0;
+}
+
+.progress-lane__title {
+  margin: 0;
+  font-size: var(--ui-font-base);
+  font-weight: var(--ui-weight-semibold);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-strong);
+}
+
+.progress-lane__summary {
+  margin: var(--ui-space-2) 0 0;
+  font-size: var(--ui-font-xs);
+  line-height: var(--ui-leading-base);
+  color: var(--ui-text-soft);
+}
+
+/* 计数：大号数字，作为这一列的视觉锚点 */
+.progress-lane__count {
+  flex: none;
+  font-size: var(--ui-font-lg);
+  color: var(--ui-text-soft);
+}
+
+/*
+ * 竖轨：left 位置与节点圆点对齐。圆点挂在轨道上，卡片在轨道右侧。
+ * 轨道用 border-left 而不是伪元素，是为了让它随内容高度自然伸缩。
+ */
+.progress-track {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-3);
+  margin: 0;
+  padding: 0 0 0 var(--ui-space-4);
+  list-style: none;
+  border-left: 1px solid var(--ui-line-strong);
+}
+
+.progress-node {
+  position: relative;
+  min-width: 0;
+}
+
+/* 节点圆点：骑在竖轨上 */
+.progress-node__dot {
+  position: absolute;
+  left: calc(var(--ui-space-4) * -1 - 3px);
+  top: 14px;
+  width: 7px;
+  height: 7px;
+  border-radius: var(--ui-radius-pill);
+  background: var(--ui-surface);
+  border: 2px solid var(--ui-line-element);
+}
+
+.progress-node__card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-2);
+  padding: var(--ui-space-3) var(--ui-space-4);
+  background: var(--ui-surface-deep);
+  border-radius: var(--ui-radius-m);
+}
+
+.progress-node__name {
+  margin: 0;
+  font-size: var(--ui-font-sm);
+  font-weight: var(--ui-weight-medium);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-strong);
+}
+
+.progress-node__desc {
+  margin: 0;
+  font-size: var(--ui-font-xs);
+  line-height: var(--ui-leading-base);
+  color: var(--ui-text-soft);
+}
+
+/* 第一列的节点圆点用成功色，把「已落地」和其余阶段区分开 */
+.progress-lane:first-child .progress-node__dot {
+  border-color: var(--ui-tone-success-fg);
+}
+
+/* ======================================================================
+   功能进展：窄屏纵向折叠清单
+   三只手风琴，默认只展开第一阶段；一屏不会堆满十几条。
+   ====================================================================== */
+
+.progress-accordion {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-3);
+}
+
+.progress-fold {
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-line);
+  border-radius: var(--ui-radius-l);
+  box-shadow: var(--ui-shadow-card);
+  /* 展开的内容不要顶出圆角 */
+  overflow: hidden;
+}
+
+.progress-fold__heading {
+  margin: 0;
+}
+
+/* 触发器：整行可点，最小 56px 高，拇指容易命中 */
+.progress-fold__trigger {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-3);
+  width: 100%;
+  min-height: 56px;
+  padding: var(--ui-space-3) var(--ui-space-4);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  transition: var(--ui-transition-colors);
+}
+
+.progress-fold__trigger:hover {
+  background: var(--ui-surface-hover);
+}
+
+.progress-fold__text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-1);
+  flex: 1;
+  min-width: 0;
+}
+
+.progress-fold__title {
+  font-size: var(--ui-font-base);
+  font-weight: var(--ui-weight-semibold);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-strong);
+}
+
+.progress-fold__summary {
+  font-size: var(--ui-font-xs);
+  line-height: var(--ui-leading-base);
+  color: var(--ui-text-soft);
+}
+
+.progress-fold__count {
+  flex: none;
+  font-size: var(--ui-font-xs);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-soft);
+}
+
+.progress-fold__caret {
+  display: inline-flex;
+  flex: none;
+  font-size: var(--ui-font-sm);
+  line-height: var(--ui-leading-none);
+  color: var(--ui-text-soft);
+  transition: transform var(--ui-dur-base) var(--ui-ease-standard);
+}
+
+.progress-fold__caret.is-open {
+  transform: rotate(180deg);
+}
+
+.progress-fold__panel {
+  padding: 0 var(--ui-space-4) var(--ui-space-2);
+  border-top: 1px solid var(--ui-line);
+}
+
+.portal-progress__disclosure {
+  margin: 0;
+  padding-top: var(--ui-space-4);
+  border-top: 1px solid var(--ui-line);
+  font-size: var(--ui-font-xs);
+  line-height: var(--ui-leading-loose);
+  color: var(--ui-text-soft);
+}
+
+/* ======================================================================
+   宽屏版心放宽
+   ====================================================================== */
+
+@media (min-width: 1024px) {
+  .portal-shell {
+    --ui-container: 1120px;
+  }
+
+  .portal-hero {
+    padding: var(--ui-space-6) var(--ui-space-7);
+  }
+
+  .portal-grid {
+    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  }
+}
+
+@media (min-width: 1440px) {
+  .portal-shell {
+    --ui-container: 1320px;
+  }
+}
+
+/* ======================================================================
+   工作台：功能进展速览（批次四：填充下半页，与功能进展页共用 store/roadmap.ts）
+   ====================================================================== */
+
+.portal-roadmap {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--ui-space-4);
+}
+
+.portal-roadmap__card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-2);
+  padding: var(--ui-space-5);
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-line);
+  border-radius: var(--ui-radius-l);
+  box-shadow: var(--ui-shadow-card);
+}
+
+.portal-roadmap__count {
+  margin: 0;
+  font-size: var(--ui-font-2xl);
+  font-weight: var(--ui-weight-semibold);
+  color: var(--ui-text-strong);
+}
+
+.portal-roadmap__title {
+  margin: 0;
+  font-size: var(--ui-font-base);
+  font-weight: var(--ui-weight-semibold);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-strong);
+}
+
+.portal-roadmap__summary {
+  margin: 0;
+  font-size: var(--ui-font-xs);
+  line-height: var(--ui-leading-base);
+  color: var(--ui-text-soft);
+}
+
+/* ======================================================================
+   加载骨架的页面形态（批次二四态）：市场卡片与工作台宫格各一份。
+   骨架块本体在 ui-tokens/components.css（.ui-skeleton，单色淡染 + shimmer），
+   这里只补「长在页面上」的形状。
+   ====================================================================== */
+
+.portal-cards__skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-3);
+  height: 100%;
+  padding: var(--ui-space-4);
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-line);
+  border-radius: var(--ui-radius-l);
+}
+
+.portal-cards__skeleton-head {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-3);
+}
+
+.portal-cards__skeleton-lines {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-2);
+  flex: 1;
+}
+
+.portal-cards__skeleton-line {
+  width: 60%;
+}
+
+.portal-grid__skel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--ui-space-2);
+  padding: var(--ui-space-3) var(--ui-space-2);
+}
+
+/* 宫格里的图标骨架与真实瓦片同尺寸（52px），避免加载完成后布局跳动 */
+.portal-grid .ui-skeleton--tile {
+  width: 52px;
+  height: 52px;
 }
