@@ -1,7 +1,8 @@
-import { Link, useParams } from 'react-router-dom';
-import { LeftArrowOutlined, RefreshOutlined } from 'dd-icons';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { LeftArrowOutlined } from 'dd-icons';
 import { DEMO_APPS } from '../../store/demoCatalog';
 import AppNotFound from '../parts/AppNotFound';
+import WorkspaceStage from '../parts/WorkspaceStage';
 
 /**
  * 子应用工作区：/apps/:appId
@@ -25,32 +26,56 @@ import AppNotFound from '../parts/AppNotFound';
  *     但子应用工作区里它们只会碍事。
  *
  * ============================================================================
- * 为什么现在还没有真的把子应用装进去
+ * 工作区契约（批次三，接 iframe 前立契）
  * ============================================================================
  *
- * 应用容器适配层（P0-4）尚未接入，演示目录里的 entry 全部指向 RFC 2606 保留域 .invalid，
- * 那个顶级域永不解析。所以这里**不发起任何请求**：
- *   - 用一个不挂载任何地址的容器占位，占据真实子应用将来会占的位置与尺寸；
- *   - 占位内容说明当前状态，并给出「返回工作台」的出口。
- * 真实接入时把 entry 挂上去即可，工作区条与布局都不用改。
+ * 舞台四态由 WorkspaceStage 承担（loading / error / ready / not-integrated）。
+ * 演示目录的 entry 全部指向 RFC 2606 保留域 .invalid（永不解析），
+ * 所以当前 stage 恒为 not-integrated：不发起任何请求，只说明状态并给出返回出口。
+ * P0-4 接入时换成真实加载状态机，舞台与布局都不用改。
+ *
+ * 返回语义：工作区条「返回」是「退一步」（navigate(-1)），深链直落
+ * （location.key === 'default'）没有来路，才回退 /preview。移动端返回手势
+ * 等价于浏览器返回——与「退一步」一致，不会把用户多弹一层。
  *
  * 注意：这里的文案刻意不出现任何工程术语（测试会扫描全站文案）。
  */
 export default function SubAppWorkspace() {
   const { appId } = useParams<{ appId: string }>();
+  const navigate = useNavigate();
+  const location = useLocation();
   const app = DEMO_APPS.find((item) => item.appId === appId);
 
   if (!app) {
     return <AppNotFound />;
   }
 
+  /** 深链直落没有来路可退，退到工作台首页；其余情况都是「退一步」 */
+  function exitWorkspace() {
+    if (location.key === 'default') {
+      navigate('/preview');
+    } else {
+      navigate(-1);
+    }
+  }
+
   return (
     <div className="workspace">
       <header className="workspace__bar">
-        <Link className="workspace__back" to="/preview" aria-label="返回工作台">
+        {/*
+          返回的语义是「回到来路」而不是「压入一条新历史」：从工作台/市场进来时
+          navigate(-1) 让浏览器返回键的预期成立（不会在工作区与门户之间多绕一圈）。
+          用 button 而不是 Link：Link 的目标只能是确定地址，表达不了「退一步」。
+        */}
+        <button
+          type="button"
+          className="workspace__back"
+          aria-label="返回工作台"
+          onClick={exitWorkspace}
+        >
           <LeftArrowOutlined aria-hidden="true" />
           <span className="workspace__back-text">返回</span>
-        </Link>
+        </button>
 
         <h1 className="workspace__title">{app.name}</h1>
 
@@ -58,23 +83,17 @@ export default function SubAppWorkspace() {
       </header>
 
       {/*
-        真实子应用将来的挂载位置。现在不挂任何地址，只占位，
-        所以这里放的是说明而不是空容器——空容器会让人以为页面坏了。
+        真实子应用将来的挂载位置。演示期 entry 是保留域，不挂任何地址，
+        舞台落在 not-integrated（说明 + 返回出口），而不是空容器——
+        空容器会让人以为页面坏了。
       */}
       <div className="workspace__stage">
-        <div className="workspace__placeholder" role="note" aria-label="应用加载说明">
-          <span className="workspace__placeholder-icon" aria-hidden="true">
-            <RefreshOutlined />
-          </span>
-          <p className="workspace__placeholder-title">{app.name}还没有接入这里</p>
-          <p className="workspace__placeholder-desc">
-            应用容器接通后，这个页面就是它的完整工作区：门户的导航与说明都会让开，
-            只保留左上角的返回入口。
-          </p>
-          <Link className="workspace__placeholder-action" to="/preview">
-            返回工作台
-          </Link>
-        </div>
+        <WorkspaceStage
+          status="not-integrated"
+          app={app}
+          onRetry={() => window.location.reload()}
+          onExit={exitWorkspace}
+        />
       </div>
     </div>
   );

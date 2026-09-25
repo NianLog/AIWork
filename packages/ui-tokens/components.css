@@ -71,7 +71,10 @@
   position: sticky;
   top: 0;
   z-index: var(--ui-z-sticky);
-  min-height: var(--ui-appbar-h);
+  /* 钉钉 WebView 的刘海屏安全区：高度契约随之加高，而不是被 padding 撑破。
+     无 inset 的环境（桌面、审计用的 headless Chrome）env() 为 0，契约回到 40px。 */
+  min-height: calc(var(--ui-appbar-h) + env(safe-area-inset-top));
+  padding-top: env(safe-area-inset-top);
   background: var(--ui-surface);
   border-bottom: 1px solid var(--ui-line);
 }
@@ -1081,4 +1084,235 @@
 
 .ui-skip-link:focus {
   top: var(--ui-space-3);
+}
+/* ======================================================================
+   四态数据视图的公共件：骨架屏、彩虹加载条、错误态（2026-09-25 批次二）
+   每个数据视图收敛成 loading / error / content(+empty) 四态，视图层只认
+   「status + data + error」形状；接入真实数据源时只换来源不换视图。
+   ====================================================================== */
+
+/*
+ * 骨架块：单色淡染（任取一相 10-14% alpha）+ 同色系高光 shimmer——
+ * 这是彩虹规范给骨架屏定的形态。默认紫罗兰（应用图标的主色相），
+   品牌橙场（子应用工作区）用 --brand 变体；同屏至多两相。
+ * prefers-reduced-motion 时 base.css 的全局降级把 shimmer 冻成静块，
+ * 骨架仍然在，只是不闪。
+ */
+.ui-skeleton {
+  --skel-tint: rgba(124, 92, 240, 0.12);
+  --skel-glow: rgba(124, 92, 240, 0.22);
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--ui-radius-s);
+  background: var(--skel-tint);
+}
+
+.ui-skeleton--brand {
+  --skel-tint: rgba(237, 125, 51, 0.12);
+  --skel-glow: rgba(237, 125, 51, 0.22);
+}
+
+.ui-skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, var(--skel-glow), transparent);
+  animation: ui-skel-shimmer 1.4s var(--ui-ease-standard) infinite;
+}
+
+@keyframes ui-skel-shimmer {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(100%);
+  }
+}
+
+.ui-skeleton--line {
+  height: 12px;
+}
+
+.ui-skeleton--line-lg {
+  height: 16px;
+}
+
+.ui-skeleton--pill {
+  height: 22px;
+  width: 72px;
+  border-radius: var(--ui-radius-pill);
+}
+
+.ui-skeleton--tile {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--ui-radius-l);
+}
+
+.ui-skeleton--block {
+  height: 84px;
+  border-radius: var(--ui-radius-m);
+}
+
+/*
+ * 七段彩虹加载条（彩虹规范的首个落地形态）。
+ * 只出现在装饰位：工作区加载态、未接入空态的点缀。段高 8px 起步（面积识别），
+ * 脉冲只用 opacity、逐段错峰；reduced-motion 时全局降级为静止色条。
+ * 容器自行加 aria-hidden（纯装饰，加载状态由外层 role="status" 文本播报）。
+ */
+.ui-rainbow-bar {
+  display: flex;
+  gap: var(--ui-space-1);
+  width: 168px;
+}
+
+.ui-rainbow-bar span {
+  flex: 1;
+  height: 8px;
+  border-radius: var(--ui-radius-pill);
+  animation: ui-rainbow-pulse 1.2s var(--ui-ease-standard) infinite;
+}
+
+.ui-rainbow-bar span:nth-child(1) {
+  background: var(--ui-rainbow-red);
+  animation-delay: 0ms;
+}
+
+.ui-rainbow-bar span:nth-child(2) {
+  background: var(--ui-rainbow-orange);
+  animation-delay: 90ms;
+}
+
+.ui-rainbow-bar span:nth-child(3) {
+  background: var(--ui-rainbow-yellow);
+  animation-delay: 180ms;
+}
+
+.ui-rainbow-bar span:nth-child(4) {
+  background: var(--ui-rainbow-green);
+  animation-delay: 270ms;
+}
+
+.ui-rainbow-bar span:nth-child(5) {
+  background: var(--ui-rainbow-cyan);
+  animation-delay: 360ms;
+}
+
+.ui-rainbow-bar span:nth-child(6) {
+  background: var(--ui-rainbow-blue);
+  animation-delay: 450ms;
+}
+
+.ui-rainbow-bar span:nth-child(7) {
+  background: var(--ui-rainbow-purple);
+  animation-delay: 540ms;
+}
+
+@keyframes ui-rainbow-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/*
+ * 数据视图的错误态四要素容器：发生了什么（标题）+ 为什么（描述）+ 错误码 +
+ * 建议操作（按钮组：重试 / 返回）。文案按「无法完成 X + 下一步」模板写。
+ */
+.ui-errorstate {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--ui-space-3);
+  max-width: 440px;
+  margin-inline: auto;
+  padding: var(--ui-space-8) var(--ui-space-6);
+  text-align: center;
+}
+
+.ui-errorstate__code {
+  font-size: var(--ui-font-xs);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--ui-tracking-wide);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-tone-danger-fg);
+}
+
+.ui-errorstate__title {
+  margin: 0;
+  font-size: var(--ui-font-md);
+  font-weight: var(--ui-weight-semibold);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-strong);
+}
+
+.ui-errorstate__desc {
+  margin: 0;
+  font-size: var(--ui-font-sm);
+  line-height: var(--ui-leading-loose);
+  color: var(--ui-text-soft);
+}
+
+.ui-errorstate__actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ui-space-3);
+  flex-wrap: wrap;
+  margin-top: var(--ui-space-2);
+}
+
+/*
+ * 统计卡的可点击形态（2026-09-25 批次四）：「看数」变「看数到下钻」，
+ * 点击即筛选，选中态与分段筛选器绑定同一份状态。按钮版本与 div 版本同构，
+ * 只是可聚焦可点击——语义升格，版式不变。
+ */
+button.ui-stat {
+  width: 100%;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ui-stat.is-active {
+  border-color: var(--ui-brand-strong);
+  background: var(--ui-brand-soft-weak);
+}
+
+.ui-stat.is-active .ui-stat__label::before {
+  background: var(--ui-brand-strong);
+}
+
+/*
+ * 字段错误槽（批次二反馈原语约定）：
+ * 错误文案挂 .ui-field__error，控件标 aria-invalid="true"，
+ * 错误文本的 id 写进控件的 aria-describedby；校验时机失焦即时 + 提交全量；
+ * 文案说清「哪里错、怎么改」。真实校验随登录/发布链路开通后启用，
+ * 槽位先立在结构里，避免届时逐页补 DOM。
+ */
+.ui-field__error {
+  margin: 0;
+  font-size: var(--ui-font-xs);
+  line-height: var(--ui-leading-base);
+  color: var(--ui-tone-danger-fg);
+}
+
+/* 悬停反馈：统计卡是可点控件，移入必须有样式变化（状态审计强制项）。
+   与选中态区分：hover 只抬阴影 + 深化边线，不上品牌底色——底色是「当前选中」的语义。 */
+button.ui-stat:hover {
+  border-color: var(--ui-line-strong);
+  box-shadow: var(--ui-shadow-raise);
+}
+
+/* 表格加载骨架（批次二四态）：几条整行骨架占住表格的形，加载完成前卡片不塌 */
+.ui-table-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-4);
+  padding: var(--ui-space-5) var(--ui-space-4);
 }

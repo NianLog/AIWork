@@ -1,7 +1,7 @@
 {
   "version": 1,
   "schema": "dde-agent-index/1",
-  "generatedAt": "2026-09-25T09:42:22.964Z",
+  "generatedAt": "2026-09-25T12:15:49.444Z",
   "generator": "npx tsx scripts/notes.ts index",
   "disclaimer": "本索引是笔记库的派生快照，用于快速导航与关系检索，不是事实源。\n凡涉及代码修改、实现细节核对、或笔记 freshness.state 为 stale/undated 时，\n必须回读 source.path/lines 指向的源文件与相关代码，避免被过期记录误导。",
   "usage": {
@@ -12,12 +12,12 @@
     "markRechecked": "npx tsx scripts/notes.ts touch <笔记路径>   # 刷新 Last-verified 元数据"
   },
   "stats": {
-    "activeNotes": 10,
+    "activeNotes": 11,
     "archivedNotes": 0,
     "modules": 0,
-    "relations": 18,
+    "relations": 19,
     "byLifecycle": {
-      "implemented": 10
+      "implemented": 11
     },
     "staleNotes": []
   },
@@ -42,6 +42,7 @@
       "citedBy": [
         "implemented/architecture/2026-09-25-shared-structural-style-layer.md",
         "implemented/architecture/2026-09-25-warm-brand-palette.md",
+        "implemented/feature/2026-09-25-uiux-improvement-four-batches.md",
         "implemented/testing/2026-09-25-vitest-dingtalk-esm-and-semantic-tests.md"
       ],
       "lastVerified": null,
@@ -335,6 +336,68 @@
         ]
       },
       "updateHint": "编辑 .agents/notes/implemented/feature/2026-09-25-business-language-ui-copy.md 后运行：npx tsx scripts/notes.ts verify && npx tsx scripts/notes.ts index"
+    },
+    {
+      "id": "implemented/feature/2026-09-25-uiux-improvement-four-batches.md",
+      "path": ".agents/notes/implemented/feature/2026-09-25-uiux-improvement-four-batches.md",
+      "anchor": "// Note: .agents/notes/implemented/feature/2026-09-25-uiux-improvement-four-batches.md",
+      "title": "门户与后台体验改进四批次（四态骨架 / URL 状态 / 彩虹规范 / 表格交互）",
+      "lifecycle": "implemented",
+      "class": "feature",
+      "date": "2026-09-25",
+      "scope": [
+        "packages/ui-tokens/**",
+        "apps/portal/src/**",
+        "apps/admin/src/**"
+      ],
+      "supersedes": null,
+      "supersededBy": [],
+      "cites": [
+        "implemented/architecture/2026-09-25-dingtalk-design-system.md"
+      ],
+      "citedBy": [],
+      "lastVerified": "2026-09-25",
+      "archivedDate": null,
+      "freshness": {
+        "state": "fresh",
+        "monthsSinceVerify": 0,
+        "rule": "最近复核 2026-09-25"
+      },
+      "summary": "四个批次一次做完，全部落在既有分层里（页面认数据形状、令牌进 tokens.css、结构件进 components.css）：",
+      "bodySha256": "1be9d842004c6694",
+      "lines": {
+        "title": 1,
+        "status": 3,
+        "scope": [
+          4
+        ],
+        "supersedes": null,
+        "lastVerified": 5,
+        "archived": null,
+        "sections": [
+          {
+            "title": "Problem",
+            "line": 7
+          },
+          {
+            "title": "Decision",
+            "line": 15
+          },
+          {
+            "title": "Alternatives considered",
+            "line": 37
+          },
+          {
+            "title": "Consequences",
+            "line": 46
+          },
+          {
+            "title": "Verification",
+            "line": 58
+          }
+        ]
+      },
+      "updateHint": "编辑 .agents/notes/implemented/feature/2026-09-25-uiux-improvement-four-batches.md 后运行：npx tsx scripts/notes.ts verify && npx tsx scripts/notes.ts index"
     },
     {
       "id": "implemented/process/2026-09-24-adopt-dde-notes.md",
@@ -687,6 +750,11 @@
       "type": "cite",
       "from": "implemented/feature/2026-09-25-business-language-ui-copy.md",
       "to": "implemented/testing/2026-09-25-vitest-dingtalk-esm-and-semantic-tests.md"
+    },
+    {
+      "type": "cite",
+      "from": "implemented/feature/2026-09-25-uiux-improvement-four-batches.md",
+      "to": "implemented/architecture/2026-09-25-dingtalk-design-system.md"
     },
     {
       "type": "cite",

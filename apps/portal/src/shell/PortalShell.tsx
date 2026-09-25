@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { Avatar } from 'dingtalk-design-mobile';
@@ -102,8 +103,15 @@ function resolveActiveKey(pathname: string) {
 export default function PortalShell() {
   const location = useLocation();
   const isWide = useMediaQuery(WIDE_QUERY);
+  const mainRef = useRef<HTMLElement>(null);
   const meta = useRouteMeta(PAGE_METAS, FALLBACK_META);
   const activeKey = resolveActiveKey(location.pathname);
+
+  // 路由落点：切页后焦点主动落在内容区（main 已有 tabIndex={-1}），
+  // 页面标题行的变化也随之被读屏播报。没有这一步，焦点会掉回 body。
+  useEffect(() => {
+    mainRef.current?.focus({ preventScroll: true });
+  }, [location.pathname]);
 
   return (
     <div className="portal-shell ui-shell">
@@ -161,7 +169,9 @@ export default function PortalShell() {
 
           <span className="portal-ident">
             <span className="portal-ident__org">
-              <OrganizationOutlined style={{ fontSize: 13 }} />
+              <span aria-hidden="true">
+                <OrganizationOutlined style={{ fontSize: 13 }} />
+              </span>
               {DEMO_VIEWER.orgLabel}
             </span>
             <Link className="portal-ident__user" to="/login" aria-label="返回登录页">
@@ -171,7 +181,7 @@ export default function PortalShell() {
         </div>
       </header>
 
-      <main className="ui-main" id="portal-main" tabIndex={-1}>
+      <main className="ui-main" id="portal-main" tabIndex={-1} ref={mainRef}>
         <div className="ui-container ui-main__inner">
           {/*
             页面名与体验披露压成一条 28px 的窄行：左边是 h1（测试与读屏软件靠它认页面），

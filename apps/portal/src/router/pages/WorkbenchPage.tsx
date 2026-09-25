@@ -1,28 +1,41 @@
-import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useMemo } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { Button, Empty } from 'dingtalk-design-mobile';
 import { RightArrowOutlined } from 'dd-icons';
-import { DEMO_APPS, DEMO_DISCLOSURE, DEMO_VIEWER, summarizeDemoApps } from '../../store/demoCatalog';
-import type { DemoApp } from '../../store/demoCatalog';
+import { DEMO_APPS_VIEW, DEMO_DISCLOSURE, DEMO_VIEWER, summarizeDemoApps } from '../../store/demoCatalog';
+import { summarizeRoadmap } from '../../store/roadmap';
 import AppDetailDrawer from '../parts/AppDetailDrawer';
 import { AppIconTile } from '../parts/AppVisuals';
 
 /**
- * 工作台：门户首屏，对标钉钉工作台的信息结构（问候 + 应用宫格 + 说明区块）。
+ * 工作台：门户首屏，对标钉钉工作台的信息结构（问候 + 应用宫格 + 进展速览）。
  *
- * 宫格只打开详情抽屉，不产生任何指向子应用的导航——应用容器接入前这条路径必须不存在。
- * 界面不展示应用标识、技术框架、权限码等实现细节，只保留业务用户关心的信息。
+ * 四态骨架（批次二）：页面只认 DEMO_APPS_VIEW 的「status + data + error」形状，
+ * 演示数据永远 success，loading / error 由测试喂形状覆盖。
+ * 选中态进 URL（批次二）：宫格点开的详情抽屉由 ?app=<appId> 驱动，
+ * 浏览器返回键 = 关抽屉，详情可深链。
  *
  * 版式取舍：
- * - 问候与两个关键数字合成一张卡，右侧跟一句披露标签；以前是「问候卡 + 空的使用数据卡」
- *   两张几乎等高的卡上下堆叠，首屏一半面积在讲「现在没有数据」；
- * - 宫格改成自适应的响应式网格（每列最小 88px），不再按断点手算列数，
- *   宽屏自然铺到 8 列，窄屏 3 列，中间尺寸也不会出现 4 列挤成一团的情况；
- * - 「使用数据」保留空态说明，但收成一张矮卡并挪到宫格之后，不再占据首屏另一半。
+ * - 问候与两个关键数字合成一张卡，右侧跟一句披露标签；
+ * - 宫格是自适应的响应式网格（每列最小 84px），宽屏自然铺开，窄屏 3 列；
+ * - 下半页（批次四）：原来是一张「使用数据会在上线后展示」的空说明卡，
+ *   首屏下半部大面积讲「现在没有数据」。换成「功能进展速览」——与功能进展页
+ *   同一份数据（store/roadmap.ts），三张阶段卡把「上重下空」填掉，
+ *   且不编造任何运行数据（使用数据仍等真实来源，见功能进展页的承诺）。
  */
 export default function WorkbenchPage() {
-  const [activeApp, setActiveApp] = useState<DemoApp | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const view = DEMO_APPS_VIEW;
   const stats = summarizeDemoApps();
-  const enabledApps = useMemo(() => DEMO_APPS.filter((app) => app.status === 1), []);
+  const roadmap = useMemo(() => summarizeRoadmap(), []);
+  const enabledApps = useMemo(() => view.data.filter((app) => app.status === 1), [view.data]);
+
+  /** 选中态即 URL：?app=xxx 打开抽屉（推历史），清除参数关闭（replace） */
+  const activeAppId = searchParams.get('app');
+  const activeApp = activeAppId
+    ? view.data.find((app) => app.appId === activeAppId) ?? null
+    : null;
 
   return (
     <div className="ui-page portal-page--workbench">
@@ -49,37 +62,80 @@ export default function WorkbenchPage() {
           <h2 className="ui-section__title">常用应用</h2>
           <Link className="ui-section__link" to="/preview/market">
             全部应用
-            <RightArrowOutlined style={{ fontSize: 12 }} />
+            <span aria-hidden="true">
+              <RightArrowOutlined style={{ fontSize: 12 }} />
+            </span>
           </Link>
         </div>
-        <ul className="portal-grid">
-          {enabledApps.map((app) => (
-            <li key={app.appId}>
-              <button
-                type="button"
-                className="portal-grid__tile"
-                onClick={() => setActiveApp(app)}
-              >
-                <AppIconTile app={app} />
-                <span className="portal-grid__name">{app.name}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
+        {view.status === 'loading' ? (
+          <ul className="portal-grid" aria-hidden="true">
+            {[0, 1, 2, 3, 4, 5].map((index) => (
+              <li key={index} className="portal-grid__skel">
+                <span className="ui-skeleton ui-skeleton--tile" />
+                <span className="ui-skeleton ui-skeleton--line" />
+              </li>
+            ))}
+          </ul>
+        ) : view.status === 'error' ? (
+          <div className="ui-card ui-card--center">
+            <div className="ui-errorstate" role="alert">
+              <h2 className="ui-errorstate__title">无法加载常用应用</h2>
+              <p className="ui-errorstate__desc">
+                {view.error ?? '网络暂时没有响应，稍后重试一般就能恢复。'}
+              </p>
+              <div className="ui-errorstate__actions">
+                <Button size="large" onClick={() => window.location.reload()}>
+                  重试
+                </Button>
+              </div>
+            </div>
+          </div>
+        ) : enabledApps.length > 0 ? (
+          <ul className="portal-grid">
+            {enabledApps.map((app) => (
+              <li key={app.appId}>
+                <button
+                  type="button"
+                  className="portal-grid__tile"
+                  onClick={() => setSearchParams({ app: app.appId })}
+                >
+                  <AppIconTile app={app} />
+                  <span className="portal-grid__name">{app.name}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <div className="ui-card ui-card--center">
+            <Empty title="还没有可用的应用" inline />
+          </div>
+        )}
       </section>
 
-      <section className="ui-section" aria-label="使用数据">
+      <section className="ui-section" aria-label="功能进展速览">
         <div className="ui-section__head">
-          <h2 className="ui-section__title">使用数据</h2>
+          <h2 className="ui-section__title">功能进展速览</h2>
+          <Link className="ui-section__link" to="/preview/status">
+            去看功能进展
+            <span aria-hidden="true">
+              <RightArrowOutlined style={{ fontSize: 12 }} />
+            </span>
+          </Link>
         </div>
-        <div className="ui-card">
-          <p className="ui-note ui-note--tight portal-empty-note">
-            使用数据会在功能正式上线后展示。现在不提供任何示例数字，避免被误认为真实统计。
-          </p>
+        <div className="portal-roadmap">
+          {roadmap.map((stage) => (
+            <div className="portal-roadmap__card" key={stage.key}>
+              <p className="portal-roadmap__count ui-num">{stage.count}</p>
+              <p className="portal-roadmap__title">{stage.title}</p>
+              <p className="portal-roadmap__summary">{stage.summary}</p>
+            </div>
+          ))}
         </div>
       </section>
 
-      {activeApp ? <AppDetailDrawer app={activeApp} onClose={() => setActiveApp(null)} /> : null}
+      {activeApp ? (
+        <AppDetailDrawer app={activeApp} onClose={() => setSearchParams({}, { replace: true })} />
+      ) : null}
     </div>
   );
 }

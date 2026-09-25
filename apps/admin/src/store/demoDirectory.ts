@@ -345,3 +345,18 @@ export const DEMO_OPERATOR = {
   roleLabel: '未分配角色',
   envLabel: '体验环境',
 } as const;
+
+/**
+ * 四态数据视图契约（2026-09-25 批次二）：视图层只认「status + data + error」形状。
+ * 演示数据永远 success；P0-3/P0-4 接 Yudao / 注册接口时换来源不改视图。
+ */
+export interface DataView<T> {
+  status: 'loading' | 'error' | 'success';
+  data: T[];
+  error?: string;
+}
+
+export const DEMO_USERS_VIEW: DataView<DemoUser> = { status: 'success', data: DEMO_USERS };
+export const DEMO_ROLES_VIEW: DataView<DemoRole> = { status: 'success', data: DEMO_ROLES };
+export const DEMO_ORGS_VIEW: DataView<DemoOrganization> = { status: 'success', data: DEMO_ORGANIZATIONS };
+export const DEMO_APPLICATIONS_VIEW: DataView<DemoApplicationRecord> = { status: 'success', data: DEMO_APPLICATIONS };

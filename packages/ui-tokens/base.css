@@ -20,6 +20,16 @@ body,
   min-height: 100%;
 }
 
+/*
+ * WebView 字体缩放禁令：钉钉 WebView（尤其 Android）会按系统字体设置放大文字，
+ * 版式节奏全部失效。100% 把字号钉在 CSS 声明值上，用户仍可用系统设置放大
+ * 整页（视觉缩放），但文字不再单独重排。
+ */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 body {
   margin: 0;
   background: var(--ui-surface-sunken);
@@ -29,6 +39,8 @@ body {
   font-size: var(--ui-font-base);
   line-height: var(--ui-leading-base);
   -webkit-font-smoothing: antialiased;
+  /* WebView 触控高亮：组件态有自己的反馈，灰色系统高亮只会叠一层脏色 */
+  -webkit-tap-highlight-color: transparent;
 }
 
 a {

@@ -26,7 +26,7 @@ export const DEMO_SESSION_LABEL = '无需登录';
 
 /** 演示态长说明，用于详情抽屉与各页说明文案。 */
 export const DEMO_EXPLANATION =
-  '这里的应用信息是为了展示界面效果而准备的示例，并不来自正式的应用清单，目前也无法从界面直接打开使用。';
+  '这里的应用信息是为了展示界面效果而准备的示例，并不来自正式的应用清单。';
 
 /** 演示入口域：RFC 2606 保留，永不解析。 */
 const DEMO_ENTRY_ORIGIN = 'https://apps.invalid';
@@ -259,3 +259,18 @@ export function summarizeDemoApps() {
     permissionTotal,
   };
 }
+
+/**
+ * 四态数据视图契约（2026-09-25 批次二）：视图层只认「status + data + error」形状。
+ * 演示数据是永远 success 的来源；P0-4 接真实注册接口时换掉这个来源，页面不改形状。
+ * loading / error 分支今天没有真实触发路径，由测试直接喂对应形状覆盖，
+ * 不造假的加载延迟——假装在加载比没有加载更糟。
+ */
+export interface DataView<T> {
+  status: 'loading' | 'error' | 'success';
+  data: T[];
+  error?: string;
+}
+
+/** 演示目录的数据视图：永远 success。 */
+export const DEMO_APPS_VIEW: DataView<DemoApp> = { status: 'success', data: DEMO_APPS };

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Alert, Avatar, Breadcrumb, Button, Input, Menu, Tag } from 'dingtalk-design-desktop';
@@ -81,13 +81,30 @@ export default function AdminShell() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const [navOpen, setNavOpen] = useState(false);
+  const siderRef = useRef<HTMLElement>(null);
+  const navtoggleRef = useRef<HTMLButtonElement>(null);
+  const mainRef = useRef<HTMLElement>(null);
   const meta = useRouteMeta(PAGE_METAS, FALLBACK_META);
   const activeKey = resolveActiveKey(pathname);
 
-  // 切页即收起窄屏抽屉，否则点完菜单抽屉还盖着刚打开的内容
+  // 切页即收起窄屏抽屉，否则点完菜单抽屉还盖着刚打开的内容。
+  // 这次收起不还焦点给汉堡按钮——切页时焦点归路由落点（见下面 main 的聚焦 effect）。
   useEffect(() => {
     setNavOpen(false);
   }, [pathname]);
+
+  // 窄屏抽屉打开时焦点移入侧栏（第一个可聚焦项是「收起导航」按钮）。
+  // 关闭后侧栏是 visibility:hidden，焦点若留在里面会被丢回 body，所以必须主动安置。
+  useEffect(() => {
+    if (!navOpen) {
+      return;
+    }
+    siderRef.current
+      ?.querySelector<HTMLElement>(
+        'button:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])',
+      )
+      ?.focus();
+  }, [navOpen]);
 
   // Esc 收起抽屉：滑出的浮层必须能只靠键盘关掉
   useEffect(() => {
@@ -97,11 +114,18 @@ export default function AdminShell() {
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') {
         setNavOpen(false);
+        navtoggleRef.current?.focus();
       }
     }
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [navOpen]);
+
+  // 路由落点：切页后焦点主动落在内容区（main 已有 tabIndex={-1}）。
+  // 没有这一步，SPA 切页对键盘与读屏用户等于「焦点掉回 body，从页面头重新开始」。
+  useEffect(() => {
+    mainRef.current?.focus({ preventScroll: true });
+  }, [pathname]);
 
   return (
     <div className={`admin-shell${navOpen ? ' is-nav-open' : ''}`}>
@@ -109,7 +133,7 @@ export default function AdminShell() {
         跳转到主要内容
       </a>
 
-      <aside className="admin-sider" aria-label="后台导航区">
+      <aside className="admin-sider" aria-label="后台导航区" ref={siderRef}>
         <div className="admin-brand">
           <span className="admin-brand__logo" aria-hidden="true">
             <AiDiagonalStarsFilled />
@@ -122,7 +146,10 @@ export default function AdminShell() {
             type="button"
             className="admin-sider__close"
             aria-label="收起导航"
-            onClick={() => setNavOpen(false)}
+            onClick={() => {
+              setNavOpen(false);
+              navtoggleRef.current?.focus();
+            }}
           >
             <CloseOutlined />
           </button>
@@ -160,7 +187,10 @@ export default function AdminShell() {
         className="admin-scrim"
         aria-label="收起导航"
         tabIndex={navOpen ? 0 : -1}
-        onClick={() => setNavOpen(false)}
+        onClick={() => {
+          setNavOpen(false);
+          navtoggleRef.current?.focus();
+        }}
       />
 
       <div className="admin-main">
@@ -171,6 +201,7 @@ export default function AdminShell() {
               className="admin-header__navtoggle"
               aria-label="展开导航"
               aria-expanded={navOpen}
+              ref={navtoggleRef}
               onClick={() => setNavOpen(true)}
             >
               <MenuOutlined />
@@ -218,6 +249,15 @@ export default function AdminShell() {
               测试按 role="note" 断言披露语义持续在场，压缩版式不能把它压掉。
             */}
             <div className="admin-topline">
+              {/*
+                页面主标题（h1）由外壳统一渲染：后台五个页面同构，各页再写一遍标题
+                只会在某天出现两个 h1 或者一个都没有。标题数据来自路由 handle（见 useRouteMeta）。
+
+                DOM 上 h1 在披露条之前：读屏先读到页面名、再读整段披露，信息主次才对。
+                视觉位置不变——.admin-pagehead__title 的 order: 2 让它仍然靠右。
+              */}
+              <h1 className="admin-pagehead__title">{meta.title}</h1>
+
               <Alert
                 className="admin-banner"
                 type="info"
@@ -225,15 +265,9 @@ export default function AdminShell() {
                 message={DEMO_DISCLOSURE}
                 description={DEMO_EXPLANATION}
               />
-
-              {/*
-                页面主标题（h1）由外壳统一渲染：后台五个页面同构，各页再写一遍标题
-                只会在某天出现两个 h1 或者一个都没有。标题数据来自路由 handle（见 useRouteMeta）。
-              */}
-              <h1 className="admin-pagehead__title">{meta.title}</h1>
             </div>
 
-            <main className="admin-content" id="admin-main" tabIndex={-1}>
+            <main className="admin-content" id="admin-main" tabIndex={-1} ref={mainRef}>
               {/* key 挂在路由出口上：切页时重放一次 ui-enter，与门户同一条入场曲线 */}
               <div className="admin-content__inner ui-enter" key={pathname}>
                 <Outlet />

@@ -398,6 +398,13 @@
   gap: var(--ui-space-1);
 }
 
+/* 数据组结构化（批次四）：相邻指标之间一条分隔线（装饰位，ink 的弱化，
+   与角标边框同源；不承载信息），数字大、标签小，扫一眼比出量级 */
+.portal-hero__stat + .portal-hero__stat {
+  padding-left: var(--ui-space-6);
+  border-left: 1px solid rgba(46, 20, 8, 0.25);
+}
+
 .portal-hero__stat dt {
   font-size: var(--ui-font-xs);
   line-height: var(--ui-leading-tight);
@@ -406,6 +413,9 @@
 
 .portal-hero__stat dd {
   margin: 0;
+  font-size: var(--ui-font-xl);
+  font-weight: var(--ui-weight-semibold);
+  line-height: var(--ui-leading-num);
   color: var(--ui-brand-ink);
 }
 
@@ -732,6 +742,8 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  /* 滚动链隔离：面板滚到底后不许再带走背景列表，配合浮层打开时的 body 滚动锁 */
+  overscroll-behavior: contain;
   padding: var(--ui-space-5);
   display: flex;
   flex-direction: column;
@@ -845,6 +857,11 @@
   justify-content: center;
   gap: var(--ui-space-1);
   flex: none;
+  /* 它是 button 不是链接（见 SubAppWorkspace 的注释）：把 UA 的按钮皮剥掉 */
+  border: 0;
+  background: none;
+  font-family: inherit;
+  cursor: pointer;
   /* 触控目标：极窄屏会把文字隐藏，只剩箭头，所以宽高都要自己撑够。
      高度取 --ui-control-l（36px）而不是更大的 44px —— 工作区条本身只有 36px，
      再高的按钮会把条撑胖，破坏「门户只留一条细条」这个约定。 */
@@ -885,6 +902,54 @@
   font-size: var(--ui-font-xs);
   line-height: var(--ui-leading-tight);
   color: var(--ui-text-soft);
+}
+
+/* ---- 工作区舞台四态（批次三契约）：加载骨架 / 未接入占位 / 就绪挂载 ---- */
+.workspace__loading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-5);
+  width: min(560px, 100%);
+}
+
+.workspace__loading-head {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-4);
+}
+
+.workspace__loading-note {
+  margin: 0;
+  font-size: var(--ui-font-sm);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-soft);
+}
+
+.workspace__loading-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-4);
+}
+
+.workspace__loading-bar {
+  width: 40%;
+}
+
+/* 未接入占位里的七彩短条：空态点缀（彩虹规范允许的装饰位），比图标更轻 */
+.workspace__placeholder-rainbow {
+  width: 112px;
+}
+
+/* 就绪态：子应用铺满舞台，舞台自己不再留内边距（那条边距属于门户，不属于子应用） */
+.workspace__stage--flat {
+  padding: 0;
+}
+
+.workspace__frame {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: var(--ui-surface);
 }
 
 @media (max-width: 400px) {
@@ -1435,4 +1500,95 @@
   .portal-shell {
     --ui-container: 1320px;
   }
+}
+
+/* ======================================================================
+   工作台：功能进展速览（批次四：填充下半页，与功能进展页共用 store/roadmap.ts）
+   ====================================================================== */
+
+.portal-roadmap {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--ui-space-4);
+}
+
+.portal-roadmap__card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-2);
+  padding: var(--ui-space-5);
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-line);
+  border-radius: var(--ui-radius-l);
+  box-shadow: var(--ui-shadow-card);
+}
+
+.portal-roadmap__count {
+  margin: 0;
+  font-size: var(--ui-font-2xl);
+  font-weight: var(--ui-weight-semibold);
+  color: var(--ui-text-strong);
+}
+
+.portal-roadmap__title {
+  margin: 0;
+  font-size: var(--ui-font-base);
+  font-weight: var(--ui-weight-semibold);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-strong);
+}
+
+.portal-roadmap__summary {
+  margin: 0;
+  font-size: var(--ui-font-xs);
+  line-height: var(--ui-leading-base);
+  color: var(--ui-text-soft);
+}
+
+/* ======================================================================
+   加载骨架的页面形态（批次二四态）：市场卡片与工作台宫格各一份。
+   骨架块本体在 ui-tokens/components.css（.ui-skeleton，单色淡染 + shimmer），
+   这里只补「长在页面上」的形状。
+   ====================================================================== */
+
+.portal-cards__skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-3);
+  height: 100%;
+  padding: var(--ui-space-4);
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-line);
+  border-radius: var(--ui-radius-l);
+}
+
+.portal-cards__skeleton-head {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-3);
+}
+
+.portal-cards__skeleton-lines {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-2);
+  flex: 1;
+}
+
+.portal-cards__skeleton-line {
+  width: 60%;
+}
+
+.portal-grid__skel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--ui-space-2);
+  padding: var(--ui-space-3) var(--ui-space-2);
+}
+
+/* 宫格里的图标骨架与真实瓦片同尺寸（52px），避免加载完成后布局跳动 */
+.portal-grid .ui-skeleton--tile {
+  width: 52px;
+  height: 52px;
 }

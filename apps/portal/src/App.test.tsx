@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import App from './App';
 import { WIDE_QUERY } from './shell/useMediaQuery';
@@ -12,7 +12,8 @@ import { DEMO_DISCLOSURE, DEMO_SESSION_LABEL } from './store/demoCatalog';
  * 五条不可协商的性质：
  * 1. 统一登录未开通时不采集凭据、不创建会话；
  * 2. 体验界面持续声明演示态与非登录态（role="note" + DEMO_DISCLOSURE + DEMO_SESSION_LABEL）；
- * 3. 应用只可浏览，不存在任何通往子应用的导航路径，打开类操作永久不可用；
+ * 3. 通往子应用的唯一路径是详情浮层的「进入工作区」，工作区必须全屏接管（无门户导航）；
+ *    写意图操作（申请上架等）永久不可用；
  * 4. 全站不存在外部链接，演示 entry（.invalid 保留域）不可能被点开；
  * 5. 界面文案不得出现工程术语——终端用户看不懂的表述等于没有表述。
  *
@@ -252,7 +253,7 @@ describe('演示应用不可被当成真实子应用', () => {
     expect(panel.textContent).toContain(DEMO_DISCLOSURE);
     expect(panel.textContent).toContain('视觉算法组');
     expect(panel.textContent).toContain('创建生图任务');
-    // 浮层内不出现链接：打开应用靠按钮跳转，避免与遮罩状态冲突的「新标签打开」
+    // 浮层内不出现链接：进入工作区靠按钮跳转，避免与遮罩状态冲突的「新标签打开」
     expect(within(panel).queryAllByRole('link')).toHaveLength(0);
 
     /*
@@ -261,7 +262,7 @@ describe('演示应用不可被当成真实子应用', () => {
      * 保护的性质换了一条，但没有丢：现在要断言的是**工作区里没有任何门户导航**，
      * 即子应用打开后确实是全屏接管，而不是嵌在门户框架里。
      */
-    fireEvent.click(within(panel).getByRole('button', { name: /打开应用/ }));
+    fireEvent.click(within(panel).getByRole('button', { name: /进入工作区/ }));
     expect(window.location.pathname).toBe('/apps/ai-image-gen');
 
     // 全屏工作区：只有一条返回入口，门户的三个导航入口一个都不在
@@ -269,6 +270,25 @@ describe('演示应用不可被当成真实子应用', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'AI 商品图生成' })).toBeTruthy();
     expect(externalHrefs()).toEqual([]);
     expectBusinessLanguage();
+  });
+
+  it('详情浮层的状态在地址上：可深链进入，浏览器返回即关闭', async () => {
+    // 深链：带着 ?app= 直接落到市场页，浮层应当已经打开
+    openPortal('/preview/market?app=ai-video-gen');
+    expect(screen.getByRole('dialog', { name: 'AI 商品视频生成 应用详情' })).toBeTruthy();
+
+    cleanup();
+
+    // 常规路径：点卡片推入 ?app=（可分享、可刷新），浏览器返回即关闭
+    openPortal('/preview/market');
+    const listRegion = screen.getByRole('region', { name: '应用列表' });
+    fireEvent.click(within(listRegion).getByText('AI 商品图生成'));
+    expect(screen.getByRole('dialog')).toBeTruthy();
+    expect(window.location.search).toBe('?app=ai-image-gen');
+
+    window.history.back();
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(window.location.search).toBe('');
   });
 
   it('应用工作区可以退回工作台，关闭浮层后详情不再存在', () => {

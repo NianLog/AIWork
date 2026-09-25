@@ -842,12 +842,18 @@
      * 这样滑出有过渡，且菜单 DOM 始终是同一份。
      */
     transform: translateX(-100%);
-    transition: transform var(--ui-dur-base) var(--ui-ease-standard);
+    /* transform 不把元素移出 Tab 序：关闭态必须配 visibility，否则键盘用户
+       会 Tab 进屏幕外的菜单，「焦点消失」。延迟到滑出动画结束再藏。 */
+    visibility: hidden;
+    transition: transform var(--ui-dur-base) var(--ui-ease-standard),
+      visibility 0s linear var(--ui-dur-base);
     box-shadow: var(--ui-shadow-overlay);
   }
 
   .is-nav-open .admin-sider {
     transform: none;
+    visibility: visible;
+    transition: transform var(--ui-dur-base) var(--ui-ease-standard), visibility 0s;
   }
 
   .admin-sider__close {

@@ -89,7 +89,9 @@ export default function LoginPage() {
               <strong>无需登录，先看看界面</strong>
               <span>浏览工作台、应用市场与功能进展</span>
             </span>
-            <RightArrowOutlined style={{ fontSize: 16 }} />
+            <span aria-hidden="true">
+              <RightArrowOutlined style={{ fontSize: 16 }} />
+            </span>
           </Link>
 
           <p className="ui-note">

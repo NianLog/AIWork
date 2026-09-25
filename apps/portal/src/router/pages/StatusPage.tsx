@@ -1,6 +1,8 @@
 import { useId, useState } from 'react';
 import { CheckOutlined, ClockOutlined, InProcessOutlined, PulldownOutlined } from 'dd-icons';
 import { DEMO_DISCLOSURE, DEMO_SESSION_LABEL } from '../../store/demoCatalog';
+import { ROADMAP_STAGES as STAGES } from '../../store/roadmap';
+import type { StageKey } from '../../store/roadmap';
 import { PROGRESS_BOARD_QUERY, useMediaQuery } from '../../shell/useMediaQuery';
 
 /**
@@ -37,81 +39,6 @@ import { PROGRESS_BOARD_QUERY, useMediaQuery } from '../../shell/useMediaQuery';
  * 所以只呈现功能层面的进展说明。测试会断言页面上有「不展示使用人数、响应速度等运行数据」
  * 这句话——这是对用户的承诺，不是装饰文案。
  */
-
-type StageKey = 'ready' | 'building' | 'planned';
-
-interface StageItem {
-  name: string;
-  desc: string;
-}
-
-interface Stage {
-  key: StageKey;
-  title: string;
-  /** 阶段的通俗说明，帮助判断这一阶段意味着什么 */
-  summary: string;
-  icon: 'check' | 'process' | 'clock';
-  items: StageItem[];
-}
-
-const STAGES: Stage[] = [
-  {
-    key: 'ready',
-    title: '已经可以体验',
-    summary: '现在打开门户就能用，不需要登录',
-    icon: 'check',
-    items: [
-      {
-        name: '浏览应用与查看介绍',
-        desc: '在工作台和应用市场查看每个应用能做什么、由哪个团队负责。',
-      },
-      {
-        name: '查找与筛选应用',
-        desc: '按名称、分类或团队搜索，也可在正式版、试运行、已停用之间切换查看。',
-      },
-    ],
-  },
-  {
-    key: 'building',
-    title: '正在建设',
-    summary: '已经开工，还没有到可以试用的程度',
-    icon: 'process',
-    items: [
-      {
-        name: '统一登录',
-        desc: '登录开通后，每个人看到的应用会跟随自己的岗位与所在组织。',
-      },
-      {
-        name: '权限管理',
-        desc: '每位成员能用哪些功能由管理员统一配置，互不越界。',
-      },
-    ],
-  },
-  {
-    key: 'planned',
-    title: '规划中',
-    summary: '已经排进计划，尚未开工',
-    icon: 'clock',
-    items: [
-      {
-        name: '应用上架',
-        desc: '业务团队可以自助提交新应用，审核通过后出现在应用市场。',
-      },
-      {
-        name: '使用统计',
-        desc: '按应用查看使用次数与活跃情况，帮助团队评估效果。',
-      },
-      {
-        name: '消息提醒',
-        desc: '任务完成、风险提醒等消息会通过工作台与钉钉送达。',
-      },
-      {
-        name: '安全守护',
-        desc: '所有操作留痕可查，异常使用及时提醒，保护数据安全。',
-      },
-    ],
-  },
-];
 
 const STAGE_ICON = {
   check: <CheckOutlined />,

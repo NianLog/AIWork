@@ -38,7 +38,9 @@ import { AppIconTile, AppStatusTag } from './AppVisuals';
  * 把背后的内容视为惰性。打开时焦点移进面板，关闭时还给触发元素；Tab 在面板内循环。
  * Escape 关闭。这三条是「浮层」与「页面里的一块」在行为上的分水岭。
  *
- * 「打开应用」是唯一通往子应用的入口，它跳转到 /apps/:appId（全屏工作区）。
+ * 「进入工作区」是唯一通往子应用工作区的入口（CTA 文案 2026-09-25 批次二调整：
+ * 原来的「打开应用」承诺了「应用会被打开」，而工作区当前是未接入占位——
+ * 按钮不再承诺超出实际的行为）。它跳转到 /apps/:appId（全屏工作区）。
  * 注意这里用 button + navigate 而不是 <Link>：弹层内不出现链接，避免在浮层里
  * 产生「新标签打开」这类会与遮罩状态冲突的行为。
  */
@@ -46,6 +48,13 @@ export default function AppDetailDrawer({ app, onClose }: { app: DemoApp; onClos
   const navigate = useNavigate();
   const panelRef = useRef<HTMLDivElement>(null);
   const returnFocusRef = useRef<Element | null>(null);
+  // onClose 的最新引用：调用方传的是内联箭头函数，每次渲染都是新引用。
+  // 直接放进 effect 依赖，父级任何一次重渲染都会让本 effect 重走一遍
+  // 「还焦 → 移焦」的循环。用 ref 持有，effect 只依赖稳定值。
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
 
   /** Tab 在面板内循环：浮层不能让焦点跑到背后的页面上 */
   const trapFocus = useCallback((event: KeyboardEvent) => {
@@ -72,9 +81,14 @@ export default function AppDetailDrawer({ app, onClose }: { app: DemoApp; onClos
   useEffect(() => {
     returnFocusRef.current = document.activeElement;
 
+    // 背景滚动锁：遮罩盖住的是长列表（市场页），不锁的话面板滚到底会带走背景。
+    // cleanup 无条件恢复——「打开应用」跳转工作区时本组件卸载，也必须把滚动还回去。
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') {
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (event.key === 'Tab') {
@@ -94,12 +108,13 @@ export default function AppDetailDrawer({ app, onClose }: { app: DemoApp; onClos
 
     return () => {
       document.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = previousOverflow;
       const previous = returnFocusRef.current;
       if (previous instanceof HTMLElement) {
         previous.focus();
       }
     };
-  }, [onClose, trapFocus]);
+  }, [trapFocus]);
 
   return createPortal(
     <div
@@ -185,7 +200,7 @@ export default function AppDetailDrawer({ app, onClose }: { app: DemoApp; onClos
             inline={false}
             onClick={() => navigate(`/apps/${app.appId}`)}
           >
-            打开应用
+            进入工作区
           </Button>
         </footer>
       </div>

@@ -263,6 +263,33 @@ describe('演示数据只读，不提供变更能力', () => {
     expect(screen.getByText('AI 商品图生成')).toBeTruthy();
   });
 
+  it('统计卡即筛选入口：点卡片切口径，aria-pressed 表达选中', () => {
+    openAdmin('/preview/apps');
+
+    // 点「正式版」统计卡 = 切到正式版筛选
+    const stableCard = screen.getByRole('button', { name: /正式版/ });
+    fireEvent.click(stableCard);
+    expect(screen.getByText('共 1 个应用')).toBeTruthy();
+    expect(stableCard.getAttribute('aria-pressed')).toBe('true');
+
+    // 点「应用总数」切回全部
+    fireEvent.click(screen.getByRole('button', { name: /应用总数/ }));
+    expect(screen.getByText('共 4 个应用')).toBeTruthy();
+
+    // 用户页同一动线
+    cleanup();
+    openAdmin('/preview/users');
+    fireEvent.click(screen.getByRole('button', { name: /待激活/ }));
+    expect(screen.getByText('共 2 位成员')).toBeTruthy();
+  });
+
+  it('应用列表默认按最近更新排序：最新发布的排在第一行', () => {
+    openAdmin('/preview/apps');
+
+    const firstTitle = document.querySelector('.ui-cell-title');
+    expect(firstTitle?.textContent).toBe('直播巡检助手');
+  });
+
   it('用户页的检索与状态筛选只作用于演示数据', () => {
     openAdmin('/preview/users');
 
