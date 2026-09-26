@@ -1,20 +1,27 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
+import { SESSION_KEY } from './api/yudao';
+import type { AdminSession } from './api/yudao';
 import { DEMO_DISCLOSURE, DEMO_EXPLANATION, DEMO_OPERATOR } from './store/demoDirectory';
 
 /**
  * 后台测试：锁安全语义与「说人话」，不锁具体版式。
  *
  * 六条不可协商的性质：
- * 1. 统一登录未开通时不采集凭据、不创建会话；
- * 2. 体验界面持续声明演示态与非登录态（role="note" + DEMO_DISCLOSURE + DEMO_EXPLANATION）；
- * 3. 演示数据只读——写意图按钮全部禁用且点击无效，只读控件（检索、状态筛选）保持可用；
+ * 1. 登录真实可用（批次 B 起）：凭据只换取 sessionStorage 会话（引导文档 §8.4），
+ *    退出登录即清空；未登录访问数据页得到「先登录」引导，而不是数据；
+ * 2. 体验界面持续声明演示态（role="note" + DEMO_DISCLOSURE + DEMO_EXPLANATION）；
+ * 3. 示例数据只读——写意图按钮全部禁用且点击无效，只读控件（检索、状态筛选）保持可用；
  * 4. 全站不存在外部链接，演示 entry / backendApi（.invalid 保留域）不可能被导航到；
  * 5. 界面文案不得出现工程术语——终端用户看不懂的表述等于没有表述；
  * 6. 界面不得摊出内部标识（角色编码、记录主键、权限码）——那是给程序看的，不是给人看的。
+ *
+ * 批次 B 起 /preview/apps 的数据来自真实接口：这里全局 mock fetch 返回固定三应用
+ * （正式版 / 试运行 / 停用各一），会话经 sessionStorage 预置；需要未登录场景的用例
+ * 在开头显式清掉。登录 / 失败 / 重试的请求都走同一个 mock，按 URL 分流。
  *
  * 版式、组件选型与措辞可以自由调整，只要这六条不破，测试就不该红。
  *
@@ -64,6 +71,77 @@ const INTERNAL_IDENTIFIERS = [
   'o-01',
 ];
 
+/** 预置会话：大多数用例以「已登录」姿态渲染，未登录用例自己清掉。 */
+const FAKE_SESSION: AdminSession = {
+  accessToken: 'test-access-token',
+  refreshToken: 'test-refresh-token',
+  user: { id: 1, username: 'admin', nickname: '联调管理员' },
+};
+
+/**
+ * 接口返回的应用记录（后端字段原样，状态口径 0=启用 1=停用）：
+ * 正式版 / 试运行（带试运行版本与比例）/ 停用各一，最近更新时间互不相同。
+ */
+const FIXTURE_APPS = [
+  {
+    id: 1,
+    appId: 'image-studio',
+    name: '图像工坊',
+    version: '1.4.0',
+    framework: 'react',
+    sandbox: 'iframe',
+    baseRoute: '/image',
+    entry: 'https://apps.invalid/image-studio/index.html',
+    backendApi: 'https://api.invalid/image-studio',
+    icon: null,
+    latestVersion: '1.4.0',
+    canaryVersion: null,
+    canaryRatio: null,
+    status: 0,
+    createTime: Date.UTC(2026, 8, 18, 6, 2),
+  },
+  {
+    id: 2,
+    appId: 'video-studio',
+    name: '视频工坊',
+    version: '1.2.0',
+    framework: 'vue3',
+    sandbox: 'iframe',
+    baseRoute: '/video',
+    entry: 'https://apps.invalid/video-studio/index.html',
+    backendApi: 'https://api.invalid/video-studio',
+    icon: null,
+    latestVersion: '1.2.0',
+    canaryVersion: '1.3.0-rc.1',
+    canaryRatio: 20,
+    status: 0,
+    createTime: Date.UTC(2026, 8, 21, 3, 36),
+  },
+  {
+    id: 3,
+    appId: 'asset-house',
+    name: '素材仓库',
+    version: '0.6.0',
+    framework: 'vanilla',
+    sandbox: 'iframe',
+    baseRoute: '/assets',
+    entry: 'https://apps.invalid/asset-house/index.html',
+    backendApi: 'https://api.invalid/asset-house',
+    icon: null,
+    latestVersion: '0.6.0',
+    canaryVersion: null,
+    canaryRatio: null,
+    status: 1,
+    createTime: Date.UTC(2026, 8, 22, 9, 48),
+  },
+];
+
+const fetchMock = vi.fn();
+
+function jsonResponse(body: unknown, status = 200) {
+  return { ok: status >= 200 && status < 300, status, json: async () => body } as Response;
+}
+
 function openAdmin(path = '/') {
   window.history.replaceState(null, '', path);
   return render(<App />);
@@ -93,13 +171,6 @@ function writeIntentButtons() {
   });
 }
 
-/** 可用的「退出登录」按钮——没有会话就不该存在。 */
-function enabledLogoutButtons() {
-  return screen
-    .queryAllByRole('button', { name: /退出登录/ })
-    .filter((button) => !(button as HTMLButtonElement).disabled);
-}
-
 function expectBusinessLanguage() {
   const bodyText = document.body.textContent ?? '';
   ENGINEERING_TERMS.forEach((term) => {
@@ -110,34 +181,68 @@ function expectBusinessLanguage() {
   });
 }
 
+beforeEach(() => {
+  sessionStorage.setItem(SESSION_KEY, JSON.stringify(FAKE_SESSION));
+  fetchMock.mockImplementation(async () =>
+    jsonResponse({ code: 0, data: { list: FIXTURE_APPS, total: FIXTURE_APPS.length }, msg: '' }),
+  );
+  vi.stubGlobal('fetch', fetchMock);
+});
+
 afterEach(() => {
   cleanup();
   window.history.replaceState(null, '', '/');
+  sessionStorage.clear();
+  vi.unstubAllGlobals();
+  fetchMock.mockReset();
 });
 
 describe('后台登录页', () => {
-  it('统一登录未开通时不采集凭据、不创建会话', () => {
-    openAdmin();
+  it('提交账号密码：成功后写入会话并进入应用列表', async () => {
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/system/auth/login')) {
+        return jsonResponse({
+          code: 0,
+          data: { userId: 1, accessToken: 'at-new', refreshToken: 'rt-new', expiresTime: 0 },
+          msg: '',
+        });
+      }
+      if (url.includes('get-permission-info')) {
+        return jsonResponse({
+          code: 0,
+          data: { user: { id: 1, username: 'admin', nickname: '联调管理员' }, roles: [], permissions: [] },
+          msg: '',
+        });
+      }
+      return jsonResponse({ code: 0, data: { list: FIXTURE_APPS, total: FIXTURE_APPS.length }, msg: '' });
+    });
+    openAdmin('/login');
 
-    expect(screen.getByRole('heading', { name: '登录管理后台' })).toBeTruthy();
-    expect(allNotes().join('\n')).toContain('统一登录尚未开通');
+    fireEvent.change(screen.getByPlaceholderText('请输入账号'), { target: { value: 'admin' } });
+    fireEvent.change(screen.getByPlaceholderText('请输入密码'), { target: { value: 'admin123' } });
+    fireEvent.submit(screen.getByRole('form', { name: '后台登录' }));
 
-    const account = screen.getByPlaceholderText<HTMLInputElement>('登录开通后可用');
-    const password = screen.getByPlaceholderText<HTMLInputElement>('当前不收集密码');
-    expect(account.disabled).toBe(true);
-    expect(password.disabled).toBe(true);
+    await waitFor(() => expect(window.location.pathname).toBe('/preview/apps'));
+    expect(sessionStorage.getItem(SESSION_KEY)).toContain('at-new');
+    // 登录后的身份区显示账号信息，而不是占位身份
+    expect(screen.getByText('联调管理员')).toBeTruthy();
+  });
 
-    // desktop 组件库的 Button 会落原生 disabled，禁用后点击根本不会触发 onClick
-    const submit = screen.getByRole<HTMLButtonElement>('button', { name: /登录（暂不可用）/ });
-    expect(submit.disabled).toBe(true);
-    fireEvent.click(submit);
+  it('登录失败：展示失败原因，不创建会话', async () => {
+    sessionStorage.removeItem(SESSION_KEY);
+    fetchMock.mockImplementation(async () =>
+      jsonResponse({ code: 400, data: null, msg: '登录失败，账号密码不正确' }),
+    );
+    openAdmin('/login');
+
+    fireEvent.change(screen.getByPlaceholderText('请输入账号'), { target: { value: 'admin' } });
+    fireEvent.change(screen.getByPlaceholderText('请输入密码'), { target: { value: 'wrong' } });
+    fireEvent.submit(screen.getByRole('form', { name: '后台登录' }));
+
+    expect(await screen.findByText('登录失败，账号密码不正确')).toBeTruthy();
     expect(window.location.pathname).toBe('/login');
-
-    const form = screen.getByRole('form', { name: '后台登录' });
-    expect(fireEvent.submit(form)).toBe(false);
-    expect(window.location.pathname).toBe('/login');
-
-    expect(enabledLogoutButtons()).toEqual([]);
+    expect(sessionStorage.getItem(SESSION_KEY)).toBeNull();
   });
 
   it('登录页披露演示态，且不存在可在浏览器打开的外部地址', () => {
@@ -148,7 +253,7 @@ describe('后台登录页', () => {
     expectBusinessLanguage();
   });
 
-  it('唯一可用入口是「先看看界面」，它只指向后台内部页面', () => {
+  it('「先看看界面」仍然可用，登录不是浏览界面的前置条件', () => {
     openAdmin('/login');
 
     fireEvent.click(screen.getByRole('link', { name: /无需登录，先看看界面/ }));
@@ -160,13 +265,12 @@ describe('后台登录页', () => {
 });
 
 describe('后台体验界面', () => {
-  it.each(PREVIEW_ROUTES)('%s 持续声明演示态，且不存在可用的退出登录动作', (path) => {
+  it.each(PREVIEW_ROUTES)('%s 持续声明演示态', (path) => {
     openAdmin(path);
 
     const notes = allNotes().join('\n');
     expect(notes).toContain(DEMO_DISCLOSURE);
     expect(notes).toContain(DEMO_EXPLANATION);
-    expect(enabledLogoutButtons()).toEqual([]);
     expectBusinessLanguage();
   });
 
@@ -195,11 +299,11 @@ describe('后台体验界面', () => {
       expect(window.location.pathname).toBe(path);
       expect(screen.getByRole('heading', { level: 1, name: headingName })).toBeTruthy();
       expect(allNotes().join('\n')).toContain(DEMO_DISCLOSURE);
-      expect(enabledLogoutButtons()).toEqual([]);
     }
   });
 
-  it('顶部身份区不提供任何可用的登录态动作', () => {
+  it('未登录预览时：身份区是占位身份，退出登录不可用', () => {
+    sessionStorage.removeItem(SESSION_KEY);
     openAdmin('/preview/apps');
 
     expect(screen.getByPlaceholderText<HTMLInputElement>('搜索功能尚未开通').disabled).toBe(true);
@@ -217,11 +321,63 @@ describe('后台体验界面', () => {
     );
     expect(externalHrefs()).toEqual([]);
   });
+
+  it('已登录时：身份区显示账号信息，退出登录清空会话并回登录页', () => {
+    openAdmin('/preview/apps');
+
+    expect(screen.getByText('联调管理员')).toBeTruthy();
+    expect(screen.getByText('账号 admin')).toBeTruthy();
+
+    const logout = screen.getByRole<HTMLButtonElement>('button', { name: '退出登录' });
+    expect(logout.disabled).toBe(false);
+    fireEvent.click(logout);
+
+    expect(window.location.pathname).toBe('/login');
+    expect(sessionStorage.getItem(SESSION_KEY)).toBeNull();
+  });
+});
+
+describe('应用列表的真实数据通道', () => {
+  it('未登录时：不请求数据，给出先登录引导而不是数据', () => {
+    sessionStorage.removeItem(SESSION_KEY);
+    openAdmin('/preview/apps');
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(screen.getByText('登录后才能查看真实的应用数据。')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: '去登录' }));
+    expect(window.location.pathname).toBe('/login');
+  });
+
+  it('接口失败时：错误态给出原因与重试出口，重试真的会再发请求', async () => {
+    fetchMock.mockImplementation(async () => jsonResponse({ code: 500, data: null, msg: '系统异常' }));
+    openAdmin('/preview/apps');
+
+    expect(await screen.findByText('系统异常')).toBeTruthy();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole('button', { name: '重试' }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+  });
+
+  it('会话过期（接口 401）：清死会话并转先登录引导，不当故障透传', async () => {
+    fetchMock.mockImplementation(async () => jsonResponse({ code: 401, data: null, msg: '账号未登录' }));
+    openAdmin('/preview/apps');
+
+    expect(await screen.findByText('登录状态已过期，请重新登录。')).toBeTruthy();
+    expect(screen.getByRole('button', { name: '去登录' })).toBeTruthy();
+    expect(sessionStorage.getItem(SESSION_KEY)).toBeNull();
+    expect(screen.queryByText('账号未登录')).toBeNull();
+  });
 });
 
 describe('演示数据只读，不提供变更能力', () => {
-  it.each(PREVIEW_ROUTES)('%s 上的写意图按钮全部禁用，点击不产生跳转', (path) => {
+  it.each(PREVIEW_ROUTES)('%s 上的写意图按钮全部禁用，点击不产生跳转', async (path) => {
     openAdmin(path);
+    // 应用列表取数是异步的：先等数据落地，写按钮才存在（其余页仍是同步演示数据）
+    if (path === '/preview/apps') {
+      await screen.findByText('图像工坊');
+    }
 
     const writeButtons = writeIntentButtons();
     expect(writeButtons.length).toBeGreaterThan(0);
@@ -232,19 +388,21 @@ describe('演示数据只读，不提供变更能力', () => {
     expect(window.location.pathname).toBe(path);
   });
 
-  it('应用列表的检索与发布状态筛选只作用于演示数据', () => {
+  it('应用列表的检索与发布状态筛选作用于接口数据', async () => {
     openAdmin('/preview/apps');
 
+    // 搜索框在 success 分支才渲染：先等数据落地，再取控件
+    await screen.findByText('图像工坊');
     const searchbox = screen.getByPlaceholderText<HTMLInputElement>('搜索应用名称、负责团队或版本');
     expect(searchbox.disabled).toBe(false);
-    expect(screen.getByText('共 4 个应用')).toBeTruthy();
+    expect(screen.getByText('共 3 个应用')).toBeTruthy();
 
     const filters = screen.getByRole('group', { name: '按发布状态筛选' });
     const counts: Array<[string, string]> = [
       ['已停用', '共 1 个应用'],
-      ['试运行', '共 2 个应用'],
+      ['试运行', '共 1 个应用'],
       ['正式版', '共 1 个应用'],
-      ['全部', '共 4 个应用'],
+      ['全部', '共 3 个应用'],
     ];
     for (const [label, count] of counts) {
       fireEvent.click(within(filters).getByText(label));
@@ -258,13 +416,14 @@ describe('演示数据只读，不提供变更能力', () => {
       screen.getByText('没有找到相关应用，试试换个关键词或切换发布状态。'),
     ).toBeTruthy();
 
-    fireEvent.change(searchbox, { target: { value: '视觉算法组' } });
+    fireEvent.change(searchbox, { target: { value: '素材' } });
     expect(screen.getByText('共 1 个应用')).toBeTruthy();
-    expect(screen.getByText('AI 商品图生成')).toBeTruthy();
+    expect(screen.getByText('素材仓库')).toBeTruthy();
   });
 
-  it('统计卡即筛选入口：点卡片切口径，aria-pressed 表达选中', () => {
+  it('统计卡即筛选入口：点卡片切口径，aria-pressed 表达选中', async () => {
     openAdmin('/preview/apps');
+    await screen.findByText('图像工坊');
 
     // 点「正式版」统计卡 = 切到正式版筛选
     const stableCard = screen.getByRole('button', { name: /正式版/ });
@@ -274,20 +433,21 @@ describe('演示数据只读，不提供变更能力', () => {
 
     // 点「应用总数」切回全部
     fireEvent.click(screen.getByRole('button', { name: /应用总数/ }));
-    expect(screen.getByText('共 4 个应用')).toBeTruthy();
+    expect(screen.getByText('共 3 个应用')).toBeTruthy();
 
-    // 用户页同一动线
+    // 用户页同一动线（仍是演示数据）
     cleanup();
     openAdmin('/preview/users');
     fireEvent.click(screen.getByRole('button', { name: /待激活/ }));
     expect(screen.getByText('共 2 位成员')).toBeTruthy();
   });
 
-  it('应用列表默认按最近更新排序：最新发布的排在第一行', () => {
+  it('应用列表默认按最近更新排序：最新更新的排在第一行', async () => {
     openAdmin('/preview/apps');
+    await screen.findByText('素材仓库');
 
     const firstTitle = document.querySelector('.ui-cell-title');
-    expect(firstTitle?.textContent).toBe('直播巡检助手');
+    expect(firstTitle?.textContent).toBe('素材仓库');
   });
 
   it('用户页的检索与状态筛选只作用于演示数据', () => {

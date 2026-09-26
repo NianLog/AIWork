@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { DEMO_DISCLOSURE, DEMO_EXPLANATION } from '../../store/demoCatalog';
+import { PORTAL_ENV_LABEL, PORTAL_EXPLANATION } from '../../store/portalNotice';
 
 /**
  * 应用不存在时的兜底：/apps/:appId 里 appId 不在演示目录中。
@@ -27,8 +27,8 @@ export default function AppNotFound() {
           </Link>
         </p>
 
-        <p className="ui-fallback__note" role="note" aria-label="体验说明">
-          {DEMO_DISCLOSURE} · {DEMO_EXPLANATION}
+        <p className="ui-fallback__note" role="note" aria-label="环境说明">
+          {PORTAL_ENV_LABEL} · {PORTAL_EXPLANATION}
         </p>
       </div>
     </div>

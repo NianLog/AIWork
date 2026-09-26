@@ -1,6 +1,6 @@
 import { useId, useState } from 'react';
 import { CheckOutlined, ClockOutlined, InProcessOutlined, PulldownOutlined } from 'dd-icons';
-import { DEMO_DISCLOSURE, DEMO_SESSION_LABEL } from '../../store/demoCatalog';
+import { PORTAL_ENV_LABEL, PORTAL_SOURCE_LABEL } from '../../store/portalNotice';
 import { ROADMAP_STAGES as STAGES } from '../../store/roadmap';
 import type { StageKey } from '../../store/roadmap';
 import { PROGRESS_BOARD_QUERY, useMediaQuery } from '../../shell/useMediaQuery';
@@ -185,8 +185,8 @@ export default function StatusPage() {
       */}
       {isBoard ? <ProgressTimeline /> : <ProgressAccordion />}
 
-      <p className="portal-progress__disclosure" role="note" aria-label="体验说明">
-        {DEMO_DISCLOSURE} · {DEMO_SESSION_LABEL}
+      <p className="portal-progress__disclosure" role="note" aria-label="环境说明">
+        {PORTAL_ENV_LABEL} · {PORTAL_SOURCE_LABEL}
         ：当前是界面功能体验，不包含真实业务数据，也不授予任何访问权限。
       </p>
     </div>

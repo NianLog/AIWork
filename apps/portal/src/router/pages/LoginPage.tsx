@@ -1,4 +1,5 @@
-import { Link } from 'react-router-dom';
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button, Form, Input, NoticeBar } from 'dingtalk-design-mobile';
 import {
   AiDiagonalStarsFilled,
@@ -7,24 +8,24 @@ import {
   RightArrowOutlined,
   SafeOutlined,
 } from 'dd-icons';
-import { DEMO_DISCLOSURE, DEMO_SESSION_LABEL } from '../../store/demoCatalog';
+import { loginWithPassword } from '../../api/yudao';
+import { PORTAL_ENV_LABEL, PORTAL_SOURCE_LABEL } from '../../store/portalNotice';
+import { useSessionStore } from '../../store/sessionStore';
 
 /**
- * 登录页：统一登录尚未开通，表单保持不可用——不采集凭据、不创建会话。
+ * 登录页（批次 B 起接入真实登录）：账号密码走统一登录接口，双令牌与会话只落
+ * sessionStorage（引导文档 §8.4 [锁定]），成功后进入工作台。「无需登录，先看看界面」
+ * 保留：预览路由不设守卫，门户各页仍是示例数据。
  *
- * 这是安全语义的硬约束而不是文案装饰：账号与密码输入框、登录按钮必须保持禁用，
- * 表单提交不得产生任何跳转（表单内部只做本地校验）。「无需登录，先看看界面」
- * 是当前唯一可用的入口。
+ * 组件库注意：移动端 Input 的受控签名是值直传（onChange={(value) => …}），
+ * 与桌面端的事件对象签名不同，别照抄后台写法。
  *
  * 宽屏下整页拆成左右两栏（左侧品牌与能力说明、右侧登录表单），是门户里唯一一处
  * 双栏登录页：电脑版钉钉上这个页面往往是员工看到的第一屏，值得用它撑起「大气」。
  *
- * 版式取舍：
- * - 唯一可用的入口以前是一个跟正文同色的文字链，混在「或」下面几乎看不见，
- *   现在是有底色、有悬停、有箭头的整块主行动区——页面上只有一个能点的东西，
- *   它就该长得像主行动；
- * - 禁用的输入框与按钮不再靠颜色硬凑：整组控件套在一个明确写着原因的说明块里，
- *   用户看到的第一句话就是「还不能登录」，而不是先看到两个灰输入框再去找为什么。
+ * 版式取舍（沿批次一）：
+ * - 预览入口保持整块主行动区——它现在是次行动，但仍是「只想看看」用户的主路径；
+ * - 说明块保留：第一句话说清当前环境的形态，而不是让用户从两个输入框自己猜。
  */
 const FEATURES = [
   { icon: <PictureOutlined />, text: '商品图、短视频，一键生成' },
@@ -33,6 +34,34 @@ const FEATURES = [
 ];
 
 export default function LoginPage() {
+  const navigate = useNavigate();
+  const [account, setAccount] = useState('');
+  const [password, setPassword] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [failure, setFailure] = useState('');
+
+  async function handleLogin() {
+    if (submitting) {
+      return;
+    }
+    if (!account.trim() || !password) {
+      setFailure('请先填写账号和密码。');
+      return;
+    }
+    setSubmitting(true);
+    setFailure('');
+    try {
+      const session = await loginWithPassword(account.trim(), password);
+      // 接口层已落 sessionStorage；同步订阅层，外壳身份区与工作台问候立即跟随。
+      useSessionStore.getState().setSession(session);
+      navigate('/preview');
+    } catch (error) {
+      setFailure(error instanceof Error ? error.message : '登录没有成功，请稍后再试。');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   return (
     <main className="portal-login ui-enter">
       <aside className="portal-login__hero" aria-label="AI 中台能做什么">
@@ -62,23 +91,43 @@ export default function LoginPage() {
             <p className="portal-login__desc">使用你的工作账号登录，即可使用全部 AI 工具</p>
           </div>
 
-          <div className="portal-login__notice" role="note" aria-label="登录开通说明">
-            <NoticeBar text="统一登录尚未开通，暂时还不能登录" />
+          <div className="portal-login__notice" role="note" aria-label="登录说明">
+            <NoticeBar text="当前为联调环境，账号由管理员开通" />
             <p className="ui-note ui-note--tight">
-              登录功能正在建设中。开通之前，你可以直接看看各页面的界面效果；本页不会收集账号密码，
-              也不会创建任何账号。
+              登录后建立会话；在更多能力开通之前，也可以先看看各页面的界面效果。
             </p>
           </div>
 
+          {failure ? (
+            <p className="ui-note ui-note--tight" role="alert">
+              {failure}
+            </p>
+          ) : null}
+
           <Form className="portal-login__form" aria-label="门户登录">
             <Form.Item label="账号">
-              <Input placeholder="登录开通后可用" disabled />
+              <Input
+                placeholder="请输入账号"
+                value={account}
+                onChange={(value) => setAccount(value)}
+              />
             </Form.Item>
             <Form.Item label="密码">
-              <Input type="password" placeholder="当前不收集密码" disabled />
+              <Input
+                type="password"
+                placeholder="请输入密码"
+                value={password}
+                onChange={(value) => setPassword(value)}
+              />
             </Form.Item>
-            <Button type="primary" size="large" inline={false} htmlType="submit" disabled>
-              登录（暂不可用）
+            <Button
+              type="primary"
+              size="large"
+              inline={false}
+              disabled={submitting}
+              onClick={() => void handleLogin()}
+            >
+              {submitting ? '正在登录…' : '登录'}
             </Button>
           </Form>
 
@@ -95,8 +144,7 @@ export default function LoginPage() {
           </Link>
 
           <p className="ui-note">
-            {DEMO_DISCLOSURE} · {DEMO_SESSION_LABEL}
-            ：体验界面只展示页面效果，不创建账号，也不授予任何访问权限。
+            {PORTAL_ENV_LABEL} · {PORTAL_SOURCE_LABEL}：登录后即可看到全部已启用的应用。
           </p>
         </div>
       </section>

@@ -27,7 +27,10 @@ Last-verified: 2026-09-25
    reduced-motion 全局开关沿用 base.css 既有的那一个。
 4. **工作区舞台立契**：`WorkspaceStage` 四态（loading / error / ready / not-integrated）在接 iframe 之前
    就把契约定住；演示 entry 是 RFC 2606 保留域，当前恒为 not-integrated（说明 + 返回出口），
-   P0-4 只换状态来源，舞台与布局不改。
+   P0-4 只换状态来源，舞台与布局不改。后半句后来接上了实体：`SubAppWorkspace` 把 status 收成
+   单点 `'not-integrated' as WorkspaceStatus`（const + 字面量会收窄类型，舞台类的
+   `=== 'ready'` 派生会被 TS 判成不可达比较 TS2367——断言是给 P0-4 的活契约留门），
+   ready 时舞台挂 `workspace__stage--flat` 撤掉门户内边距，iframe 得以铺满整格。
 5. **后台表格交互**：统计卡改成真按钮（点卡片切口径，aria-pressed 表达选中）；
    默认排序列（应用按最近更新、用户按最近登录且「从未登录」最旧、角色/组织按人数）；
    分页 10 条且单页隐藏；行操作收敛为「文字主操作 + ··· 下拉」，禁用项把原因写进可访问名与悬停提示。
@@ -63,3 +66,7 @@ Last-verified: 2026-09-25
 - 真实浏览器抽查：市场页卡片点击推入 `?app=`、浮层挂载、Esc 以 replace 关闭且滚动锁归还；
   后台统计卡点击切口径（共 1 个应用、aria-pressed=true）、默认排序首行为直播巡检助手、
   行操作为文字主操作 + ··· 下拉。
+- 演示期摸不到的 loading / error 两态由 `scripts/qc/stage-probe.mjs` 补测（把三态类名挂进
+  真实 DOM 走真实 CSS 链）：骨架 shimmer 的 `::after` 实生成且 glow 渐变解析到位、
+  彩虹七段各自 ≥8px、errorstate 三段文字对比度 ≥5.57。骨架 tint/glow 与 hero 分隔线
+  色值已收进 `tokens.css`（`--ui-skel-*`、`--ui-brand-ink-line`），结构层零色值字面量恢复。

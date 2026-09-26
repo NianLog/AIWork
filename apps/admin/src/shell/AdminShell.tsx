@@ -14,14 +14,16 @@ import {
   UploadOutlined,
 } from 'dd-icons';
 import { DEMO_DISCLOSURE, DEMO_EXPLANATION, DEMO_OPERATOR } from '../store/demoDirectory';
+import { clearSession, readSession } from '../api/yudao';
 import { useRouteMeta } from '../shell/useRouteMeta';
 import type { RouteMeta } from '../shell/useRouteMeta';
 
 /**
  * 后台外壳：左侧分组导航 + 顶部面包屑与身份区 + 披露提示条。
  *
- * 导航点击只切换后台内部路由，不产生任何外部跳转。顶部「退出登录」永久禁用——
- * 没有登录态就不存在退出动作，界面上出现可用的退出按钮会让人误以为已经登录。
+ * 导航点击只切换后台内部路由，不产生任何外部跳转。身份区随会话切换（批次 B 起）：
+ * 登录后显示账号信息并提供「退出登录」（清空会话回登录页）；未登录预览时是占位身份，
+ * 退出按钮保持禁用——没有登录态就不存在退出动作，可用的退出按钮会让人误以为已经登录。
  *
  * 版式取舍：
  * - 不再用组件库 Layout/Sider 的自动折叠（breakpoint="lg" 到 992px 会把 216px 侧栏
@@ -86,6 +88,8 @@ export default function AdminShell() {
   const mainRef = useRef<HTMLElement>(null);
   const meta = useRouteMeta(PAGE_METAS, FALLBACK_META);
   const activeKey = resolveActiveKey(pathname);
+  // 会话在挂载时读取一次：登录/退出都伴随路由跳转（重挂载），不需要响应式订阅
+  const session = readSession();
 
   // 切页即收起窄屏抽屉，否则点完菜单抽屉还盖着刚打开的内容。
   // 这次收起不还焦点给汉堡按钮——切页时焦点归路由落点（见下面 main 的聚焦 effect）。
@@ -221,18 +225,37 @@ export default function AdminShell() {
               prefix={<SearchOutlined />}
             />
             <Tag className="admin-header__env" color="default">
-              {DEMO_OPERATOR.envLabel}
+              {session ? '联调环境' : DEMO_OPERATOR.envLabel}
             </Tag>
             <span className="admin-header__divider" aria-hidden="true" />
-            <Link className="admin-operator" to="/login" aria-label="返回登录页">
-              <Avatar className="admin-operator__avatar">管</Avatar>
-              <span className="admin-operator__text">
-                <span className="admin-operator__name">{DEMO_OPERATOR.displayName}</span>
-                <span className="admin-operator__role">{DEMO_OPERATOR.roleLabel}</span>
+            {session ? (
+              <span className="admin-operator">
+                <Avatar className="admin-operator__avatar">
+                  {session.user.nickname.slice(0, 1)}
+                </Avatar>
+                <span className="admin-operator__text">
+                  <span className="admin-operator__name">{session.user.nickname}</span>
+                  <span className="admin-operator__role">账号 {session.user.username}</span>
+                </span>
               </span>
-            </Link>
-            <Button className="admin-header__logout" disabled>
-              退出登录（尚未登录）
+            ) : (
+              <Link className="admin-operator" to="/login" aria-label="返回登录页">
+                <Avatar className="admin-operator__avatar">管</Avatar>
+                <span className="admin-operator__text">
+                  <span className="admin-operator__name">{DEMO_OPERATOR.displayName}</span>
+                  <span className="admin-operator__role">{DEMO_OPERATOR.roleLabel}</span>
+                </span>
+              </Link>
+            )}
+            <Button
+              className="admin-header__logout"
+              disabled={!session}
+              onClick={() => {
+                clearSession();
+                navigate('/login');
+              }}
+            >
+              {session ? '退出登录' : '退出登录（尚未登录）'}
             </Button>
           </div>
         </header>

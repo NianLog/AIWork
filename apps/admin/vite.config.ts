@@ -26,6 +26,17 @@ export default defineConfig({
     strictPort: true,
     cors: false,
     /**
+     * 开发期同源转发：/admin-api → 云上后端（部署与域名见 infra/docker/server/DEPLOY.md）。
+     * 代码里全部走相对路径 /admin-api/**，联调机不需要知道后端地址；
+     * vitest 不读 server 段，测试里的 fetch 由用例自己 mock。
+     */
+    proxy: {
+      '/admin-api': {
+        target: 'http://jbslab.bili:48080',
+        changeOrigin: true,
+      },
+    },
+    /**
      * 忽略原子写留下的临时目录（形如 src/.styles.css.<pid>.<uuid>.tmpdir/）。
      *
      * 某些编辑器/工具把文件写磁盘的方式是「先写临时文件再替换」，临时目录与目标文件同层。
@@ -42,5 +53,11 @@ export default defineConfig({
     port: 5174,
     strictPort: true,
     cors: false,
+    proxy: {
+      '/admin-api': {
+        target: 'http://jbslab.bili:48080',
+        changeOrigin: true,
+      },
+    },
   },
 });

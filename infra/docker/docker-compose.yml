@@ -1,0 +1,83 @@
+# AI 中台门户 · 后端底座编排（MySQL + Redis + 裁剪版 ruoyi-vue-pro）
+#
+# 使用顺序（见 .agents/notes/implemented/architecture/2026-09-25-yudao-integration-boundary.md）：
+#   1. 克隆锁 tag 的 Yudao 仓库到本仓库同级目录（../yudao-portal 相对本文件即 ../../yudao-portal）
+#   2. 裁剪 server pom（只留 system + infra），新增 yudao-module-portal 模块
+#   3. 用仓库自带 mvnw 构建 yudao-server.jar
+#   4. 复制 .env.example 为 .env 并改密码，再 `docker compose up -d`
+#
+# 首次启动时 MySQL 会自动导入 Yudao 的初始化 SQL（挂载到 initdb.d），
+# 因此步骤 1 未完成前不要起本编排。
+
+name: ai-portal
+
+services:
+  mysql:
+    image: mysql:8
+    container_name: ai-portal-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?请先复制 .env.example 为 .env 并设置密码}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-ruoyi-vue-pro}
+      TZ: Asia/Shanghai
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      # Yudao 初始化脚本（建库建表 + 内置租户与管理员）；目录随克隆出现
+      - ../../yudao-portal/sql/mysql/:/docker-entrypoint-initdb.d/:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  redis:
+    image: redis:6-alpine
+    container_name: ai-portal-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  yudao-server:
+    # 只跑 jar，不在镜像里构建；JRE 17 可运行 jdk17/21 线产物
+    image: eclipse-temurin:17-jre
+    container_name: ai-portal-yudao
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      TZ: Asia/Shanghai
+    ports:
+      - "${YUDAO_PORT:-48080}:48080"
+    volumes:
+      # 构建产物；步骤 3 完成后此文件才存在
+      - ../../yudao-portal/yudao-server/target/yudao-server.jar:/app/yudao-server.jar:ro
+    working_dir: /app
+    # 容器网络里数据库主机名是服务名（mysql / redis），不是 127.0.0.1；
+    # 用命令行参数覆盖 jar 内 local 配置。属性键名随首次真实启动核对修正。
+    command:
+      - java
+      - -jar
+      - yudao-server.jar
+      - --spring.datasource.dynamic.datasource.master.url=jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-ruoyi-vue-pro}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai
+      - --spring.datasource.dynamic.datasource.master.username=root
+      - --spring.datasource.dynamic.datasource.master.password=${MYSQL_ROOT_PASSWORD}
+      - --spring.data.redis.host=redis
+
+volumes:
+  mysql-data:
+  redis-data:

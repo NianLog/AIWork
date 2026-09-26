@@ -1,47 +1,161 @@
 // @vitest-environment jsdom
-
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import App from './App';
+import MarketPage from './router/pages/MarketPage';
+import { useAppRegistryStore } from './store/appRegistryStore';
+import type { DataView, PortalApp } from './store/appRegistryStore';
+import { SESSION_KEY } from './api/yudao';
 
 /**
- * 应用市场的加载态（2026-09-25 批次二）：演示数据永远 success，
- * loading 形状只能靠 mock 注入——这里单独一个文件，避免把 App.test.tsx
- * 里的其余用例也拖进 mock 环境。
- *
- * 锁三条性质：
- * 1. 加载时有骨架（彩虹规范允许的加载装饰位），页面不塌形；
- * 2. 骨架是纯装饰（aria-hidden），读屏只听到「应用列表加载中」的 region；
- * 3. 加载期间不播报结果数（没有可播报的数），也不出现表格/卡片数据。
+ * 应用市场的非成功态（批次 C 起）：事实源是注册表 store，这里直接写 store 状态
+ * 覆盖 loading / error / needsLogin / 空清单四个分支（fetch 被替换成空操作，
+ * 页面挂载时的拉取不会覆盖喂进去的形状）。
  */
-vi.mock('./store/demoCatalog', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('./store/demoCatalog')>();
-  return {
-    ...actual,
-    DEMO_APPS_VIEW: { status: 'loading' as const, data: actual.DEMO_APPS },
-  };
-});
+
+const realFetch = useAppRegistryStore.getState().fetch;
+
+function feed(view: DataView<PortalApp>, needsLogin = false): void {
+  useAppRegistryStore.setState({ view, needsLogin, fetch: vi.fn() });
+}
+
+const SAMPLE: PortalApp = {
+  id: 1,
+  appId: 'ai-image-gen',
+  name: 'AI 商品图生成',
+  version: '1.4.0',
+  framework: 'react',
+  sandbox: 'iframe',
+  baseRoute: '/ai-image',
+  entry: '/subapp-probe/index.html',
+  backendApi: 'https://api.invalid/x',
+  status: 0,
+  permissions: [],
+  canaryVersion: null,
+  canaryRatio: null,
+  updateTime: 0,
+};
 
 afterEach(() => {
   cleanup();
-  window.history.replaceState(null, '', '/');
+  sessionStorage.clear();
+  vi.unstubAllGlobals();
+  useAppRegistryStore.setState({
+    view: { status: 'loading', data: [] },
+    needsLogin: false,
+    flight: undefined,
+    fetch: realFetch,
+  });
 });
 
-describe('应用市场加载态', () => {
-  it('加载中渲染骨架而非数据，且骨架不进无障碍树', () => {
-    window.history.replaceState(null, '', '/preview/market');
-    render(<App />);
+describe('应用市场非成功态', () => {
+  it('loading：骨架屏在无障碍树外，不播报结果数', () => {
+    feed({ status: 'loading', data: [] });
+    render(
+      // 页面 2026-09-26 起用 useNavigate（未登录「去登录」直跳），裸渲染会缺 Router 上下文
+      <MemoryRouter>
+        <MarketPage />
+      </MemoryRouter>,
+    );
 
     const region = screen.getByRole('region', { name: '应用列表加载中' });
-    expect(region.querySelectorAll('.ui-skeleton').length).toBeGreaterThan(0);
-
-    // 骨架列表是装饰（aria-hidden）；region 本身带标签，读屏听到的是「应用列表加载中」
-    expect(region.querySelector('ul')?.getAttribute('aria-hidden')).toBe('true');
-
-    // 没有可播报的数：加载中不出现「找到 N 个应用」
+    // region 播报加载状态；骨架是装饰（aria-hidden），两者分工而不是 region 整体隐藏
+    expect(region.querySelector('.portal-cards')?.getAttribute('aria-hidden')).toBe('true');
     expect(screen.queryByText(/找到 \d+ 个应用/)).toBeNull();
+  });
 
-    // 数据不该在加载态里露出来（骨架里没有应用名）
-    expect(screen.queryByText('AI 商品图生成')).toBeNull();
+  it('error：失败四要素齐备，重试真的会再拉取', async () => {
+    const refetch = vi.fn();
+    useAppRegistryStore.setState({
+      view: { status: 'error', data: [], error: '网络暂时没有响应，稍后重试一般就能恢复。' },
+      needsLogin: false,
+      fetch: refetch,
+    });
+    render(
+      // 页面 2026-09-26 起用 useNavigate（未登录「去登录」直跳），裸渲染会缺 Router 上下文
+      <MemoryRouter>
+        <MarketPage />
+      </MemoryRouter>,
+    );
+
+    const alert = screen.getByRole('alert');
+    expect(alert.textContent).toContain('无法加载应用列表');
+    expect(alert.textContent).toContain('网络暂时没有响应');
+
+    fireEvent.click(screen.getByRole('button', { name: '重试' }));
+    // 市场页每次挂载都重新拉取（C1 语义：重进页面即见新配置）——挂载 1 次 + 重试 1 次
+    expect(refetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('未登录：给「先登录」引导而不是把 401 当故障', () => {
+    feed({ status: 'error', data: [], error: '登录后才能查看应用列表。' }, true);
+    render(
+      // 页面 2026-09-26 起用 useNavigate（未登录「去登录」直跳），裸渲染会缺 Router 上下文
+      <MemoryRouter>
+        <MarketPage />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole('region', { name: '需要登录' }).textContent).toContain('应用清单需要登录后获取');
+    expect(screen.getByRole('button', { name: '去登录' })).toBeTruthy();
+  });
+
+  it('空清单：说明「应用在管理端配置后出现」，不伪造应用', () => {
+    feed({ status: 'success', data: [] });
+    render(
+      // 页面 2026-09-26 起用 useNavigate（未登录「去登录」直跳），裸渲染会缺 Router 上下文
+      <MemoryRouter>
+        <MarketPage />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText('应用在管理端配置并启用后，会自动出现在这里。')).toBeTruthy();
+    expect(screen.queryByRole('region', { name: '应用列表' })).toBeNull();
+  });
+
+  it('检索无结果时的空态属于筛选结果，提供清除出口', () => {
+    feed({ status: 'success', data: [SAMPLE] });
+    render(
+      // 页面 2026-09-26 起用 useNavigate（未登录「去登录」直跳），裸渲染会缺 Router 上下文
+      <MemoryRouter>
+        <MarketPage />
+      </MemoryRouter>,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText('搜索应用名称或标识'), {
+      target: { value: '不存在的工具' },
+    });
+    expect(screen.getByText('没有找到相关应用')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: '清除筛选条件' }));
+    expect(screen.getByRole('region', { name: '应用列表' }).textContent).toContain('AI 商品图生成');
+  });
+
+  it('会话过期（接口 401）：清死会话并转「先登录」引导，不当故障透传', async () => {
+    // 本地有死会话（令牌 30 分钟过期后残留），请求照发但后端回 code 401
+    sessionStorage.setItem(
+      SESSION_KEY,
+      JSON.stringify({
+        accessToken: 'dead-token',
+        refreshToken: 'rt',
+        user: { id: 1, username: 'admin', nickname: '联调管理员' },
+        roles: [],
+        permissions: [],
+      }),
+    );
+    useAppRegistryStore.setState({ view: { status: 'loading', data: [] }, needsLogin: false, fetch: realFetch });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ code: 401, msg: '账号未登录', data: null }) })),
+    );
+    render(
+      <MemoryRouter>
+        <MarketPage />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole('region', { name: '需要登录' })).toBeTruthy();
+    expect(sessionStorage.getItem(SESSION_KEY)).toBeNull();
+    expect(screen.queryByText('账号未登录')).toBeNull();
   });
 });

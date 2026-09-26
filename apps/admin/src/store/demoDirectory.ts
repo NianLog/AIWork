@@ -1,24 +1,23 @@
-import type { AppRegistry, MicroAppManifest } from '@ai-portal/shared-types';
+import type { AppRegistry } from '@ai-portal/shared-types';
 
 /**
- * 演示态管理数据（P0-1 视觉重构期专用）。
+ * 演示态管理数据。批次 B（2026-09-26）起应用列表已接真实接口（api/yudao.ts），
+ * 本文件只剩三类职责：
+ * 1. 用户 / 角色 / 组织三页的示例数据（对应系统模块，接真实服务前保持只读演示）；
+ * 2. 角色页「各应用的可用功能」卡片的应用与权限示例（应用列表页不再使用）；
+ * 3. 未登录预览时的占位身份与披露文案。
  *
- * 负责人于 2026-09-24 授权：为呈现目标场景中的后台形态（应用注册、RBAC、组织隔离），
- * 界面可展示显式标注的演示数据。约束与门户侧一致：
- * 1. 应用记录复用 `AppRegistry` 契约，P0-3/P0-4 接真实服务时整模块删除；
- * 2. entry / backendApi 使用 RFC 2606 保留域 `.invalid`，永不解析；
- * 3. 所有增删改按钮必须禁用——后台没有 Yudao Cloud 就没有任何写路径，
- *    「能点但保存不了」比「不能点」更容易被误当成真实能力；
- * 4. 人员、角色、组织均为虚构，不含任何真实身份信息。
+ * 负责人于 2026-09-24 授权的约束继续有效：entry / backendApi 使用 RFC 2606 保留域
+ * `.invalid` 永不解析；人员、角色、组织均为虚构，不含任何真实身份信息。
  *
- * 退出条件：P0-3 接入 Yudao Cloud RBAC 后删除本文件并移除演示徽章。
+ * 退出条件：用户 / 角色 / 组织接真实服务后删除本文件并移除演示徽章。
  */
 
 /** 演示态统一披露文案，与门户侧保持同值；两处常量必须在同一 PR 内同步修改。 */
 export const DEMO_DISCLOSURE = '体验示例 · 非真实数据';
 
 export const DEMO_EXPLANATION =
-  '这里的人员、角色、组织与应用信息都是为了展示界面效果而准备的示例，不来自真实业务系统，也不代表任何真实的人员或组织；所有保存类操作都不可用。';
+  '这里的人员、角色与组织信息都是为展示界面效果准备的示例，不来自真实业务系统，也不代表任何真实的人员或组织；应用列表已是真实数据，保存类操作仍不可用。';
 
 const DEMO_ENTRY_ORIGIN = 'https://apps.invalid';
 const DEMO_API_ORIGIN = 'https://api.invalid';
@@ -66,19 +65,18 @@ export interface DemoOrganization {
 }
 
 /**
- * 应用发布记录：注册接口契约 + 清单契约中的 backendApi + 发布链路展示字段。
+ * 应用发布记录：注册接口契约 + 发布链路展示字段。
  *
- * `AppRegistry` 不含 backendApi，但网关按 /api/{appId}/** 代理时必须知道它；
- * 这是两个 [锁定] 契约间的缺口，已记入 DDE 笔记待 P0-5 确认，此处不改类型只交叉组合。
+ * backendApi 已于 2026-09-25 补进 `AppRegistry`（网关按它代理 /api/{appId}/**，
+ * 决策见 DDE 笔记 2026-09-25-p0-second-half-plan-and-four-decisions），不再交叉借字段。
  */
-export type DemoApplicationRecord = AppRegistry &
-  Pick<MicroAppManifest, 'backendApi'> & {
-    channel: 'stable' | 'canary' | 'paused';
-    canaryRatio?: number;
-    publishedAt: string;
-    ownerTeam: string;
-    tileTone: 'brand' | 'violet' | 'cyan' | 'emerald' | 'amber' | 'rose' | 'slate';
-  };
+export type DemoApplicationRecord = AppRegistry & {
+  channel: 'stable' | 'canary' | 'paused';
+  canaryRatio?: number;
+  publishedAt: string;
+  ownerTeam: string;
+  tileTone: 'brand' | 'violet' | 'cyan' | 'emerald' | 'amber' | 'rose' | 'slate';
+};
 
 /** 发布状态标签：stable 正式版 / canary 试运行 / paused 已停用。 */
 export const CHANNEL_META: Record<DemoApplicationRecord['channel'], { label: string; tagColor: TagColor }> = {
@@ -258,6 +256,7 @@ export const DEMO_ORGANIZATIONS: DemoOrganization[] = [
   },
 ];
 
+/** 仅角色页「各应用的可用功能」卡片在用；应用列表页已改走真实接口（api/yudao.ts）。 */
 export const DEMO_APPLICATIONS: DemoApplicationRecord[] = [
   {
     appId: 'ai-image-gen',
@@ -339,7 +338,7 @@ export const DEMO_APPLICATIONS: DemoApplicationRecord[] = [
   },
 ];
 
-/** 演示态管理员身份，仅用于头像与身份卡；不含真实凭据。 */
+/** 未登录预览时的占位身份，仅用于头像与身份卡；不含真实凭据。 */
 export const DEMO_OPERATOR = {
   displayName: '演示管理员',
   roleLabel: '未分配角色',

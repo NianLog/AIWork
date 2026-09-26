@@ -1,0 +1,26 @@
+{
+  "name": "@ai-portal/demo-vue",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "typecheck": "vue-tsc --noEmit",
+    "lint": "eslint src --ext .ts",
+    "test": "vitest run",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@ai-portal/shared-sdk": "workspace:*",
+    "@ai-portal/shared-types": "workspace:*",
+    "vue": "^3.5.13"
+  },
+  "devDependencies": {
+    "@ai-portal/eslint-config-mfe": "workspace:*",
+    "@vitejs/plugin-vue": "^5.2.1",
+    "@vue/test-utils": "^2.4.6",
+    "vite": "^5.4.21",
+    "vue-tsc": "^2.1.10"
+  }
+}

@@ -402,7 +402,7 @@
    与角标边框同源；不承载信息），数字大、标签小，扫一眼比出量级 */
 .portal-hero__stat + .portal-hero__stat {
   padding-left: var(--ui-space-6);
-  border-left: 1px solid rgba(46, 20, 8, 0.25);
+  border-left: 1px solid var(--ui-brand-ink-line);
 }
 
 .portal-hero__stat dt {
@@ -940,16 +940,46 @@
   width: 112px;
 }
 
-/* 就绪态：子应用铺满舞台，舞台自己不再留内边距（那条边距属于门户，不属于子应用） */
-.workspace__stage--flat {
-  padding: 0;
-}
+/* 就绪态的 padding: 0 定义在 .workspace__stage 之后——同优先级下后者会覆盖前者，
+   早先定义在文件上方时曾把这条覆盖掉（就绪态仍留 24px 边距），别再挪回去。 */
 
+/*
+ * iframe 铺满挂载位用「绝对定位 + 四边归零」，不是 height:100%。
+ * 百分比高度依赖「flex 拉伸出的父高度可当基准」——标准 Chromium 认，
+ * 部分 WebKit / 旧引擎不认，iframe 会塌回默认 150px 高。绝对定位只依赖
+ * 挂载位自身尺寸（flex:1 拉出来的，各引擎都稳），绕开这类引擎差异；
+ * 顺带让 iframe 离开 inline 流，消灭基线缝隙。
+ */
 .workspace__frame {
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 100%;
   height: 100%;
   border: 0;
   background: var(--ui-surface);
+}
+
+/*
+ * 子应用挂载位（批次 C 容器层）：iframe 适配器把 <iframe class="workspace__frame">
+ * 塞进 .workspace__mount。挂载位常驻 DOM——加载骨架显示期间 iframe 就在隐藏位里
+ * 并行加载（--pending），就绪瞬间切换显示，用户不看到空白帧。
+ *
+ * 布局：舞台是 column flex（主轴竖向），挂载位 flex:1 吃满剩余高度、
+ * align-self:stretch 吃满宽度；position:relative 给绝对定位的 iframe 当包含块。
+ * 早先写 display:flex 让 iframe 成了 flex 项，被怪异地收缩成一半宽（616px）
+ * ×默认高（150px），不要改回 flex。
+ */
+.workspace__mount {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  align-self: stretch;
+}
+
+.workspace__mount--pending {
+  display: none;
 }
 
 @media (max-width: 400px) {
@@ -959,15 +989,22 @@
   }
 }
 
-/* 子应用将来占的位置。现在铺满剩余高度，居中放占位说明。 */
+/* 舞台：column flex。主轴竖向让挂载位 flex:1 吃满高度；居中规则留给
+   加载/错误态的卡片（WorkspaceStage）。就绪态在下面 --flat 里收掉边距。 */
 .workspace__stage {
   flex: 1;
   min-height: 0;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   padding: var(--ui-space-6) var(--ui-gutter);
   background: var(--ui-surface-sunken);
+}
+
+/* 就绪态：子应用铺满舞台，舞台自己不再留内边距（那条边距属于门户，不属于子应用） */
+.workspace__stage--flat {
+  padding: 0;
 }
 
 .workspace__placeholder {

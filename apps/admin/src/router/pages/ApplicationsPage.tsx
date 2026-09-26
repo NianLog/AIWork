@@ -1,28 +1,30 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Card, Input, SegmentedControl, Table, Tag } from 'dingtalk-design-desktop';
 import type { TableColumnsType } from 'dingtalk-design-desktop';
-import { CHANNEL_META, DEMO_APPLICATIONS_VIEW } from '../../store/demoDirectory';
-import type { DemoApplicationRecord } from '../../store/demoDirectory';
+import { ApiError, clearSession, fetchApplications, readSession } from '../../api/yudao';
+import { CHANNEL_META } from '../../store/demoDirectory';
+import type { DataView, DemoApplicationRecord } from '../../store/demoDirectory';
 import RowActions from '../parts/RowActions';
 
 /**
  * 应用列表：后台的第一屏，回答「现在有哪些应用、各自处于什么状态」。
  *
- * 四态骨架（2026-09-25 批次二）：页面只认 DEMO_APPLICATIONS_VIEW 的
- * 「status + data + error」形状；演示数据永远 success，loading / error 由测试
- * 喂形状覆盖，P0-4 接真实接口时只换来源。
+ * 数据来源（批次 B 起）：真实接口 /admin-api/portal-app/page（字段映射与状态口径
+ * 换算见 api/yudao.ts）。页面仍只认 DataView 的「status + data + error」形状，
+ * loading / error / success 三态都来自真实请求；未登录时给出「先登录」的引导
+ * 而不是数据。
  *
  * 只展示业务用户看得懂的信息（名称、负责团队、版本、发布状态、最近更新时间），
- * 不渲染任何部署细节。所有写操作按钮永久禁用——没有后台服务就没有写路径，
- * 「能点但保存不了」比「不能点」更容易被误当成真实能力。
+ * 不渲染任何部署细节。写操作按钮保持禁用：编辑与调整通道需要完整的表单链路
+ * （后续批次落地），「能点但保存不了」比「不能点」更容易被误当成真实能力。
  *
  * 版式与交互（批次二/四）：
- * - 统计卡从「只能看」改成「能点」：点哪张卡就切到对应筛选（aria-pressed 表达选中），
- *   统计数字与表格之间从两张皮变成一条动线；总数卡切回全部；
- * - 最近更新列可排序，默认最新在前（「刚发布的排在最上面」是列表页的默认预期）；
- * - 分页 10 条一页且单页隐藏——现在四条数据不该出现分页器，接真实数据后自然出现；
- * - 操作列用 RowActions：文字主操作 + 「···」下拉收纳次要动作，不再摆三个图标按钮。
+ * - 统计卡可点：点哪张卡切到对应筛选（aria-pressed 表达选中），总数卡切回全部；
+ * - 最近更新列可排序，默认最新在前；
+ * - 分页 10 条一页且单页隐藏——数据少时不出分页器，数据多时自然出现；
+ * - 操作列用 RowActions：文字主操作 + 「···」下拉收纳次要动作；
+ * - 「刷新」随真实数据一起回归：重新拉取并走一遍 loading 态。
  *
  * 页头（h1）由外壳统一渲染：后台五个页面同构，标题写在 route handle 里，
  * 页面只负责标题下面的操作与内容。
@@ -37,17 +39,58 @@ const CHANNEL_OPTIONS: Array<{ value: ChannelFilter; label: string }> = [
   { value: 'paused', label: '已停用' },
 ];
 
-/** 应用被下架时，无论原发布通道是什么，对外都只说「已停用」。 */
+/** 应用被下架时，无论原发布通道是什么，对外都只说「已停用」（status 0=启用 1=停用，批次 C 已与后端同口径）。 */
 function resolveChannel(app: DemoApplicationRecord): DemoApplicationRecord['channel'] {
-  return app.status === 1 ? app.channel : 'paused';
+  return app.status === 0 ? app.channel : 'paused';
 }
 
 export default function ApplicationsPage() {
   const navigate = useNavigate();
   const [keyword, setKeyword] = useState('');
   const [channel, setChannel] = useState<ChannelFilter>('all');
+  const [view, setView] = useState<DataView<DemoApplicationRecord>>({ status: 'loading', data: [] });
+  const [needsLogin, setNeedsLogin] = useState(false);
+  const [reloadCount, setReloadCount] = useState(0);
 
-  const view = DEMO_APPLICATIONS_VIEW;
+  useEffect(() => {
+    if (!readSession()) {
+      setNeedsLogin(true);
+      setView({ status: 'error', data: [], error: '登录后才能查看真实的应用数据。' });
+      return;
+    }
+    setNeedsLogin(false);
+    let cancelled = false;
+    setView({ status: 'loading', data: [] });
+    fetchApplications()
+      .then((data) => {
+        if (!cancelled) {
+          setView({ status: 'success', data });
+        }
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          // 会话过期/被顶号（code 401，访问令牌 30 分钟有效期）：清死会话转「先登录」
+          // 引导，不当故障透传——与门户注册表 store 同一条语义。
+          if (error instanceof ApiError && error.code === 401) {
+            clearSession();
+            setNeedsLogin(true);
+            setView({ status: 'error', data: [], error: '登录状态已过期，请重新登录。' });
+            return;
+          }
+          setView({
+            status: 'error',
+            data: [],
+            error: error instanceof Error ? error.message : '应用列表暂时没有加载出来。',
+          });
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [reloadCount]);
+
+  const reload = () => setReloadCount((count) => count + 1);
+
   const rows = useMemo(() => {
     const query = keyword.trim().toLowerCase();
     return view.data.filter((app) => {
@@ -57,7 +100,9 @@ export default function ApplicationsPage() {
       if (!query) {
         return true;
       }
-      return [app.name, app.ownerTeam, app.version].some((field) => field.toLowerCase().includes(query));
+      return [app.name, app.ownerTeam, app.version].some((field) =>
+        field.toLowerCase().includes(query),
+      );
     });
   }, [keyword, channel, view.data]);
 
@@ -66,8 +111,7 @@ export default function ApplicationsPage() {
       view.data.filter((app) => resolveChannel(app) === target).length;
     return [
       { label: '应用总数', value: view.data.length, tone: 'brand', filter: 'all' as ChannelFilter },
-      /* 统计卡与筛选 tab、状态徽章共用一套口径：总数/正式版/试运行/已停用。
-         旧卡的「已开放使用」是 正式版+试运行 的派生数（3），与筛选「正式版」（1）对不上。 */
+      /* 统计卡与筛选 tab、状态徽章共用一套口径：总数/正式版/试运行/已停用。 */
       { label: '正式版', value: countBy('stable'), tone: 'success', filter: 'stable' as ChannelFilter },
       { label: '试运行中', value: countBy('canary'), tone: 'warning', filter: 'canary' as ChannelFilter },
       { label: '已停用', value: countBy('paused'), tone: 'neutral', filter: 'paused' as ChannelFilter },
@@ -82,7 +126,9 @@ export default function ApplicationsPage() {
       render: (_, record) => (
         <span>
           <span className="ui-cell-title">{record.name}</span>
-          <span className="ui-cell-sub">由 {record.ownerTeam} 负责</span>
+          <span className="ui-cell-sub">
+            {record.ownerTeam ? `由 ${record.ownerTeam} 负责` : '负责团队尚未登记'}
+          </span>
         </span>
       ),
     },
@@ -91,7 +137,7 @@ export default function ApplicationsPage() {
       dataIndex: 'version',
       key: 'version',
       width: 100,
-      render: (value: string) => <span className="ui-num">{value}</span>,
+      render: (value: string) => <span className="ui-num">{value || '—'}</span>,
     },
     {
       title: '发布状态',
@@ -154,9 +200,8 @@ export default function ApplicationsPage() {
       <div className="admin-toolbar-row">
         <p className="ui-pagehead__lead">这里列出所有已经上架到应用市场的应用，以及它们当前的版本和发布状态。</p>
         <div className="ui-pagehead__actions">
-          {/* 这里刻意不放「刷新」：演示数据是同步常量，刷新没有任何可观察行为，
-              一个点了没反应（或永久禁用）的按钮只会教用户「这产品有坏按钮」。
-              接入真实数据后，刷新随 loading 态一起回来。 */}
+          {/* 真实数据回来了，「刷新」随之回归：重新拉取并走一遍 loading 态 */}
+          <Button onClick={reload}>刷新</Button>
           <Button type="primary" onClick={() => navigate('/preview/publish')}>
             发布新应用
           </Button>
@@ -195,7 +240,13 @@ export default function ApplicationsPage() {
                 {view.error ?? '网络暂时没有响应，稍后重试一般就能恢复。'}
               </p>
               <div className="ui-errorstate__actions">
-                <Button onClick={() => window.location.reload()}>重试</Button>
+                {needsLogin ? (
+                  <Button type="primary" onClick={() => navigate('/login')}>
+                    去登录
+                  </Button>
+                ) : (
+                  <Button onClick={reload}>重试</Button>
+                )}
               </div>
             </div>
           ) : (

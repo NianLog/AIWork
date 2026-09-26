@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { Button } from 'dingtalk-design-mobile';
-import { DEMO_DISCLOSURE, DEMO_SESSION_LABEL } from '../../store/demoCatalog';
+import { PORTAL_ENV_LABEL, PORTAL_SOURCE_LABEL } from '../../store/portalNotice';
 
 /**
  * 兜底页：地址不存在时的落脚点。
@@ -35,8 +35,8 @@ export default function NotFoundPage() {
             返回登录页
           </Button>
         </div>
-        <p className="ui-fallback__note" role="note" aria-label="体验说明">
-          {DEMO_DISCLOSURE} · {DEMO_SESSION_LABEL}
+        <p className="ui-fallback__note" role="note" aria-label="环境说明">
+          {PORTAL_ENV_LABEL} · {PORTAL_SOURCE_LABEL}
         </p>
       </div>
     </main>

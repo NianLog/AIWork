@@ -3,48 +3,42 @@ import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { Button } from 'dingtalk-design-mobile';
 import { CheckOutlined, CloseOutlined } from 'dd-icons';
-import { DEMO_DISCLOSURE, DEMO_EXPLANATION } from '../../store/demoCatalog';
-import type { DemoApp } from '../../store/demoCatalog';
+import { deriveChannel, deriveVisual, formatUpdateTime } from '../../store/appRegistryStore';
+import type { PortalApp } from '../../store/appRegistryStore';
+import { PORTAL_EXPLANATION } from '../../store/portalNotice';
 import { AppIconTile, AppStatusTag } from './AppVisuals';
 
 /**
- * 应用详情弹层。
+ * 应用详情弹层（批次 C 起吃注册表记录）。
  *
  * ============================================================================
  * 为什么不用组件库的 Drawer
  * ============================================================================
  *
  * 原来用 dingtalk-design-mobile 的 <Drawer>。它的定位是「内容区侧滑抽屉」——挂在
- * 页面内容流上，从右侧或底部推开一块，遮罩只盖住内容区。放在门户里有两个问题：
- *   1. 它是**嵌在页面里**的一块，不是浮在整页之上的浮层。子应用或长页面滚动时，
- *      抽屉会跟着内容走位；
- *   2. 移动端组件库的抽屉在窄屏上从底部升起、占 82% 高度，本质是「换了一页」，
- *      而不是「盖住当前页看一下详情」。
+ * 页面内容流上，遮罩只盖住内容区。放在门户里有两个问题：
+ *   1. 它是**嵌在页面里**的一块，不是浮在整页之上的浮层，长页面滚动时会跟着走位；
+ *   2. 移动端组件库的抽屉在窄屏上从底部升起、占 82% 高度，本质是「换了一页」。
  *
- * 所以这里自己实现浮层：position: fixed + inset: 0，全视口遮罩，面板居中。
- * 并且**用 createPortal 挂进 document.body**，不留在路由树里——
- * `.portal-content` 带着入场动画的残留 transform，任何 fixed 后代都会被它
- * 降格成「相对内容盒定位」并困在局部层叠上下文里（实测浮层被顶栏压住、
- * 关闭按钮点不到）。浮层天生该在 body 层，这不只是为了绕开这一个坑。
- * 断点只改面板形态，不改「浮在整页之上」这个本质：
- *   - 宽屏：居中卡片，最大 560px 宽；
- *   - 窄屏：从底部升起的面板，最多占 88% 高（拇指够得到，且仍能看见背后的页面）。
+ * 所以这里自己实现浮层：position: fixed + inset: 0，全视口遮罩，面板居中，
+ * 并用 createPortal 挂进 document.body（.portal-content 的入场动画残留在
+ * fixed 后代上会降格成局部定位，浮层天生该在 body 层）。
  *
  * ============================================================================
  * 无障碍
  * ============================================================================
  *
- * role="dialog" + aria-modal="true" 放在**浮层容器**上而不是面板上——读屏软件据此
- * 把背后的内容视为惰性。打开时焦点移进面板，关闭时还给触发元素；Tab 在面板内循环。
- * Escape 关闭。这三条是「浮层」与「页面里的一块」在行为上的分水岭。
+ * role="dialog" + aria-modal="true" 放在浮层容器上；打开时焦点移进面板，
+ * 关闭时还给触发元素，Tab 在面板内循环，Escape 关闭。
  *
- * 「进入工作区」是唯一通往子应用工作区的入口（CTA 文案 2026-09-25 批次二调整：
- * 原来的「打开应用」承诺了「应用会被打开」，而工作区当前是未接入占位——
- * 按钮不再承诺超出实际的行为）。它跳转到 /apps/:appId（全屏工作区）。
- * 注意这里用 button + navigate 而不是 <Link>：弹层内不出现链接，避免在浮层里
- * 产生「新标签打开」这类会与遮罩状态冲突的行为。
+ * 「进入工作区」是唯一通往子应用工作区的入口（批次 C 起是真的进入：容器层
+ * 会把子应用挂进工作区）。用 button + navigate 而不是 <Link>：弹层内不出现
+ * 链接，避免「新标签打开」与遮罩状态冲突。
+ *
+ * 数据边界（诚实呈现）：注册接口没有分类/简介/负责团队，这里就不渲染这些行；
+ * permissions 为空时整个「可用功能」块隐藏，不编造清单。
  */
-export default function AppDetailDrawer({ app, onClose }: { app: DemoApp; onClose: () => void }) {
+export default function AppDetailDrawer({ app, onClose }: { app: PortalApp; onClose: () => void }) {
   const navigate = useNavigate();
   const panelRef = useRef<HTMLDivElement>(null);
   const returnFocusRef = useRef<Element | null>(null);
@@ -82,7 +76,7 @@ export default function AppDetailDrawer({ app, onClose }: { app: DemoApp; onClos
     returnFocusRef.current = document.activeElement;
 
     // 背景滚动锁：遮罩盖住的是长列表（市场页），不锁的话面板滚到底会带走背景。
-    // cleanup 无条件恢复——「打开应用」跳转工作区时本组件卸载，也必须把滚动还回去。
+    // cleanup 无条件恢复——「进入工作区」跳转工作区时本组件卸载，也必须把滚动还回去。
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
 
@@ -102,7 +96,7 @@ export default function AppDetailDrawer({ app, onClose }: { app: DemoApp; onClos
     const panel = panelRef.current;
     panel
       ?.querySelector<HTMLElement>(
-        'button:not([disabled]), [href], input, [tabindex]:not([tabindex="-1"])',
+        'button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
       )
       ?.focus();
 
@@ -115,6 +109,8 @@ export default function AppDetailDrawer({ app, onClose }: { app: DemoApp; onClos
       }
     };
   }, [trapFocus]);
+
+  const visual = deriveVisual(app.appId);
 
   return createPortal(
     <div
@@ -132,12 +128,10 @@ export default function AppDetailDrawer({ app, onClose }: { app: DemoApp; onClos
       <div className="overlay__panel" ref={panelRef}>
         <header className="overlay__head">
           <div className="overlay__ident">
-            <AppIconTile app={app} size="l" />
+            <AppIconTile visual={visual} size="l" />
             <div className="overlay__ident-text">
               <h2 className="overlay__title">{app.name}</h2>
-              <p className="overlay__subtitle">
-                {app.category} · {app.ownerTeam}
-              </p>
+              <p className="overlay__subtitle">版本 v{app.version}</p>
             </div>
           </div>
           <button type="button" className="overlay__close" onClick={onClose} aria-label="关闭">
@@ -146,53 +140,50 @@ export default function AppDetailDrawer({ app, onClose }: { app: DemoApp; onClos
         </header>
 
         <div className="overlay__body">
-          <p className="overlay__summary">{app.summary}</p>
-
           <div className="overlay__state">
-            <AppStatusTag app={app} />
-            <span className="overlay__state-note">版本 v{app.version}</span>
+            <AppStatusTag channel={deriveChannel(app)} />
+            <span className="overlay__state-note">更新于 {formatUpdateTime(app.updateTime)}</span>
           </div>
 
           <dl className="ui-facts overlay__facts">
             <div className="ui-fact">
-              <dt className="ui-fact__label">负责团队</dt>
-              <dd className="ui-fact__value">{app.ownerTeam}</dd>
-            </div>
-            <div className="ui-fact">
-              <dt className="ui-fact__label">分类</dt>
-              <dd className="ui-fact__value">{app.category}</dd>
+              <dt className="ui-fact__label">当前版本</dt>
+              <dd className="ui-fact__value">{app.version || '—'}</dd>
             </div>
             <div className="ui-fact">
               <dt className="ui-fact__label">最近更新</dt>
-              <dd className="ui-fact__value ui-num">{app.updatedAt}</dd>
+              <dd className="ui-fact__value ui-num">{formatUpdateTime(app.updateTime)}</dd>
             </div>
           </dl>
 
-          <section className="overlay__block" aria-label="可用功能">
-            <h3 className="overlay__block-title">可用功能（{app.permissions.length}）</h3>
-            <ul className="ui-items">
-              {app.permissions.map((item) => (
-                <li className="ui-item" key={item.code}>
-                  <span className="ui-tile ui-tile--s ui-tone-emerald" aria-hidden="true">
-                    <CheckOutlined />
-                  </span>
-                  <span className="ui-item__text">
-                    <span className="ui-item__title">{item.name}</span>
-                    <span className="ui-item__desc">{item.description}</span>
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </section>
+          {app.permissions.length > 0 ? (
+            <section className="overlay__block" aria-label="可用功能">
+              <h3 className="overlay__block-title">可用功能（{app.permissions.length}）</h3>
+              <ul className="ui-items">
+                {app.permissions.map((item) => (
+                  <li className="ui-item" key={item.code}>
+                    <span className="ui-tile ui-tile--s ui-tone-emerald" aria-hidden="true">
+                      <CheckOutlined />
+                    </span>
+                    <span className="ui-item__text">
+                      <span className="ui-item__title">{item.name}</span>
+                      <span className="ui-item__desc">{item.description}</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
 
-          <p className="ui-note" role="note" aria-label="体验示例说明">
-            {DEMO_DISCLOSURE} · {DEMO_EXPLANATION}
+          <p className="ui-note" role="note" aria-label="环境说明">
+            {PORTAL_EXPLANATION}
           </p>
         </div>
 
         <footer className="overlay__foot">
+          {/* 与角标 X 的 aria-label「关闭」区分：同名会让读屏/语音控制二义 */}
           <Button size="large" inline={false} onClick={onClose}>
-            关闭
+            关闭详情
           </Button>
           <Button
             type="primary"

@@ -1,0 +1,23 @@
+{
+  "appId": "demo-vue",
+  "name": "任务清单（Vue3 演示）",
+  "version": "0.1.0",
+  "framework": "vue3",
+  "baseRoute": "/demo-vue",
+  "backendApi": "http://jbslab.bili:48080",
+  "sandbox": "iframe",
+  "permissions": [
+    {
+      "code": "demo-vue:task:create",
+      "name": "新建任务",
+      "module": "task",
+      "description": "在任务清单中新增任务"
+    },
+    {
+      "code": "demo-vue:task:delete",
+      "name": "删除任务",
+      "module": "task",
+      "description": "删除任务清单中的任务"
+    }
+  ]
+}

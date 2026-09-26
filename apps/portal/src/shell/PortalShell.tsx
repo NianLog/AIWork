@@ -10,11 +10,12 @@ import {
   OrganizationOutlined,
   ShopOutlined,
 } from 'dd-icons';
-import { DEMO_VIEWER } from '../store/demoCatalog';
+import { PORTAL_ENV_LABEL } from '../store/portalNotice';
+import { useSessionStore } from '../store/sessionStore';
 import { WIDE_QUERY, useMediaQuery } from './useMediaQuery';
 import { useRouteMeta } from './useRouteMeta';
 import type { RouteMeta } from './useRouteMeta';
-import DemoNotice from './DemoNotice';
+import EnvNotice from './EnvNotice';
 
 /**
  * 门户外壳：紧凑顶栏 + 主导航 + 页面标题行 + 内容区。
@@ -105,6 +106,9 @@ export default function PortalShell() {
   const isWide = useMediaQuery(WIDE_QUERY);
   const mainRef = useRef<HTMLElement>(null);
   const meta = useRouteMeta(PAGE_METAS, FALLBACK_META);
+  // 身份区随登录态切换（批次 C 起）：登录显示账号昵称，未登录显示访客。
+  // 会话事实源在 sessionStorage，store 只做订阅层——登录/退出不需要整页刷新。
+  const session = useSessionStore((state) => state.session);
   const activeKey = resolveActiveKey(location.pathname);
 
   // 路由落点：切页后焦点主动落在内容区（main 已有 tabIndex={-1}），
@@ -172,10 +176,10 @@ export default function PortalShell() {
               <span aria-hidden="true">
                 <OrganizationOutlined style={{ fontSize: 13 }} />
               </span>
-              {DEMO_VIEWER.orgLabel}
+              {PORTAL_ENV_LABEL}
             </span>
             <Link className="portal-ident__user" to="/login" aria-label="返回登录页">
-              <Avatar nick={DEMO_VIEWER.displayName} size={24} />
+              <Avatar nick={session?.user.nickname ?? '访客'} size={24} />
             </Link>
           </span>
         </div>
@@ -190,7 +194,7 @@ export default function PortalShell() {
           */}
           <div className="portal-titlebar">
             <h1 className="portal-titlebar__title">{meta.title}</h1>
-            <DemoNotice />
+            <EnvNotice />
           </div>
 
           <div className="portal-content ui-enter" key={location.pathname}>

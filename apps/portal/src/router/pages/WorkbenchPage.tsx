@@ -1,36 +1,38 @@
-import { useMemo } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useEffect, useMemo } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Button, Empty } from 'dingtalk-design-mobile';
 import { RightArrowOutlined } from 'dd-icons';
-import { DEMO_APPS_VIEW, DEMO_DISCLOSURE, DEMO_VIEWER, summarizeDemoApps } from '../../store/demoCatalog';
+import { useAppRegistryStore, summarizeApps } from '../../store/appRegistryStore';
+import { useSessionStore } from '../../store/sessionStore';
+import { PORTAL_ENV_LABEL } from '../../store/portalNotice';
 import { summarizeRoadmap } from '../../store/roadmap';
 import AppDetailDrawer from '../parts/AppDetailDrawer';
 import { AppIconTile } from '../parts/AppVisuals';
+import { deriveVisual } from '../../store/appRegistryStore';
 
 /**
- * 工作台：门户首屏，对标钉钉工作台的信息结构（问候 + 应用宫格 + 进展速览）。
+ * 工作台：门户首屏（问候 + 应用宫格 + 进展速览）。
  *
- * 四态骨架（批次二）：页面只认 DEMO_APPS_VIEW 的「status + data + error」形状，
- * 演示数据永远 success，loading / error 由测试喂形状覆盖。
- * 选中态进 URL（批次二）：宫格点开的详情抽屉由 ?app=<appId> 驱动，
- * 浏览器返回键 = 关抽屉，详情可深链。
+ * 批次 C（P0-4）起应用宫格来自注册表接口：页面挂载即拉取（in-flight 去重），
+ * 管理端新增配置不需要重启门户就能在这里出现（C1 验收路径）。
+ * 四态视图形状不变（DataView），事实源从演示目录换成接口。
  *
- * 版式取舍：
- * - 问候与两个关键数字合成一张卡，右侧跟一句披露标签；
- * - 宫格是自适应的响应式网格（每列最小 84px），宽屏自然铺开，窄屏 3 列；
- * - 下半页（批次四）：原来是一张「使用数据会在上线后展示」的空说明卡，
- *   首屏下半部大面积讲「现在没有数据」。换成「功能进展速览」——与功能进展页
- *   同一份数据（store/roadmap.ts），三张阶段卡把「上重下空」填掉，
- *   且不编造任何运行数据（使用数据仍等真实来源，见功能进展页的承诺）。
+ * 问候对象随登录态：未登录显示「访客」，登录后显示账号昵称。
+ * 两个统计数字由清单派生，不与列表分开维护。
  */
 export default function WorkbenchPage() {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-
-  const view = DEMO_APPS_VIEW;
-  const stats = summarizeDemoApps();
+  const view = useAppRegistryStore((state) => state.view);
+  const needsLogin = useAppRegistryStore((state) => state.needsLogin);
+  const session = useSessionStore((state) => state.session);
   const roadmap = useMemo(() => summarizeRoadmap(), []);
-  const enabledApps = useMemo(() => view.data.filter((app) => app.status === 1), [view.data]);
 
+  useEffect(() => {
+    void useAppRegistryStore.getState().fetch();
+  }, []);
+
+  const stats = useMemo(() => summarizeApps(view.data), [view.data]);
   /** 选中态即 URL：?app=xxx 打开抽屉（推历史），清除参数关闭（replace） */
   const activeAppId = searchParams.get('app');
   const activeApp = activeAppId
@@ -41,20 +43,20 @@ export default function WorkbenchPage() {
     <div className="ui-page portal-page--workbench">
       <section className="portal-hero" aria-label="欢迎信息">
         <div className="portal-hero__main">
-          <h2 className="portal-hero__title">你好，{DEMO_VIEWER.displayName}</h2>
+          <h2 className="portal-hero__title">你好，{session?.user.nickname ?? '访客'}</h2>
           <p className="portal-hero__sub">AI 工具，一个入口全部搞定。</p>
         </div>
         <dl className="portal-hero__stats">
           <div className="portal-hero__stat">
             <dt>可用应用</dt>
-            <dd className="ui-num">{stats.enabled}</dd>
+            <dd className="ui-num">{stats.total}</dd>
           </div>
           <div className="portal-hero__stat">
             <dt>小范围试运行</dt>
             <dd className="ui-num">{stats.canary}</dd>
           </div>
         </dl>
-        <span className="ui-badge ui-badge--outline portal-hero__badge">{DEMO_DISCLOSURE}</span>
+        <span className="ui-badge ui-badge--outline portal-hero__badge">{PORTAL_ENV_LABEL}</span>
       </section>
 
       <section className="ui-section" aria-label="常用应用">
@@ -67,7 +69,15 @@ export default function WorkbenchPage() {
             </span>
           </Link>
         </div>
-        {view.status === 'loading' ? (
+        {needsLogin ? (
+          <div className="ui-card ui-card--center">
+            <Empty title="登录后查看应用" inline />
+            <p className="ui-note">应用清单需要登录后获取。</p>
+            <Button size="large" inline={false} onClick={() => navigate('/login')}>
+              去登录
+            </Button>
+          </div>
+        ) : view.status === 'loading' ? (
           <ul className="portal-grid" aria-hidden="true">
             {[0, 1, 2, 3, 4, 5].map((index) => (
               <li key={index} className="portal-grid__skel">
@@ -84,22 +94,22 @@ export default function WorkbenchPage() {
                 {view.error ?? '网络暂时没有响应，稍后重试一般就能恢复。'}
               </p>
               <div className="ui-errorstate__actions">
-                <Button size="large" onClick={() => window.location.reload()}>
+                <Button size="large" onClick={() => void useAppRegistryStore.getState().fetch()}>
                   重试
                 </Button>
               </div>
             </div>
           </div>
-        ) : enabledApps.length > 0 ? (
+        ) : view.data.length > 0 ? (
           <ul className="portal-grid">
-            {enabledApps.map((app) => (
+            {view.data.map((app) => (
               <li key={app.appId}>
                 <button
                   type="button"
                   className="portal-grid__tile"
                   onClick={() => setSearchParams({ app: app.appId })}
                 >
-                  <AppIconTile app={app} />
+                  <AppIconTile visual={deriveVisual(app.appId)} />
                   <span className="portal-grid__name">{app.name}</span>
                 </button>
               </li>
@@ -108,6 +118,7 @@ export default function WorkbenchPage() {
         ) : (
           <div className="ui-card ui-card--center">
             <Empty title="还没有可用的应用" inline />
+            <p className="ui-note">应用在管理端配置并启用后，会自动出现在这里。</p>
           </div>
         )}
       </section>

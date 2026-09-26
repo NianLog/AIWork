@@ -26,6 +26,33 @@ export default defineConfig({
     strictPort: true,
     cors: false,
     /**
+     * 开发期同源转发：/admin-api → 云上后端（部署与域名见 infra/docker/server/DEPLOY.md）。
+     * 门户登录与后续注册接口都走相对路径；vitest 不读 server 段，fetch 由用例 mock。
+     *
+     * /subapps → 子应用 dev server（批次 D 定稿命名空间）。两条硬约束：
+     * ① 不能用 /apps——工作区路由本身就是 /apps/:appId，vite 代理按前缀盲转会把
+     *   门户自己的路由也转给子应用 dev server（批次 C 加过又删的教训）；
+     * ② 必须同源——桥接契约是「同源直注 window.portal」，子应用经 5173 送达才有
+     *   宿主桥。ws:true 供子应用的 HMR websocket 穿过代理。
+     */
+    proxy: {
+      '/admin-api': {
+        target: 'http://jbslab.bili:48080',
+        changeOrigin: true,
+      },
+      '/subapps': {
+        target: 'http://127.0.0.1:5175',
+        changeOrigin: false,
+        ws: true,
+      },
+      // 子应用业务请求统一走线上网关（批次 E）：hosted iframe 与门户同源，
+      // /api/{appId}/** 由这里代理到 nginx+Lua 网关，浏览器无跨源。
+      '/api': {
+        target: 'http://jbslab.bili',
+        changeOrigin: true,
+      },
+    },
+    /**
      * 忽略原子写留下的临时目录（形如 src/.styles.css.<pid>.<uuid>.tmpdir/）。
      *
      * 某些编辑器/工具把文件写磁盘的方式是「先写临时文件再替换」，临时目录与目标文件同层。
@@ -42,5 +69,23 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     cors: false,
+    // 同 server 段：/admin-api 与 /subapps（/apps 前缀与工作区路由冲突，永不代理）。
+    proxy: {
+      '/admin-api': {
+        target: 'http://jbslab.bili:48080',
+        changeOrigin: true,
+      },
+      '/subapps': {
+        target: 'http://127.0.0.1:5175',
+        changeOrigin: false,
+        ws: true,
+      },
+      // 子应用业务请求统一走线上网关（批次 E）：hosted iframe 与门户同源，
+      // /api/{appId}/** 由这里代理到 nginx+Lua 网关，浏览器无跨源。
+      '/api': {
+        target: 'http://jbslab.bili',
+        changeOrigin: true,
+      },
+    },
   },
 });

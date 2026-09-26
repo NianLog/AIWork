@@ -1,4 +1,4 @@
-import type { PortalSDK, TokenResponse } from '@ai-portal/shared-types';
+import type { AppRuntimeProps, PortalSDK, TokenResponse } from '@ai-portal/shared-types';
 
 /** 简版登录入口收集的凭据，仅交给调用方身份服务，不缓存。 */
 export interface LoginCredentials {
@@ -35,6 +35,11 @@ interface BaseHandle {
 
 export interface HostedHandle extends BaseHandle {
   mode: 'hosted';
+  /**
+   * 宿主在挂载时写入的身份快照（auth-injection 契约：props 只作首屏展示，
+   * 鉴权与新 token 一律走 sdk.auth.getToken()）。宿主未注入时不存在。
+   */
+  props?: Readonly<AppRuntimeProps>;
 }
 
 /** 登录及生命周期属于启动句柄，不扩展五个 SDK 原语。 */

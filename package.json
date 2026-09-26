@@ -8,6 +8,7 @@
     "dev": "pnpm -r --parallel run dev",
     "dev:portal": "pnpm --filter @ai-portal/portal dev",
     "dev:admin": "pnpm --filter @ai-portal/admin dev",
+    "dev:demo": "pnpm --filter @ai-portal/demo-vue dev",
     "build": "pnpm -r run build",
     "lint": "pnpm -r run lint",
     "typecheck": "pnpm -r run typecheck",

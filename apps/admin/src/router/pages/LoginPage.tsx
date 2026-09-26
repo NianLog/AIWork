@@ -1,22 +1,21 @@
-import { Link } from 'react-router-dom';
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { Alert, Button, Input } from 'dingtalk-design-desktop';
 import { AiDiagonalStarsFilled, RightArrowOutlined } from 'dd-icons';
-import { DEMO_DISCLOSURE, DEMO_OPERATOR } from '../../store/demoDirectory';
+import { loginWithPassword } from '../../api/yudao';
+import { DEMO_DISCLOSURE } from '../../store/demoDirectory';
 
 /**
- * 后台登录页：统一登录尚未开通，表单保持不可用——不采集凭据、不创建会话。
+ * 后台登录页（批次 B 起接入真实登录）：账号密码走统一登录接口，双令牌与会话
+ * 只落 sessionStorage（引导文档 §8.4 [锁定]），成功后进入应用列表。
  *
- * 这是安全语义的硬约束而不是文案装饰：账号与密码输入框、登录按钮必须保持禁用，
- * 表单提交不得产生任何跳转。「无需登录，先看看界面」是当前唯一可用的入口，
- * 它只指向后台内部页面。
+ * 「无需登录，先看看界面」保留：预览路由不设守卫，但应用列表需要登录才能取数，
+ * 未登录访问会得到「先登录」的引导而不是数据（见 ApplicationsPage）。
  *
- * 版式上介绍区在左、表单区在右，与门户登录页同构；DOM 顺序与视觉顺序一致，
- * 读屏用户不会听到与眼前不同的次序。
- *
- * 版式取舍：
- * - 唯一可用的入口以前是一行与正文同色的文字链，几乎看不见；现在是有底色、
- *   有箭头的整块主行动区——页面上只有一个能点的东西，它就该长得像主行动；
- * - 四条能力说明从竖排列表改成两列网格，宽度够时并排，窄屏自动落回一列。
+ * 版式取舍（沿批次一）：
+ * - 介绍区在左、表单区在右，DOM 顺序与视觉顺序一致，读屏用户听到的次序不变；
+ * - 预览入口保持整块主行动区——它现在是次行动，但仍是「只想看看」用户的主路径；
+ * - 四条能力说明两列网格，窄屏自动落回一列。
  */
 
 const HIGHLIGHTS = [
@@ -27,6 +26,32 @@ const HIGHLIGHTS = [
 ];
 
 export default function LoginPage() {
+  const navigate = useNavigate();
+  const [account, setAccount] = useState('');
+  const [password, setPassword] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [failure, setFailure] = useState('');
+
+  async function handleLogin() {
+    if (submitting) {
+      return;
+    }
+    if (!account.trim() || !password) {
+      setFailure('请先填写账号和密码。');
+      return;
+    }
+    setSubmitting(true);
+    setFailure('');
+    try {
+      await loginWithPassword(account.trim(), password);
+      navigate('/preview/apps');
+    } catch (error) {
+      setFailure(error instanceof Error ? error.message : '登录没有成功，请稍后再试。');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   return (
     <div className="admin-login ui-enter">
       <aside className="admin-login__hero" aria-label="管理后台能做什么">
@@ -47,9 +72,7 @@ export default function LoginPage() {
           ))}
         </ul>
 
-        <p className="admin-login__env">
-          {DEMO_OPERATOR.envLabel} · 内容都是示例，不含真实业务数据
-        </p>
+        <p className="admin-login__env">联调环境 · 应用列表是真实数据，人员与组织仍是示例</p>
       </aside>
 
       <section className="admin-login__panel" aria-labelledby="admin-login-title">
@@ -63,28 +86,51 @@ export default function LoginPage() {
 
           <Alert
             className="admin-login__notice"
-            type="warning"
+            type="info"
             showIcon
             role="note"
-            message="统一登录尚未开通"
-            description="登录开通前，这个页面不会收集账号密码，也不会创建登录状态。"
+            message="账号由管理员开通"
+            description="使用工作账号登录；当前为联调环境，登录后应用列表来自真实数据。"
           />
+
+          {failure ? (
+            <Alert
+              className="admin-login__notice"
+              type="error"
+              showIcon
+              message={failure}
+              aria-live="polite"
+            />
+          ) : null}
 
           <form
             className="admin-login__form"
             aria-label="后台登录"
-            onSubmit={(event) => event.preventDefault()}
+            onSubmit={(event) => {
+              event.preventDefault();
+              void handleLogin();
+            }}
           >
             <label className="ui-field">
               <span className="ui-field__label">账号</span>
-              <Input placeholder="登录开通后可用" disabled />
+              <Input
+                placeholder="请输入账号"
+                value={account}
+                autoComplete="username"
+                onChange={(event) => setAccount(event.target.value)}
+              />
             </label>
             <label className="ui-field">
               <span className="ui-field__label">密码</span>
-              <Input.Password placeholder="当前不收集密码" disabled />
+              <Input.Password
+                placeholder="请输入密码"
+                value={password}
+                autoComplete="current-password"
+                onChange={(event) => setPassword(event.target.value)}
+              />
             </label>
-            <Button type="primary" htmlType="submit" block disabled>
-              登录（暂不可用）
+            <Button type="primary" htmlType="submit" block disabled={submitting}>
+              {submitting ? '正在登录…' : '登录'}
             </Button>
           </form>
 
@@ -99,7 +145,7 @@ export default function LoginPage() {
           </Link>
 
           <p className="ui-note">
-            {DEMO_DISCLOSURE}：体验界面只展示页面效果，不创建账号，也不授予任何管理权限。
+            {DEMO_DISCLOSURE}：人员、角色与组织仍是示例数据；登录只用于访问真实的应用列表。
           </p>
         </div>
       </section>

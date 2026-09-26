@@ -1,0 +1,79 @@
+# AI 中台门户 · 云服务器部署编排（FTP 上传 + 宝塔面板操作）
+#
+# 与上级目录 docker-compose.yml 的区别：文件布局自包含（./sql、./yudao-server.jar），
+# 适配「本地构建 jar → FTP/面板上传到服务器目录 → 宝塔应用编排直接拉镜像启动」流程，
+# 不需要 Dockerfile 与本地镜像构建；MySQL/Redis 只绑定本机回环，避免公网暴露。
+# 操作步骤见同目录 DEPLOY.md。
+
+name: ai-portal
+
+services:
+  mysql:
+    image: mysql:8
+    container_name: ai-portal-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?请在同目录 .env 中设置 MySQL root 密码}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-ruoyi-vue-pro}
+      TZ: Asia/Shanghai
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    # 不发布宿主端口：仅容器内网互访（yudao 经服务名 mysql:3306 连接），
+    # 彻底避开与宝塔自带 MySQL 的 3306 端口冲突
+    volumes:
+      - mysql-data:/var/lib/mysql
+      # 首次初始化自动导入：ruoyi-vue-pro.sql → quartz.sql → portal.sql（按文件名序）
+      - ${AIWORK_PORTAL_DIR:?在 .env 设置服务器上 aiwork-portal 目录的绝对路径}/sql/:/docker-entrypoint-initdb.d/:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  redis:
+    image: redis:6-alpine
+    container_name: ai-portal-redis
+    restart: unless-stopped
+    # 不发布宿主端口：仅容器内网互访（yudao 经服务名 redis:6379 连接），
+    # 彻底避开与宝塔自带 Redis 的 6379 端口冲突
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  yudao-server:
+    # 直接挂载 jar 运行，无需构建镜像；JRE 17 可运行 jdk17/21 线产物
+    image: eclipse-temurin:17-jre
+    container_name: ai-portal-yudao
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      TZ: Asia/Shanghai
+    ports:
+      - "${YUDAO_PORT:-48080}:48080"
+    volumes:
+      - ${AIWORK_PORTAL_DIR:?在 .env 设置服务器上 aiwork-portal 目录的绝对路径}/yudao-server.jar:/app/yudao-server.jar:ro
+    working_dir: /app
+    # 容器网络内数据库主机名是服务名（mysql / redis）；命令行参数覆盖 jar 内配置。
+    # yudao.captcha.enable=false：P0 前端尚无验证码 UI，正式上线前移除此项并接入。
+    command:
+      - java
+      - -jar
+      - yudao-server.jar
+      - --spring.datasource.dynamic.datasource.master.url=jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-ruoyi-vue-pro}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai
+      - --spring.datasource.dynamic.datasource.master.username=root
+      - --spring.datasource.dynamic.datasource.master.password=${MYSQL_ROOT_PASSWORD}
+      - --spring.data.redis.host=redis
+      - --yudao.captcha.enable=false
+
+volumes:
+  mysql-data:
+  redis-data:

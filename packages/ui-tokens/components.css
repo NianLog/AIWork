@@ -1099,8 +1099,8 @@
  * 骨架仍然在，只是不闪。
  */
 .ui-skeleton {
-  --skel-tint: rgba(124, 92, 240, 0.12);
-  --skel-glow: rgba(124, 92, 240, 0.22);
+  --skel-tint: var(--ui-skel-violet-tint);
+  --skel-glow: var(--ui-skel-violet-glow);
   position: relative;
   overflow: hidden;
   border-radius: var(--ui-radius-s);
@@ -1108,8 +1108,8 @@
 }
 
 .ui-skeleton--brand {
-  --skel-tint: rgba(237, 125, 51, 0.12);
-  --skel-glow: rgba(237, 125, 51, 0.22);
+  --skel-tint: var(--ui-skel-brand-tint);
+  --skel-glow: var(--ui-skel-brand-glow);
 }
 
 .ui-skeleton::after {
