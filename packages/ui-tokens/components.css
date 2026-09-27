@@ -622,6 +622,16 @@
   flex-wrap: wrap;
 }
 
+/*
+ * 键盘替身的焦点指示（parts/SegmentedField）：语义层的 radio 视觉隐藏后
+ * 自身焦点环被裁剪不可见，焦点落到整组上兜底；环复用全局 :focus-visible
+ * 的同一令牌，保持视觉语言一致。
+ */
+.ui-segments:focus-within {
+  box-shadow: var(--ui-focus-ring);
+  border-radius: var(--ui-radius-m);
+}
+
 .ui-chips {
   display: flex;
   align-items: center;

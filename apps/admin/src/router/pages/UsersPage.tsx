@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Button, Card, Input, Modal, SegmentedControl, Table, Tag, message } from 'dingtalk-design-desktop';
+import { Button, Card, Input, Modal, Table, Tag, message } from 'dingtalk-design-desktop';
 import type { TableColumnsType } from 'dingtalk-design-desktop';
 import { AddOutlined } from 'dd-icons';
 import { fetchUsers, formatDateTime, updateUserStatus } from '../../api/yudao';
@@ -7,6 +7,7 @@ import type { UserRow } from '../../api/yudao';
 import { USER_STATUS_META } from '../../store/domain';
 import type { CommonStatus } from '../../store/domain';
 import RowActions from '../parts/RowActions';
+import SegmentedField from '../parts/SegmentedField';
 import { useAdminData } from '../parts/useAdminData';
 import UserEditDialog from '../parts/UserEditDialog';
 import RoleAssignDialog from '../parts/RoleAssignDialog';
@@ -183,7 +184,6 @@ export default function UsersPage() {
     },
   ];
 
-  const activeIndex = STATUS_OPTIONS.findIndex((option) => option.value === status);
 
   return (
     <div className="ui-page">
@@ -243,13 +243,12 @@ export default function UsersPage() {
                   value={keyword}
                   onChange={(event) => setKeyword(event.target.value)}
                 />
-                <div className="ui-segments" role="group" aria-label="按状态筛选">
-                  <SegmentedControl
-                    texts={STATUS_OPTIONS.map((option) => option.label)}
-                    activeIndex={activeIndex}
-                    onChange={(index) => setStatus(STATUS_OPTIONS[index].value)}
-                  />
-                </div>
+                <SegmentedField
+                  label="按状态筛选"
+                  options={STATUS_OPTIONS}
+                  value={status}
+                  onChange={setStatus}
+                />
                 <span className="ui-toolbar__count">共 {rows.length} 位成员</span>
               </div>
               <Table<UserRow>

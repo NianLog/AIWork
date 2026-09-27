@@ -7,7 +7,6 @@ import {
   InputNumber,
   Modal,
   Radio,
-  SegmentedControl,
   Table,
   Tag,
   message,
@@ -18,6 +17,7 @@ import type { ApplicationRow, AppVersionRow } from '../../api/yudao';
 import { CHANNEL_META } from '../../store/domain';
 import type { AppChannel, CommonStatus } from '../../store/domain';
 import RowActions from '../parts/RowActions';
+import SegmentedField from '../parts/SegmentedField';
 import { useAdminData } from '../parts/useAdminData';
 
 /**
@@ -255,7 +255,6 @@ export default function ApplicationsPage() {
     },
   ];
 
-  const activeIndex = CHANNEL_OPTIONS.findIndex((option) => option.value === channel);
 
   return (
     <div className="ui-page">
@@ -314,13 +313,12 @@ export default function ApplicationsPage() {
                   value={keyword}
                   onChange={(event) => setKeyword(event.target.value)}
                 />
-                <div className="ui-segments" role="group" aria-label="按发布状态筛选">
-                  <SegmentedControl
-                    texts={CHANNEL_OPTIONS.map((option) => option.label)}
-                    activeIndex={activeIndex}
-                    onChange={(index) => setChannel(CHANNEL_OPTIONS[index].value)}
-                  />
-                </div>
+                <SegmentedField
+                  label="按发布状态筛选"
+                  options={CHANNEL_OPTIONS}
+                  value={channel}
+                  onChange={setChannel}
+                />
                 <span className="ui-toolbar__count">共 {rows.length} 个应用</span>
               </div>
               <Table<ApplicationRow>
