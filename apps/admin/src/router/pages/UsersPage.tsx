@@ -1,48 +1,81 @@
 import { useMemo, useState } from 'react';
-import { Button, Card, Input, SegmentedControl, Table, Tag } from 'dingtalk-design-desktop';
+import { Button, Card, Input, Modal, SegmentedControl, Table, Tag, message } from 'dingtalk-design-desktop';
 import type { TableColumnsType } from 'dingtalk-design-desktop';
-import { AddOutlined, LinkmanOutlined } from 'dd-icons';
-import { DEMO_USERS_VIEW, STATUS_META } from '../../store/demoDirectory';
-import type { DemoStatus, DemoUser } from '../../store/demoDirectory';
+import { AddOutlined } from 'dd-icons';
+import { fetchUsers, formatDateTime, updateUserStatus } from '../../api/yudao';
+import type { UserRow } from '../../api/yudao';
+import { USER_STATUS_META } from '../../store/domain';
+import type { CommonStatus } from '../../store/domain';
 import RowActions from '../parts/RowActions';
+import { useAdminData } from '../parts/useAdminData';
+import UserEditDialog from '../parts/UserEditDialog';
+import RoleAssignDialog from '../parts/RoleAssignDialog';
 
 /**
- * 用户列表：谁在这个平台里、属于哪个组织、被分配了什么角色。
+ * 用户列表（批次 H Step 3 真实化）：真实接口 /system/user/page 经 useAdminData 装载。
  *
- * 四态骨架（2026-09-25 批次二）：页面只认 DEMO_USERS_VIEW 的形状，
- * 演示数据永远 success，loading / error 由测试喂形状覆盖。
+ * 状态砍三态留两态（CommonStatus 0/1）：「待激活」演示语义删除，
+ * 从未登录在「最近登录」列显示「—」（0 排最旧，不再是独立档位）。
  *
- * 列表只读：新增、编辑、调整角色、停用全部禁用，因为后台没有可写入的服务。
- * 通讯录同步同样禁用——同步会把真实人员数据拉进来，与「不含真实业务数据」直接冲突。
+ * 角色列改为部门 + 手机号：列表接口不带回角色，逐行查角色是 N+1，
+ * 角色信息只在「调整角色」对话框里出现（决策见批次 H 计划）。
  *
- * 版式与交互（批次二/四）：
- * - 统计卡可点：点哪张卡切到对应状态筛选（aria-pressed 表达选中），总数卡切回全部；
- * - 「最近登录」可排序，默认最近在前；「从未登录」排最后（它是最旧的一档，
- *   不是空值异常），小字弱化避免被当成日期解析；
- * - 分页 10 条一页且单页隐藏；操作列用 RowActions（文字主操作 + ··· 下拉）。
+ * 写操作解禁：新增/编辑（UserEditDialog）、调整角色（RoleAssignDialog）、
+ * 停用/启用（确认后走独立 update-status 端点，2026-09-27 实测 body {id, status}）。
+ * 「同步通讯录」删除：免登凭证未批，同步无落点（批次 H 决策）。
  *
- * 成员一列把姓名与账号叠成两行（账号是小字副标题），角色一列用标签组。
+ * 版式沿用批次二/四：统计卡可点切筛选；最近登录可排序默认最新在前；
+ * 分页 10 条单页隐藏；操作列 RowActions 文字主操作 + ··· 下拉。
  */
 
-type StatusFilter = 'all' | DemoStatus;
+type StatusFilter = 'all' | CommonStatus;
 
 const STATUS_OPTIONS: Array<{ value: StatusFilter; label: string }> = [
   { value: 'all', label: '全部' },
-  { value: 'active', label: STATUS_META.active.label },
-  { value: 'invited', label: STATUS_META.invited.label },
-  { value: 'disabled', label: STATUS_META.disabled.label },
+  { value: 0, label: USER_STATUS_META[0].label },
+  { value: 1, label: USER_STATUS_META[1].label },
 ];
 
-/** 排序键：时间串 'YYYY-MM-DD HH:mm' 字典序即时间序；从未登录视为最旧。 */
-function loginRank(user: DemoUser): string {
-  return user.lastLoginAt === '从未登录' ? '' : user.lastLoginAt;
+/** 停用 / 重新启用共用的确认对话框状态。 */
+interface PendingStatus {
+  user: UserRow;
+  next: CommonStatus;
 }
 
 export default function UsersPage() {
   const [keyword, setKeyword] = useState('');
   const [status, setStatus] = useState<StatusFilter>('all');
+  const { view, reload } = useAdminData(fetchUsers);
 
-  const view = DEMO_USERS_VIEW;
+  const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState<UserRow | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [assigning, setAssigning] = useState<UserRow | null>(null);
+  const [pendingStatus, setPendingStatus] = useState<PendingStatus | null>(null);
+
+  /** 写操作统一动线：busy 锁按钮 → 成功 message+reload → 失败透出人话错误。 */
+  async function runWrite(successText: string, action: () => Promise<void>): Promise<void> {
+    setBusy(true);
+    try {
+      await action();
+      message.success(successText);
+      reload();
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : '操作没有成功，请稍后再试。');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function confirmStatus() {
+    if (!pendingStatus) return;
+    const { user, next } = pendingStatus;
+    await runWrite(next === 1 ? '成员已停用。' : '成员已启用。', async () => {
+      await updateUserStatus(user.id, next);
+      setPendingStatus(null);
+    });
+  }
+
   const rows = useMemo(() => {
     const query = keyword.trim().toLowerCase();
     return view.data.filter((user) => {
@@ -52,62 +85,60 @@ export default function UsersPage() {
       if (!query) {
         return true;
       }
-      return [user.name, user.account, user.orgName, ...user.roleNames].some((field) =>
+      return [user.nickname, user.username, user.deptName, user.mobile].some((field) =>
         field.toLowerCase().includes(query),
       );
     });
   }, [keyword, status, view.data]);
 
   const stats = useMemo(() => {
-    const countBy = (target: DemoStatus) => view.data.filter((user) => user.status === target).length;
+    const countBy = (target: CommonStatus) =>
+      view.data.filter((user) => user.status === target).length;
     return [
       { label: '成员总数', value: view.data.length, tone: 'brand', filter: 'all' as StatusFilter },
-      { label: STATUS_META.active.label, value: countBy('active'), tone: 'success', filter: 'active' as StatusFilter },
-      { label: STATUS_META.invited.label, value: countBy('invited'), tone: 'warning', filter: 'invited' as StatusFilter },
-      { label: STATUS_META.disabled.label, value: countBy('disabled'), tone: 'neutral', filter: 'disabled' as StatusFilter },
+      { label: USER_STATUS_META[0].label, value: countBy(0), tone: 'success', filter: 0 as StatusFilter },
+      { label: USER_STATUS_META[1].label, value: countBy(1), tone: 'neutral', filter: 1 as StatusFilter },
     ];
   }, [view.data]);
 
-  const columns: TableColumnsType<DemoUser> = [
+  const columns: TableColumnsType<UserRow> = [
     {
       title: '成员',
-      dataIndex: 'name',
-      key: 'name',
+      dataIndex: 'nickname',
+      key: 'nickname',
       render: (_, record) => (
         <span>
-          <span className="ui-cell-title">{record.name}</span>
-          <span className="ui-cell-sub">账号 {record.account}</span>
+          <span className="ui-cell-title">{record.nickname || record.username}</span>
+          <span className="ui-cell-sub">账号 {record.username}</span>
         </span>
       ),
     },
     {
-      title: '所属组织',
-      dataIndex: 'orgName',
-      key: 'orgName',
+      title: '部门',
+      dataIndex: 'deptName',
+      key: 'deptName',
       width: 156,
+      render: (value: string) => <span>{value || '—'}</span>,
     },
     {
-      title: '担任角色',
-      key: 'roles',
-      render: (_, record) => (
-        <span className="ui-chips">
-          {record.roleNames.map((role) => (
-            <Tag key={role} color="blue" size="small">
-              {role}
-            </Tag>
-          ))}
-        </span>
-      ),
+      title: '手机号',
+      dataIndex: 'mobile',
+      key: 'mobile',
+      width: 140,
+      render: (value: string) => <span className="ui-num">{value || '—'}</span>,
     },
     {
       title: '最近登录',
-      dataIndex: 'lastLoginAt',
-      key: 'lastLoginAt',
+      dataIndex: 'loginDate',
+      key: 'loginDate',
       width: 156,
-      sorter: (a, b) => loginRank(a).localeCompare(loginRank(b)),
+      // epoch 毫秒数值排序；从未登录（0）排最旧；空显示「—」
+      sorter: (a, b) => a.loginDate - b.loginDate,
       defaultSortOrder: 'descend',
-      render: (value: string) => (
-        <span className={value === '从未登录' ? 'admin-cell-muted' : 'ui-num'}>{value}</span>
+      render: (value: number) => (
+        <span className={value === 0 ? 'admin-cell-muted' : 'ui-num'}>
+          {value === 0 ? '—' : formatDateTime(value)}
+        </span>
       ),
     },
     {
@@ -115,7 +146,7 @@ export default function UsersPage() {
       key: 'status',
       width: 108,
       render: (_, record) => {
-        const meta = STATUS_META[record.status];
+        const meta = USER_STATUS_META[record.status];
         return (
           <Tag color={meta.tagColor} size="small">
             {meta.label}
@@ -133,20 +164,18 @@ export default function UsersPage() {
             {
               key: 'edit',
               label: '编辑',
-              disabled: true,
-              ariaLabel: `编辑 ${record.name} 的资料（暂不可用）`,
+              ariaLabel: `编辑 ${record.nickname || record.username}`,
+              onClick: () => setEditing(record),
             },
             {
               key: 'roles',
               label: '调整角色',
-              disabled: true,
-              reason: '后台服务尚未接入，暂不可用',
+              onClick: () => setAssigning(record),
             },
             {
-              key: 'disable',
-              label: '停用成员',
-              disabled: true,
-              reason: '后台服务尚未接入，暂不可用',
+              key: record.status === 0 ? 'disable' : 'enable',
+              label: record.status === 0 ? '停用成员' : '启用成员',
+              onClick: () => setPendingStatus({ user: record, next: record.status === 0 ? 1 : 0 }),
             },
           ]}
         />
@@ -160,14 +189,12 @@ export default function UsersPage() {
     <div className="ui-page">
       <div className="admin-toolbar-row">
         <p className="ui-pagehead__lead">
-          这里列出平台里的成员、他们所属的组织和担任的角色。登录开通后，成员名单会跟随企业通讯录自动更新。
+          这里列出平台里的成员、他们所属的部门与账号状态；调整角色、停用与启用都在这里完成。
         </p>
         <div className="ui-pagehead__actions">
-          <Button icon={<LinkmanOutlined />} disabled>
-            同步通讯录（暂不可用）
-          </Button>
-          <Button type="primary" icon={<AddOutlined />} disabled>
-            新增成员（暂不可用）
+          <Button onClick={reload}>刷新</Button>
+          <Button type="primary" icon={<AddOutlined />} onClick={() => setCreating(true)}>
+            新增成员
           </Button>
         </div>
       </div>
@@ -203,7 +230,7 @@ export default function UsersPage() {
                 {view.error ?? '网络暂时没有响应，稍后重试一般就能恢复。'}
               </p>
               <div className="ui-errorstate__actions">
-                <Button onClick={() => window.location.reload()}>重试</Button>
+                <Button onClick={reload}>重试</Button>
               </div>
             </div>
           ) : (
@@ -212,7 +239,7 @@ export default function UsersPage() {
                 <Input
                   className="ui-toolbar__search"
                   allowClear
-                  placeholder="搜索姓名、账号、组织或角色"
+                  placeholder="搜索姓名、账号或部门"
                   value={keyword}
                   onChange={(event) => setKeyword(event.target.value)}
                 />
@@ -225,7 +252,7 @@ export default function UsersPage() {
                 </div>
                 <span className="ui-toolbar__count">共 {rows.length} 位成员</span>
               </div>
-              <Table<DemoUser>
+              <Table<UserRow>
                 rowKey="id"
                 columns={columns}
                 dataSource={rows}
@@ -236,6 +263,47 @@ export default function UsersPage() {
           )}
         </Card>
       </section>
+
+      <UserEditDialog
+        open={creating || editing !== null}
+        user={editing}
+        onClose={() => {
+          setCreating(false);
+          setEditing(null);
+        }}
+        onSaved={() => {
+          setCreating(false);
+          setEditing(null);
+          reload();
+        }}
+      />
+
+      <RoleAssignDialog
+        open={assigning !== null}
+        user={assigning}
+        onClose={() => setAssigning(null)}
+        onSaved={() => {
+          setAssigning(null);
+          reload();
+        }}
+      />
+
+      {/* 停用 / 启用确认：独立 update-status 端点，不动其他资料 */}
+      <Modal
+        open={pendingStatus !== null}
+        title={pendingStatus?.next === 1 ? '停用成员' : '启用成员'}
+        okText={pendingStatus?.next === 1 ? '确认停用' : '确认启用'}
+        cancelText="取消"
+        confirmLoading={busy}
+        onOk={confirmStatus}
+        onCancel={() => setPendingStatus(null)}
+      >
+        <p>
+          {pendingStatus?.next === 1
+            ? `停用后「${pendingStatus?.user.nickname || pendingStatus?.user.username}」无法再登录平台，资料与角色保留，可以随时重新启用。`
+            : `启用后「${pendingStatus?.user.nickname || pendingStatus?.user.username}」恢复登录与使用。`}
+        </p>
+      </Modal>
     </div>
   );
 }

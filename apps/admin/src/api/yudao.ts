@@ -272,8 +272,8 @@ export interface ApplicationRow {
   publishedAt: string;
 }
 
-/** 'YYYY-MM-DD HH:mm'：列表「最近更新」列按这个字符串排序（字典序即时间序）。 */
-function formatDateTime(epochMs: number): string {
+/** 'YYYY-MM-DD HH:mm'：列表时间列按这个字符串排序（字典序即时间序）。 */
+export function formatDateTime(epochMs: number): string {
   const date = new Date(epochMs);
   const pad = (value: number) => String(value).padStart(2, '0');
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;

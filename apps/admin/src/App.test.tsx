@@ -138,6 +138,28 @@ const FIXTURE_APPS = [
   },
 ];
 
+/**
+ * 接口返回的用户记录（后端字段原样）：在职可用（有登录时间）/ 已停用（从未登录）/
+ * 在职可用（从未登录）各一——覆盖两态标签、「—」缺省与状态筛选。
+ */
+const FIXTURE_USERS = [
+  {
+    id: 11, username: 'linwei', nickname: '林蔚', deptId: 103, deptName: '研发部门',
+    mobile: '13800000001', email: '', sex: 0, avatar: '', postIds: [], remark: '',
+    status: 0, loginDate: 1790400000000, createTime: 1780000000000,
+  },
+  {
+    id: 12, username: 'wutong', nickname: '吴桐', deptId: 101, deptName: '深圳总公司',
+    mobile: '', email: '', sex: 1, avatar: '', postIds: null, remark: '',
+    status: 1, loginDate: null, createTime: 1780000000001,
+  },
+  {
+    id: 13, username: 'zhouyu', nickname: '周雨', deptId: 103, deptName: '研发部门',
+    mobile: '13800000003', email: '', sex: 0, avatar: '', postIds: [], remark: '',
+    status: 0, loginDate: null, createTime: 1780000000002,
+  },
+];
+
 const fetchMock = vi.fn();
 
 function jsonResponse(body: unknown, status = 200) {
@@ -382,8 +404,8 @@ describe('应用列表的真实数据通道', () => {
   });
 });
 
-/** 仍是演示数据的页面（批次 H Step 2 起应用列表/发布两页写操作已解禁走真实接口）。 */
-const DEMO_PAGE_ROUTES = ['/preview/users', '/preview/roles', '/preview/organizations'];
+/** 仍是演示数据的页面（批次 H：Step 2 应用两页、Step 3 用户页写操作已解禁走真实接口）。 */
+const DEMO_PAGE_ROUTES = ['/preview/roles', '/preview/organizations'];
 
 describe('演示数据只读，不提供变更能力', () => {
   it.each(DEMO_PAGE_ROUTES)('%s 上的写意图按钮全部禁用，点击不产生跳转', async (path) => {
@@ -448,11 +470,19 @@ describe('演示数据只读，不提供变更能力', () => {
     fireEvent.click(screen.getByRole('button', { name: /应用总数/ }));
     expect(screen.getByText('共 3 个应用')).toBeTruthy();
 
-    // 用户页同一动线（仍是演示数据；批次 G 起懒加载，先等页面挂载）
+    // 用户页同一动线（批次 H 起真实接口）：点「已停用」卡切口径
     cleanup();
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) =>
+      jsonResponse(
+        String(input).includes('/system/user/page')
+          ? { code: 0, data: { list: FIXTURE_USERS, total: FIXTURE_USERS.length }, msg: '' }
+          : { code: 0, data: { list: [], total: 0 }, msg: '' },
+      ),
+    );
     openAdmin('/preview/users');
-    fireEvent.click(await screen.findByRole('button', { name: /待激活/ }));
-    expect(screen.getByText('共 2 位成员')).toBeTruthy();
+    await screen.findByText('林蔚');
+    fireEvent.click(screen.getByRole('button', { name: /已停用/ }));
+    expect(screen.getByText('共 1 位成员')).toBeTruthy();
   });
 
   it('应用列表默认按最近更新排序：最新更新的排在第一行', async () => {
@@ -463,22 +493,25 @@ describe('演示数据只读，不提供变更能力', () => {
     expect(firstTitle?.textContent).toBe('素材仓库');
   });
 
-  it('用户页的检索与状态筛选只作用于演示数据', async () => {
+  it('用户页的检索与状态筛选作用于接口数据（批次 H）', async () => {
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) =>
+      jsonResponse(
+        String(input).includes('/system/user/page')
+          ? { code: 0, data: { list: FIXTURE_USERS, total: FIXTURE_USERS.length }, msg: '' }
+          : { code: 0, data: { list: [], total: 0 }, msg: '' },
+      ),
+    );
     openAdmin('/preview/users');
 
-    // 批次 G 起页面懒加载：控件要等 chunk 挂载后才在场
-    const searchbox = await screen.findByPlaceholderText<HTMLInputElement>(
-      '搜索姓名、账号、组织或角色',
-    );
+    const searchbox = await screen.findByPlaceholderText<HTMLInputElement>('搜索姓名、账号或部门');
     expect(searchbox.disabled).toBe(false);
-    expect(screen.getByText('共 7 位成员')).toBeTruthy();
+    expect(screen.getByText('共 3 位成员')).toBeTruthy();
 
     const filters = screen.getByRole('group', { name: '按状态筛选' });
     const counts: Array<[string, string]> = [
       ['已停用', '共 1 位成员'],
-      ['待激活', '共 2 位成员'],
-      ['在职可用', '共 4 位成员'],
-      ['全部', '共 7 位成员'],
+      ['在职可用', '共 2 位成员'],
+      ['全部', '共 3 位成员'],
     ];
     for (const [label, count] of counts) {
       fireEvent.click(within(filters).getByText(label));
@@ -491,6 +524,8 @@ describe('演示数据只读，不提供变更能力', () => {
 
     fireEvent.change(searchbox, { target: { value: '吴桐' } });
     expect(screen.getByText('共 1 位成员')).toBeTruthy();
+    // 从未登录显示「—」，演示期「待激活/从未登录」语义已删（批次 H）
+    expect(screen.queryByText('从未登录')).toBeNull();
   });
 
   it('应用发布表单真实可提交：新建走发布接口并回到应用列表（批次 H）', async () => {
