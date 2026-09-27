@@ -23,7 +23,7 @@
  * 品牌色 2026-09-28 起从暖橙 #ED7D33 换为冷蓝 #2563EB：对齐企业 OA 参考图的
  * 蓝白灰语言（大面积白卡片、近黑文字、彩色只留在应用图标），值由
  * scripts/qc/palette-final.mjs 逐对核验（橙版完整叙事见 DDE 笔记
- * 2026-09-25-warm-brand-palette，本次反转依据见 2026-09-28-portal-visual-refresh）。
+ * 2026-09-25-warm-brand-palette，本次反转依据见 2026-09-27-portal-visual-refresh）。
  * 蓝系的对比度格局与橙系**正好相反**，约束随之反转：
  *
  *   --ui-brand        #2563EB   5.17:1 于白底（作文字与图形本身已达标）
