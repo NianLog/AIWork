@@ -162,6 +162,24 @@ const FIXTURE_USERS = [
 
 const fetchMock = vi.fn();
 
+/**
+ * 接口返回的角色与权限码记录（后端字段原样）：dataScope 1=全部数据（页内人话映射），
+ * 权限码挂在图像工坊下——其余应用零权限，验证「暂未登记功能」缺省。
+ */
+const FIXTURE_ROLES = [
+  {
+    id: 1, name: '超级管理员', code: 'super_admin', sort: 1, status: 0,
+    type: 1, dataScope: 1, remark: null, createTime: 1780000000000,
+  },
+];
+
+const FIXTURE_PERMS = [
+  {
+    id: 71, appId: 'image-studio', code: 'task:create', name: '新建任务',
+    description: null, module: null, createTime: 0,
+  },
+];
+
 function jsonResponse(body: unknown, status = 200) {
   return { ok: status >= 200 && status < 300, status, json: async () => body } as Response;
 }
@@ -404,10 +422,10 @@ describe('应用列表的真实数据通道', () => {
   });
 });
 
-/** 仍是演示数据的页面（批次 H：Step 2 应用两页、Step 3 用户页写操作已解禁走真实接口）。 */
-const DEMO_PAGE_ROUTES = ['/preview/roles', '/preview/organizations'];
+/** 仍是演示数据的页面（批次 H：应用/发布/用户/角色已解禁走真实接口，组织页 Step 5 收）。 */
+const DEMO_PAGE_ROUTES = ['/preview/organizations'];
 
-describe('演示数据只读，不提供变更能力', () => {
+describe('页面数据行为（批次 H 逐步真实化）', () => {
   it.each(DEMO_PAGE_ROUTES)('%s 上的写意图按钮全部禁用，点击不产生跳转', async (path) => {
     openAdmin(path);
     // 批次 G 起五页全部懒加载（apps 页还要等接口数据）：先等页面挂载、写按钮
@@ -526,6 +544,32 @@ describe('演示数据只读，不提供变更能力', () => {
     expect(screen.getByText('共 1 位成员')).toBeTruthy();
     // 从未登录显示「—」，演示期「待激活/从未登录」语义已删（批次 H）
     expect(screen.queryByText('从未登录')).toBeNull();
+  });
+
+  it('角色页走真实接口：数据范围人话映射，权限卡按应用分组（批次 H）', async () => {
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/system/role/page')) {
+        return jsonResponse({
+          code: 0, data: { list: FIXTURE_ROLES, total: FIXTURE_ROLES.length }, msg: '',
+        });
+      }
+      if (url.includes('/portal-app-permission/page')) {
+        return jsonResponse({
+          code: 0, data: { list: FIXTURE_PERMS, total: FIXTURE_PERMS.length }, msg: '',
+        });
+      }
+      return jsonResponse({ code: 0, data: { list: FIXTURE_APPS, total: FIXTURE_APPS.length }, msg: '' });
+    });
+    openAdmin('/preview/roles');
+
+    await screen.findByText('超级管理员');
+    // dataScope 1 → 人话标签；角色编码是内部标识不上屏
+    expect(screen.getByText('全部数据')).toBeTruthy();
+    expect(screen.queryByText('super_admin')).toBeNull();
+    // 权限卡：图像工坊 1 项功能，其余应用给「暂未登记功能」缺省
+    expect(await screen.findByText('新建任务')).toBeTruthy();
+    expect(screen.getAllByText('暂未登记功能').length).toBe(2);
   });
 
   it('应用发布表单真实可提交：新建走发布接口并回到应用列表（批次 H）', async () => {

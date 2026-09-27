@@ -34,6 +34,23 @@ export const ENTITY_STATUS_META: Record<CommonStatus, { label: string; tagColor:
 /** 应用发布通道（fetchApplications 按 status 与 canary 字段派生）。 */
 export type AppChannel = 'stable' | 'canary' | 'paused';
 
+/**
+ * 角色数据范围（Yudao RoleDataScopeEnum 1-5 的页内人话映射）。
+ * 角色页列表列与编辑对话框共用，故住 domain 不住页内。
+ */
+export const ROLE_DATA_SCOPES: Array<{ value: number; label: string }> = [
+  { value: 1, label: '全部数据' },
+  { value: 2, label: '指定部门' },
+  { value: 3, label: '本部门' },
+  { value: 4, label: '本部门及以下' },
+  { value: 5, label: '仅本人' },
+];
+
+/** dataScope 数值 → 标签；未知值兜底不裸奔数字。 */
+export function roleDataScopeLabel(value: number): string {
+  return ROLE_DATA_SCOPES.find((scope) => scope.value === value)?.label ?? `范围 ${value}`;
+}
+
 export const CHANNEL_META: Record<AppChannel, { label: string; tagColor: TagColor }> = {
   stable: { label: '正式版', tagColor: 'success' },
   canary: { label: '试运行', tagColor: 'warning' },

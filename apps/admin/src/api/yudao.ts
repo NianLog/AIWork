@@ -537,6 +537,9 @@ export interface RoleInput {
   name: string;
   code: string;
   sort: number;
+  status?: CommonStatus;
+  /** 数据范围 1-5（ROLE_DATA_SCOPES），编辑时由整行展开保活。 */
+  dataScope?: number;
   remark: string;
 }
 
@@ -555,6 +558,8 @@ export async function updateRole(row: RoleRow, patch: Partial<RoleInput>): Promi
       name: row.name,
       code: row.code,
       sort: row.sort,
+      status: row.status,
+      dataScope: row.dataScope,
       remark: row.remark ?? '',
       ...patch,
     }),

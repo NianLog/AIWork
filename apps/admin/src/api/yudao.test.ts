@@ -15,10 +15,11 @@ import {
   readSession,
   updateUser,
   updateApplication,
+  updateRole,
   updateUserStatus,
 } from './yudao';
 import type { ApiError } from './yudao';
-import type { ApplicationRow, UserRow } from './yudao';
+import type { ApplicationRow, RoleRow, UserRow } from './yudao';
 
 /**
  * 批次 F 核心机制测试（后台副本）：与 apps/portal/src/api/yudao.test.ts 同型
@@ -290,6 +291,29 @@ describe('写通道封装（批次 H）', () => {
     expect(bodies[0]).not.toHaveProperty('deptName');
     expect(bodies[0]).not.toHaveProperty('loginDate');
     expect(bodies[0]).not.toHaveProperty('createTime');
+  });
+
+  it('updateRole 整行展开再覆盖：status/dataScope 不在补丁里也原样回传', async () => {
+    const bodies: Record<string, unknown>[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+        bodies.push(bodyOf(init));
+        return jsonResponse({ code: 0, msg: '', data: true });
+      }),
+    );
+
+    const row: RoleRow = {
+      id: 2, name: '巡检管理员', code: 'patrol_admin', sort: 2, status: 0,
+      type: 2, dataScope: 4, remark: '面向巡检团队', createTime: 1780000000000,
+    };
+    await updateRole(row, { name: '巡检管理员-改名' });
+
+    expect(bodies).toHaveLength(1);
+    expect(bodies[0]).toMatchObject({
+      id: 2, name: '巡检管理员-改名', code: 'patrol_admin', sort: 2,
+      status: 0, dataScope: 4, remark: '面向巡检团队',
+    });
   });
 
   it('assignRoleMenus 发 POST {roleId, menuIds}', async () => {
