@@ -328,157 +328,105 @@
 }
 
 /*
- * 首屏问候卡（2026-09-28 视觉重设计）：白卡片 + 细边框 + 轻投影——对齐企业
- * OA 参考图语言，大面积品牌色块退出首屏，品牌蓝只保留在统计数字等小面积
- * 强调位。文字回灰阶三档：层次靠字号字重，不靠把字压到品牌色块上。
+ * 工作台构图（2026-09-28 重排，参照 docs/钉钉工作台预览图）：
+ * 灰底上「问候条 + 大白卡（应用条目宫格）+ 右栏白卡（功能进展 / 应用统计）」。
+ * 层次全部来自字号字重与卡片边框，彩色只留在应用图标瓦片。
  */
-.portal-hero {
-  display: flex;
-  align-items: center;
-  gap: var(--ui-space-5);
-  flex-wrap: wrap;
-  padding: var(--ui-space-5);
-  border-radius: var(--ui-radius-l);
-  background: var(--ui-surface);
-  border: 1px solid var(--ui-line);
-  box-shadow: var(--ui-shadow-card);
-  color: var(--ui-text-strong);
-}
-
-.portal-hero__main {
-  flex: 1;
-  min-width: 200px;
-}
-
-.portal-hero__title {
-  margin: 0;
-  font-size: var(--ui-font-md);
-  font-weight: var(--ui-weight-semibold);
-  line-height: var(--ui-leading-tight);
-  color: var(--ui-text-strong);
-}
-
-.portal-hero__sub {
-  margin: var(--ui-space-2) 0 0;
-  font-size: var(--ui-font-sm);
-  line-height: var(--ui-leading-base);
-  color: var(--ui-text-soft);
-}
-
-/*
- * 披露标签压在 hero 色块上。文字取 --ui-brand-ink 实色（不叠 opacity，理由同 hero 副标题）；
- * 边框用 ink 的半透明——边框是装饰不是信息，允许弱，文字不允许。
- */
-.portal-hero__badge {
-  flex: none;
-  align-self: flex-start;
-  padding: var(--ui-space-1) var(--ui-space-3);
-  border: 1px solid var(--ui-line-strong);
-  border-radius: var(--ui-radius-pill);
-  background: transparent;
-  color: var(--ui-text-soft);
-  font-size: var(--ui-font-2xs);
-  font-weight: var(--ui-weight-medium);
-  line-height: var(--ui-leading-tight);
-}
-
-.portal-hero__stats {
+.wb-greet {
   display: flex;
   align-items: flex-end;
-  gap: var(--ui-space-6);
-  margin: 0;
-  flex: none;
+  justify-content: space-between;
+  gap: var(--ui-space-4);
+  padding: var(--ui-space-1) 0 var(--ui-space-5);
 }
 
-.portal-hero__stat {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ui-space-1);
-}
-
-/* 数据组结构化（批次四）：相邻指标之间一条分隔线（装饰位，ink 的弱化，
-   与角标边框同源；不承载信息），数字大、标签小，扫一眼比出量级 */
-.portal-hero__stat + .portal-hero__stat {
-  padding-left: var(--ui-space-6);
-  border-left: 1px solid var(--ui-line);
-}
-
-.portal-hero__stat dt {
-  font-size: var(--ui-font-xs);
-  line-height: var(--ui-leading-tight);
-  color: var(--ui-text-soft);
-}
-
-.portal-hero__stat dd {
+.wb-greet__title {
   margin: 0;
   font-size: var(--ui-font-xl);
   font-weight: var(--ui-weight-semibold);
-  line-height: var(--ui-leading-num);
-  color: var(--ui-brand-strong);
-}
-
-/*
- * 宫格：按容器宽度自适应，每列至少 84px。
- * 不再按断点手算列数——手算的后果是中间尺寸出现「4 列挤成一团」或「8 列每格空旷」。
- * 行间距比列间距大：宫格视觉上按行读，行之间需要更明确的分隔。
- */
-.portal-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
-  column-gap: var(--ui-space-2);
-  row-gap: var(--ui-space-5);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.portal-grid__tile {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--ui-space-2);
-  width: 100%;
-  min-height: 92px;
-  padding: var(--ui-space-3) var(--ui-space-2);
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: var(--ui-radius-l);
-  cursor: pointer;
-  font: inherit;
-  color: var(--ui-text-strong);
-  transition: var(--ui-transition-surface);
-}
-
-/* 宫格图标用大瓦片：这是工作台上唯一的视觉锚点，小一号就找不着 */
-.portal-grid__tile .ui-tile {
-  width: 52px;
-  height: 52px;
-  border-radius: var(--ui-radius-l);
-  font-size: var(--ui-font-xl);
-}
-
-.portal-grid__name {
-  display: block;
-  width: 100%;
-  font-size: var(--ui-font-xs);
-  font-weight: var(--ui-weight-medium);
-  /* 应用名可能两行，行高给足；原来是 1.2，两行之间会粘住 */
   line-height: var(--ui-leading-tight);
-  text-align: center;
+  letter-spacing: var(--ui-tracking-tight);
   color: var(--ui-text-strong);
-  overflow-wrap: anywhere;
 }
 
-@media (any-hover: hover) {
-  .portal-grid__tile:hover {
-    background: var(--ui-surface);
-    border-color: var(--ui-line);
-    box-shadow: var(--ui-shadow-card);
+.wb-greet__sub {
+  margin: var(--ui-space-1) 0 0;
+  font-size: var(--ui-font-sm);
+  color: var(--ui-text-soft);
+}
+
+.wb-greet__badge {
+  flex: none;
+  margin-bottom: var(--ui-space-1);
+}
+
+.wb-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--ui-page-gap);
+  align-items: start;
+}
+
+@media (min-width: 1024px) {
+  .wb-layout {
+    grid-template-columns: minmax(0, 1fr) 320px;
   }
 }
 
-.portal-grid__tile:active {
+.wb-card {
+  padding: var(--ui-space-5);
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-line);
+  border-radius: var(--ui-radius-l);
+  box-shadow: var(--ui-shadow-card);
+}
+
+.wb-rail {
+  display: grid;
+  gap: var(--ui-page-gap);
+}
+
+/* 应用条目宫格：「瓦片 + 名称」横排，auto-fill 折行——参考图 2 的行形态 */
+.wb-applist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--ui-space-1);
+}
+
+.wb-appitem {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-3);
+  width: 100%;
+  padding: var(--ui-space-2) var(--ui-space-3);
+  background: transparent;
+  border: 0;
+  border-radius: var(--ui-radius-m);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: var(--ui-transition-colors), var(--ui-transition-surface);
+}
+
+.wb-appitem:hover {
   background: var(--ui-surface-hover);
+}
+
+.wb-appitem:active {
+  background: var(--ui-surface-press);
+}
+
+.wb-appitem__name {
+  font-size: var(--ui-font-base);
+  font-weight: var(--ui-weight-medium);
+  line-height: var(--ui-leading-tight);
+  color: var(--ui-text-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* 空态说明：收成一行，不再占一张整卡 */
@@ -1477,12 +1425,8 @@
     --ui-container: 1120px;
   }
 
-  .portal-hero {
+  .wb-card {
     padding: var(--ui-space-6) var(--ui-space-7);
-  }
-
-  .portal-grid {
-    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
   }
 }
 
@@ -1492,47 +1436,77 @@
   }
 }
 
-/* ======================================================================
-   工作台：功能进展速览（批次四：填充下半页，与功能进展页共用 store/roadmap.ts）
-   ====================================================================== */
-
-.portal-roadmap {
+/*
+ * 右栏：功能进展速览（数据与功能进展页共用 store/roadmap.ts）。
+ * 行形态：淡底计数块 + 标题 + 一句说明——参考图右栏公告卡的纵向列表。
+ */
+.wb-progress {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: var(--ui-space-4);
 }
 
-.portal-roadmap__card {
+.wb-progress__item {
   display: flex;
-  flex-direction: column;
-  gap: var(--ui-space-2);
-  padding: var(--ui-space-5);
-  background: var(--ui-surface);
-  border: 1px solid var(--ui-line);
-  border-radius: var(--ui-radius-l);
-  box-shadow: var(--ui-shadow-card);
+  align-items: flex-start;
+  gap: var(--ui-space-3);
 }
 
-.portal-roadmap__count {
-  margin: 0;
-  font-size: var(--ui-font-2xl);
+.wb-progress__count {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  height: 36px;
+  border-radius: var(--ui-radius-m);
+  background: var(--ui-brand-soft);
+  color: var(--ui-brand-strong);
+  font-size: var(--ui-font-md);
   font-weight: var(--ui-weight-semibold);
-  color: var(--ui-text-strong);
+  line-height: var(--ui-leading-num);
 }
 
-.portal-roadmap__title {
-  margin: 0;
-  font-size: var(--ui-font-base);
-  font-weight: var(--ui-weight-semibold);
+.wb-progress__meta {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.wb-progress__title {
+  font-size: var(--ui-font-sm);
+  font-weight: var(--ui-weight-medium);
   line-height: var(--ui-leading-tight);
   color: var(--ui-text-strong);
 }
 
-.portal-roadmap__summary {
-  margin: 0;
+.wb-progress__summary {
   font-size: var(--ui-font-xs);
   line-height: var(--ui-leading-base);
   color: var(--ui-text-soft);
+}
+
+/* 统计卡：两格并排，数字取品牌文字档（白底 6.64:1） */
+.wb-statcard {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--ui-space-3);
+}
+
+.wb-statcard__stat dt {
+  font-size: var(--ui-font-xs);
+  color: var(--ui-text-soft);
+}
+
+.wb-statcard__stat dd {
+  margin: var(--ui-space-1) 0 0;
+  font-size: var(--ui-font-xl);
+  font-weight: var(--ui-weight-semibold);
+  line-height: var(--ui-leading-num);
+  color: var(--ui-brand-strong);
 }
 
 /* ======================================================================
@@ -1569,16 +1543,21 @@
   width: 60%;
 }
 
-.portal-grid__skel {
+.wb-applist__skel {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: var(--ui-space-2);
-  padding: var(--ui-space-3) var(--ui-space-2);
+  gap: var(--ui-space-3);
+  padding: var(--ui-space-2) var(--ui-space-3);
+  border-radius: var(--ui-radius-m);
 }
 
-/* 宫格里的图标骨架与真实瓦片同尺寸（52px），避免加载完成后布局跳动 */
-.portal-grid .ui-skeleton--tile {
-  width: 52px;
-  height: 52px;
+/* 条目骨架与真实条目同形（40px 瓦片 + 行），避免加载完成后布局跳动 */
+.wb-applist__skel .ui-skeleton--tile {
+  width: 40px;
+  height: 40px;
+}
+
+.wb-applist__skel .ui-skeleton--line {
+  flex: 1;
+  height: 14px;
 }

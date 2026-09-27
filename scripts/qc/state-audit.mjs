@@ -270,7 +270,7 @@ const PROBE = String.raw`(() => {
  */
 const HOVER_TARGETS = String.raw`(() => {
   const sigOf = (el) => el.tagName.toLowerCase() + (typeof el.className === 'string' && el.className ? '.' + el.className.trim().split(/\s+/).slice(0, 3).join('.') : '');
-  const SEL = 'a[href], button, [role="button"], [role="menuitem"], [tabindex]:not([tabindex="-1"]), .dtm-segment-item, .portal-appcard, .portal-grid__tile';
+  const SEL = 'a[href], button, [role="button"], [role="menuitem"], [tabindex]:not([tabindex="-1"]), .dtm-segment-item, .portal-appcard, .wb-appitem';
   const INTERACTIVE = 'a[href], button, [role="button"], [role="menuitem"], .dtm-segment-item';
   const seen = new Set();
   const out = [];

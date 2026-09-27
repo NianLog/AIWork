@@ -317,6 +317,15 @@
   color: var(--ui-text-soft);
 }
 
+/*
+ * dtd Avatar 缺省底色 #ccc 上放白色首字母只有 1.61:1（2026-09-28 全页扫描实锤，
+ * admin 顶栏每个页面都命中）。双类提升特指度盖掉组件库默认规则；组件库若显式
+ * 指定了具体色（内联样式）仍会赢过这里，只修「无色可派」的缺省场。
+ */
+.dtd-avatar.dtd-avatar {
+  background-color: var(--ui-brand-strong);
+}
+
 /* 图标瓦片：应用图标、列表前置图标、步骤序号的统一底座 */
 .ui-tile {
   display: inline-flex;
