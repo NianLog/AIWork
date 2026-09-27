@@ -4,8 +4,10 @@ import { defineConfig } from 'vitest/config';
 /**
  * 演示子应用（批次 D，P0-7）。
  *
- * - base 固定 /subapps/：宿主内访问走门户 5173 的同源代理（/subapps → 本 server，
- *   桥接契约「同源直注 window.portal」才能达成）；直接开 5175 也是同一条 base。
+ * - base './'（批次 I，§7.3）：构建产物以相对路径引用资源，平台在发布阶段
+ *   统一重写为 /subapps/{appId}/{version}/ 绝对路径（见 yudao-portal
+ *   PublicPathRewriter）；版本目录因此可任意迁移。dev 仍走门户 5173 的同源
+ *   代理（/subapps → 本 server，桥接契约「同源直注 window.portal」不受影响）。
  * - 5175 strictPort：与门户 5173、admin 5174 错开，根 `pnpm dev` 三服并行。
  * - 独立形态（R3）要真登录：/admin-api 同源转发到 Yudao（演示期与门户共用后端，
  *   真实子应用应指向自己的 backendApi）。
@@ -14,7 +16,7 @@ import { defineConfig } from 'vitest/config';
  */
 export default defineConfig({
   plugins: [vue()],
-  base: '/subapps/',
+  base: './',
   server: {
     host: '127.0.0.1',
     port: 5175,
