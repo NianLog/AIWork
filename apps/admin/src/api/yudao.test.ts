@@ -15,11 +15,12 @@ import {
   readSession,
   updateUser,
   updateApplication,
+  updateDept,
   updateRole,
   updateUserStatus,
 } from './yudao';
 import type { ApiError } from './yudao';
-import type { ApplicationRow, RoleRow, UserRow } from './yudao';
+import type { ApplicationRow, DeptRow, RoleRow, UserRow } from './yudao';
 
 /**
  * 批次 F 核心机制测试（后台副本）：与 apps/portal/src/api/yudao.test.ts 同型
@@ -314,6 +315,30 @@ describe('写通道封装（批次 H）', () => {
       id: 2, name: '巡检管理员-改名', code: 'patrol_admin', sort: 2,
       status: 0, dataScope: 4, remark: '面向巡检团队',
     });
+  });
+
+  it('updateDept 整行展开再覆盖：leaderUserId 为 null 时不上行', async () => {
+    const bodies: Record<string, unknown>[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+        bodies.push(bodyOf(init));
+        return jsonResponse({ code: 0, msg: '', data: true });
+      }),
+    );
+
+    const row: DeptRow = {
+      id: 103, parentId: 100, name: '研发部门', sort: 1, leaderUserId: null,
+      phone: '0755-1000', email: '', status: 0, createTime: 0,
+    };
+    await updateDept(row, { name: '研发中心' });
+
+    expect(bodies).toHaveLength(1);
+    expect(bodies[0]).toMatchObject({
+      id: 103, parentId: 100, name: '研发中心', sort: 1, phone: '0755-1000', email: '',
+    });
+    // null 转 undefined：JSON 序列化丢键，不给后端发显式 null 覆盖
+    expect(bodies[0]).not.toHaveProperty('leaderUserId');
   });
 
   it('assignRoleMenus 发 POST {roleId, menuIds}', async () => {

@@ -180,6 +180,24 @@ const FIXTURE_PERMS = [
   },
 ];
 
+/**
+ * 组织树（后端字段原样）：顶级 1 条 + 子级 2 条，联系方式覆盖邮箱/电话/全空三态。
+ */
+const FIXTURE_DEPTS = [
+  {
+    id: 100, parentId: 0, name: '深圳总公司', sort: 0, leaderUserId: null,
+    phone: '', email: 'hq@example.invalid', status: 0, createTime: 0,
+  },
+  {
+    id: 103, parentId: 100, name: '研发部门', sort: 1, leaderUserId: null,
+    phone: '0755-1000', email: '', status: 0, createTime: 0,
+  },
+  {
+    id: 106, parentId: 100, name: '市场部门', sort: 2, leaderUserId: null,
+    phone: '', email: '', status: 1, createTime: 0,
+  },
+];
+
 function jsonResponse(body: unknown, status = 200) {
   return { ok: status >= 200 && status < 300, status, json: async () => body } as Response;
 }
@@ -203,14 +221,6 @@ function allHrefs() {
 /** 会被浏览器打开的外部地址：绝对 URL 或 .invalid 保留域。 */
 function externalHrefs() {
   return allHrefs().filter((href) => /^https?:/i.test(href) || href.includes('.invalid'));
-}
-
-/** 写意图操作：可访问名里声明了不可用的按钮。 */
-function writeIntentButtons() {
-  return screen.getAllByRole('button').filter((button) => {
-    const name = `${button.textContent ?? ''} ${button.getAttribute('aria-label') ?? ''}`;
-    return /不可用|暂未开放/.test(name);
-  });
 }
 
 function expectBusinessLanguage() {
@@ -422,23 +432,26 @@ describe('应用列表的真实数据通道', () => {
   });
 });
 
-/** 仍是演示数据的页面（批次 H：应用/发布/用户/角色已解禁走真实接口，组织页 Step 5 收）。 */
-const DEMO_PAGE_ROUTES = ['/preview/organizations'];
-
 describe('页面数据行为（批次 H 逐步真实化）', () => {
-  it.each(DEMO_PAGE_ROUTES)('%s 上的写意图按钮全部禁用，点击不产生跳转', async (path) => {
-    openAdmin(path);
-    // 批次 G 起五页全部懒加载（apps 页还要等接口数据）：先等页面挂载、写按钮
-    // 存在再断言——否则同步查询落在骨架期，空数组让「至少一个」断言空转通过
-    await waitFor(() => expect(writeIntentButtons().length).toBeGreaterThan(0));
+  it('组织页走真实接口：上级组织本地映射，联系方式缺省（批次 H）', async () => {
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) =>
+      jsonResponse(
+        String(input).includes('/system/dept/list')
+          ? { code: 0, data: FIXTURE_DEPTS, msg: '' }
+          : { code: 0, data: { list: [], total: 0 }, msg: '' },
+      ),
+    );
+    openAdmin('/preview/organizations');
 
-    const writeButtons = writeIntentButtons();
-    expect(writeButtons.length).toBeGreaterThan(0);
-    writeButtons.forEach((button) => {
-      expect((button as HTMLButtonElement).disabled).toBe(true);
-      fireEvent.click(button);
-    });
-    expect(window.location.pathname).toBe(path);
+    // 名称出现 3 次 = 组织列 1 次 + 两行子部门的「上级组织」映射（锁映射语义）
+    await waitFor(() => expect(screen.getAllByText('深圳总公司').length).toBe(3));
+    // 联系方式：邮箱优先 → 电话 → 「—」；顶级组织上级显示「—」
+    expect(screen.getByText('hq@example.invalid')).toBeTruthy();
+    expect(screen.getByText('0755-1000')).toBeTruthy();
+    expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(2);
+    // 演示期「成员数 / 可用应用数」列已删
+    expect(screen.queryByText('成员数')).toBeNull();
+    expect(screen.queryByText('可用应用数')).toBeNull();
   });
 
   it('应用列表的检索与发布状态筛选作用于接口数据', async () => {

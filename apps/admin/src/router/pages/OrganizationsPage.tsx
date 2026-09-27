@@ -1,30 +1,36 @@
-import { useMemo } from 'react';
-import { Button, Card, Table, Tag } from 'dingtalk-design-desktop';
+import { useMemo, useState } from 'react';
+import { Button, Card, Modal, Table, Tag, message } from 'dingtalk-design-desktop';
 import type { TableColumnsType } from 'dingtalk-design-desktop';
 import { AddOutlined } from 'dd-icons';
-import { DEMO_ORGS_VIEW, STATUS_META } from '../../store/demoDirectory';
-import type { DemoOrganization } from '../../store/demoDirectory';
+import { deleteDept, fetchDepts } from '../../api/yudao';
+import type { DeptRow } from '../../api/yudao';
+import { ENTITY_STATUS_META } from '../../store/domain';
 import RowActions from '../parts/RowActions';
+import { useAdminData } from '../parts/useAdminData';
+import DeptEditDialog from '../parts/DeptEditDialog';
 
 /**
- * 组织列表：组织的层级决定了数据能看到哪一层。
+ * 组织列表（批次 H Step 5 真实化）：/system/dept/list 全量树经 useAdminData 装载。
  *
- * 四态骨架（2026-09-25 批次二）：页面只认 DEMO_ORGS_VIEW 的形状，演示数据永远 success。
+ * 列砍「成员数 / 可用应用数」（接口无来源，演示编造）：真实列是
+ * 组织 / 上级组织（parentId → 名称本地映射，顶级显示「—」）/ 联系方式
+ * （邮箱优先否则电话）/ 状态两态。负责人只有裸 id 无姓名来源，不上屏（批次 H 决策）。
  *
- * 组织数据同样只读；调整组织结构会直接影响每个人的可见范围，
- * 在没有真实数据来源时开放这个入口风险太高，因此一律禁用。
+ * 写操作解禁：新增/编辑（DeptEditDialog，上级组织 TreeSelect 选、编辑时排除
+ * 自己子树防环）、删除（确认后 deleteDept；有下级/有成员会被后端拒绝，如实上屏）。
  *
- * 版式取舍：四条数据范围规则从「标签 + 说明」的竖列表改成两列网格，
- * 每条一句话讲清边界；规则之间是并列关系，并排比纵向堆叠更容易横向比较。
- *
- * 交互（批次四）：成员数可排序（默认最多在前）；分页 10 条一页且单页隐藏；
- * 操作列用 RowActions（文字主操作 + ··· 下拉收纳）。
+ * 下方数据范围说明卡保留（与角色页 ROLE_DATA_SCOPES 同一套口径的科普），
+ * 「仅本人负责的商品」这类演示期文案已修正为本平台语境。
  */
 
 const SCOPE_RULES = [
   {
     name: '全部数据',
     desc: '可以查看整个企业范围内的组织、成员与应用。',
+  },
+  {
+    name: '指定部门',
+    desc: '只能查看明确指定的若干部门的数据，部门列表由角色配置。',
   },
   {
     name: '本部门及以下',
@@ -35,55 +41,64 @@ const SCOPE_RULES = [
     desc: '只能查看自己所在部门的数据，看不到其他部门。',
   },
   {
-    name: '仅本人负责的商品',
-    desc: '只能查看与自己直接相关的商品与素材。',
+    name: '仅本人',
+    desc: '只能查看与自己直接相关的数据。',
   },
 ];
 
 export default function OrganizationsPage() {
-  const view = DEMO_ORGS_VIEW;
+  const { view, reload } = useAdminData(fetchDepts);
 
-  const columns: TableColumnsType<DemoOrganization> = useMemo(
-    () => [
+  const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState<DeptRow | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<DeptRow | null>(null);
+
+  async function confirmDelete() {
+    if (!pendingDelete) return;
+    setBusy(true);
+    try {
+      await deleteDept(pendingDelete.id);
+      message.success('组织已删除。');
+      setPendingDelete(null);
+      reload();
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : '删除没有成功，请稍后再试。');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const columns: TableColumnsType<DeptRow> = useMemo(() => {
+    const nameOf = (id: number) => view.data.find((dept) => dept.id === id)?.name;
+    return [
       {
         title: '组织',
         dataIndex: 'name',
         key: 'name',
-        render: (_, record) => (
-          <span>
-            <span className="ui-cell-title">{record.name}</span>
-            <span className="ui-cell-sub">{record.type}</span>
-          </span>
-        ),
+        render: (value: string) => <span className="ui-cell-title">{value}</span>,
       },
       {
         title: '上级组织',
-        dataIndex: 'parentName',
-        key: 'parentName',
+        dataIndex: 'parentId',
+        key: 'parentId',
         width: 156,
+        render: (value: number) => <span>{nameOf(value) ?? '—'}</span>,
       },
       {
-        title: '成员数',
-        dataIndex: 'memberCount',
-        key: 'memberCount',
-        width: 100,
-        sorter: (a, b) => a.memberCount - b.memberCount,
-        defaultSortOrder: 'descend',
-        render: (value: number) => <span className="ui-num">{value}</span>,
-      },
-      {
-        title: '可用应用数',
-        dataIndex: 'appCount',
-        key: 'appCount',
-        width: 116,
-        render: (value: number) => <span className="ui-num">{value}</span>,
+        title: '联系方式',
+        key: 'contact',
+        width: 176,
+        render: (_, record) => (
+          <span className="ui-num">{record.email || record.phone || '—'}</span>
+        ),
       },
       {
         title: '状态',
         key: 'status',
         width: 108,
         render: (_, record) => {
-          const meta = STATUS_META[record.status];
+          const meta = ENTITY_STATUS_META[record.status];
           return (
             <Tag color={meta.tagColor} size="small">
               {meta.label}
@@ -101,28 +116,20 @@ export default function OrganizationsPage() {
               {
                 key: 'edit',
                 label: '编辑',
-                disabled: true,
-                ariaLabel: `编辑 ${record.name}（暂不可用）`,
-              },
-              {
-                key: 'suborg',
-                label: '调整下级组织',
-                disabled: true,
-                reason: '后台服务尚未接入，暂不可用',
+                ariaLabel: `编辑 ${record.name}`,
+                onClick: () => setEditing(record),
               },
               {
                 key: 'delete',
                 label: '删除组织',
-                disabled: true,
-                reason: '后台服务尚未接入，暂不可用',
+                onClick: () => setPendingDelete(record),
               },
             ]}
           />
         ),
       },
-    ],
-    [],
-  );
+    ];
+  }, [view.data]);
 
   return (
     <div className="ui-page">
@@ -131,8 +138,9 @@ export default function OrganizationsPage() {
           组织是划分数据范围的依据：成员属于哪个组织，就决定了他默认能看到哪些数据。
         </p>
         <div className="ui-pagehead__actions">
-          <Button type="primary" icon={<AddOutlined />} disabled>
-            新增组织（暂不可用）
+          <Button onClick={reload}>刷新</Button>
+          <Button type="primary" icon={<AddOutlined />} onClick={() => setCreating(true)}>
+            新增组织
           </Button>
         </div>
       </div>
@@ -156,15 +164,16 @@ export default function OrganizationsPage() {
                 {view.error ?? '网络暂时没有响应，稍后重试一般就能恢复。'}
               </p>
               <div className="ui-errorstate__actions">
-                <Button onClick={() => window.location.reload()}>重试</Button>
+                <Button onClick={reload}>重试</Button>
               </div>
             </div>
           ) : (
-            <Table<DemoOrganization>
+            <Table<DeptRow>
               rowKey="id"
               columns={columns}
               dataSource={view.data}
               pagination={{ pageSize: 10, hideOnSinglePage: true }}
+              locale={{ emptyText: '还没有组织，先创建一个再给成员分配。' }}
             />
           )}
         </Card>
@@ -184,6 +193,36 @@ export default function OrganizationsPage() {
           </ul>
         </Card>
       </section>
+
+      <DeptEditDialog
+        open={creating || editing !== null}
+        dept={editing}
+        onClose={() => {
+          setCreating(false);
+          setEditing(null);
+        }}
+        onSaved={() => {
+          setCreating(false);
+          setEditing(null);
+          reload();
+        }}
+      />
+
+      {/* 删除确认：存在下级或成员时后端拒绝，报错按真实口径上屏 */}
+      <Modal
+        open={pendingDelete !== null}
+        title="删除组织"
+        okText="确认删除"
+        cancelText="取消"
+        confirmLoading={busy}
+        onOk={confirmDelete}
+        onCancel={() => setPendingDelete(null)}
+      >
+        <p>
+          删除后「{pendingDelete?.name}」下的成员归属需要重新安排。
+          仍有下级组织或成员时后端会拒绝删除。确定要删除吗？
+        </p>
+      </Modal>
     </div>
   );
 }
