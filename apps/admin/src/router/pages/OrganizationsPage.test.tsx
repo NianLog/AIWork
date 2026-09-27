@@ -99,7 +99,8 @@ describe('组织页真实化（批次 H Step 5）', () => {
 
     await waitFor(() =>
       expect(createDept).toHaveBeenCalledWith(
-        expect.objectContaining({ name: '巡检组', parentId: 103, sort: 0 }),
+        // status 显式传 0：SaveReqVO @NotNull，缺省 400「状态不能为空」（e2e 实证锁死）
+        expect.objectContaining({ name: '巡检组', parentId: 103, sort: 0, status: 0 }),
       ),
     );
     // 刷新动线 = 页面挂载 + 对话框开（拉上级组织树）+ 保存后 reload，共 3 次

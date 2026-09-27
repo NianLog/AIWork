@@ -617,6 +617,12 @@ export interface DeptInput {
   parentId: number;
   name: string;
   sort: number;
+  /**
+   * Yudao DeptSaveReqVO 的 status @NotNull（2026-09-27 e2e 实证：create/update
+   * 缺省均 400「状态不能为空」）。创建动线没有状态开关，调用方显式传 0（启用）；
+   * 编辑走 updateDept 整行展开保活 row.status，不经 patch 修改。
+   */
+  status?: CommonStatus;
   phone?: string;
   email?: string;
   leaderUserId?: number;
@@ -637,6 +643,8 @@ export async function updateDept(row: DeptRow, patch: Partial<DeptInput>): Promi
       parentId: row.parentId,
       name: row.name,
       sort: row.sort,
+      // SaveReqVO @NotNull：不带上这行，编辑组织会 400「状态不能为空」（e2e 实证）
+      status: row.status,
       phone: row.phone,
       email: row.email,
       leaderUserId: row.leaderUserId ?? undefined,

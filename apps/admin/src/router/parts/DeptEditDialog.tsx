@@ -103,6 +103,9 @@ export default function DeptEditDialog({ open, dept, onClose, onSaved }: DeptEdi
           name: name.trim(),
           parentId,
           sort: 0,
+          // Yudao DeptSaveReqVO 的 status @NotNull（e2e 实证：缺省即 400「状态不能为空」），
+          // 创建动线没有状态开关，创建即启用。
+          status: 0,
           phone: phone.trim(),
           email: email.trim(),
         });

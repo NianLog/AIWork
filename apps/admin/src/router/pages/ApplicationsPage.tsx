@@ -88,7 +88,9 @@ export default function ApplicationsPage() {
     setChannelTarget(row);
     setChannelMode(row.channel === 'canary' ? 'canary' : 'stable');
     setCanaryVersion(row.canaryVersion ?? '');
-    setCanaryRatio(row.canaryRatio ?? 10);
+    // `|| 10` 而非 `?? 10`：ApplicationRow 把无试运行配置归一成 0（null 不会出现），
+    // 正式版应用首次切试运行要给 10% 起步值，否则预填 0% 违反 InputNumber min=1
+    setCanaryRatio(row.canaryRatio || 10);
   }
 
   async function confirmChannel() {

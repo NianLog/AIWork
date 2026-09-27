@@ -335,7 +335,10 @@ describe('写通道封装（批次 H）', () => {
 
     expect(bodies).toHaveLength(1);
     expect(bodies[0]).toMatchObject({
-      id: 103, parentId: 100, name: '研发中心', sort: 1, phone: '0755-1000', email: '',
+      id: 103, parentId: 100, name: '研发中心', sort: 1,
+      // status 保活上行：SaveReqVO @NotNull，漏带即 400「状态不能为空」（e2e 实证）
+      status: 0,
+      phone: '0755-1000', email: '',
     });
     // null 转 undefined：JSON 序列化丢键，不给后端发显式 null 覆盖
     expect(bodies[0]).not.toHaveProperty('leaderUserId');
