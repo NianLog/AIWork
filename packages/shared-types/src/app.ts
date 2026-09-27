@@ -3,6 +3,7 @@
  */
 import type { AppFramework, SandboxMode } from './manifest';
 import type { MicroAppPermission } from './manifest';
+import type { PortalSDK } from './sdk';
 
 /** 应用运行时配置，驱动容器动态渲染 */
 export interface AppRuntimeConfig {
@@ -51,10 +52,16 @@ export interface AppInstance {
   reload(): Promise<void>;
 }
 
-/** 容器适配器统一接口 */
+/**
+ * 容器适配器统一接口。
+ *
+ * mount 接收宿主提供的挂载节点与宿主 PortalSDK 实例：挂载点由 React 层（AppMount）
+ * 持有，宿主桥由门户会话层构造——适配器只负责传输，不组装身份（auth-injection 契约：
+ * props 快照在 store 层拼装，token 一律走 portal.auth.getToken()）。
+ */
 export interface ContainerAdapter {
   /** 挂载应用，返回应用实例 */
-  mountApp(cfg: AppRuntimeConfig): Promise<AppInstance>;
+  mountApp(cfg: AppRuntimeConfig, mount: HTMLElement, hostPortal: PortalSDK): Promise<AppInstance>;
   /** 卸载应用 */
   unmountApp(appId: string): Promise<void>;
 }
@@ -64,11 +71,14 @@ export interface AppRegistry {
   appId: string;
   name: string;
   entry: string;
+  /** 网关按 /api/{appId}/** 代理的目标后端地址（§9.1 sys_app.backend_api；2026-09-25 契约补齐） */
+  backendApi: string;
   baseRoute: string;
   framework: AppFramework;
   sandbox: SandboxMode;
   version: string;
   icon?: string;
-  status: number; // 1=启用 0=禁用
+  /** 0=启用 1=停用（对齐后端 CommonStatusEnum；2026-09-26 批次 C 从「1=启用」翻转为后端口径，换算收敛点全部删除） */
+  status: number;
   permissions: MicroAppPermission[];
 }

@@ -66,6 +66,13 @@ jobs:
       - name: 单元测试
         run: pnpm test
 
+      - name: 决策笔记校验
+        env:
+          AGENT_NOTE_ARCHIVE_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          pnpm notes:verify
+          pnpm notes index --check
+
       - name: 构建双前端
         run: pnpm build
 

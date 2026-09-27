@@ -1,15 +1,24 @@
 // @vitest-environment jsdom
 // 测试中的凭据和会话仅用于隔离验证，不参与生产身份认证。
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { PortalSDK } from '@ai-portal/shared-types';
+import type { AppRuntimeProps, PortalSDK } from '@ai-portal/shared-types';
 import {
   bootstrapPortal,
   bootstrapStandalone,
+  PORTAL_READY_EVENT,
+  waitForHost,
+  isFramedWindow,
   type BootstrapOptions,
   type PortalHandle,
   type StandaloneHandle,
   type StandaloneSession,
 } from '../src/index';
+
+/**
+ * 批次 C（2026-09-26）起 bootstrapPortal 是异步的：宿主在 iframe load 之后才注入
+ * window.portal，子应用脚本必然先执行——被嵌入的窗口必须有界等待。所有
+ * hosted 路径的用例都 await；顶层窗口无宿主时立即走独立壳，不多等一毫秒。
+ */
 
 const APP = 'ai-image';
 const CODE = 'ai-image:task:create';
@@ -21,6 +30,7 @@ const handles: PortalHandle[] = [];
 const runtime = window as Window & {
   __MICRO_APP_ENVIRONMENT__?: boolean;
   microApp?: { getData(): unknown };
+  __PORTAL_PROPS__?: unknown;
 };
 
 function session(overrides: Partial<StandaloneSession> = {}): StandaloneSession {
@@ -43,6 +53,11 @@ function deferred<T>() {
 function track<T extends PortalHandle>(handle: T): T {
   handles.push(handle);
   return handle;
+}
+
+/** async 化后的便捷入口：宿主在场的 hosted 用例统一走这里。 */
+async function hosted(options: Partial<BootstrapOptions> = {}): Promise<PortalHandle> {
+  return track(await bootstrapPortal({ appId: APP, ...options }));
 }
 
 function start(options: Partial<BootstrapOptions> = {}): StandaloneHandle {
@@ -85,6 +100,7 @@ beforeEach(() => {
   delete window.portal;
   delete runtime.microApp;
   delete runtime.__MICRO_APP_ENVIRONMENT__;
+  delete runtime.__PORTAL_PROPS__;
 });
 
 afterEach(() => {
@@ -94,6 +110,7 @@ afterEach(() => {
   delete window.portal;
   delete runtime.microApp;
   delete runtime.__MICRO_APP_ENVIRONMENT__;
+  delete runtime.__PORTAL_PROPS__;
   document.body.replaceChildren();
 });
 
@@ -102,7 +119,7 @@ describe('宿主检测与桥接', () => {
     const { host } = hostFixture();
     window.portal = host;
     runtime.microApp = { getData: () => { throw new Error('不应读取备用桥接'); } };
-    const handle = track(bootstrapPortal({ appId: APP }));
+    const handle = await hosted();
     expect(handle.mode).toBe('hosted');
     expect(handle.container.isConnected).toBe(true);
     expect(document.querySelector('form')).toBeNull();
@@ -110,6 +127,22 @@ describe('宿主检测与桥接', () => {
     await expect(handle.sdk.invoke('device.test', {})).resolves.toEqual({ ok: true });
     handle.sdk.navigate({ appId: 'ai-video', path: '/tasks' });
     expect(host.navigate).toHaveBeenCalledWith({ appId: 'ai-video', path: '/tasks' });
+  });
+
+  it('宿主在挂载期写入的身份快照经 props 透出，token 仍走原语', async () => {
+    const { host } = hostFixture();
+    window.portal = host;
+    const props: AppRuntimeProps = {
+      token: 'snapshot-token',
+      user: { userId: '7', username: 'admin', nickname: '联调管理员', roles: ['common'] },
+      permissions: [CODE],
+    };
+    runtime.__PORTAL_PROPS__ = props;
+    const handle = await hosted();
+    if (handle.mode !== 'hosted') throw new Error('应当以 hosted 模式启动');
+    expect(handle.props).toBe(props);
+    // props 只是首屏快照：取新 token 一律走宿主原语，不信任快照。
+    await expect(handle.sdk.auth.getToken()).resolves.toBe('host-token');
   });
 
   it.each([
@@ -139,10 +172,10 @@ describe('宿主检测与桥接', () => {
     '/tasks%20',
     '/%',
     '',
-  ])('宿主导航拒绝不安全路径且不调用宿主：%s', (path) => {
+  ])('宿主导航拒绝不安全路径且不调用宿主：%s', async (path) => {
     const { host } = hostFixture();
     window.portal = host;
-    const handle = track(bootstrapPortal({ appId: APP }));
+    const handle = await hosted();
     const before = location.href;
     expect(() => handle.sdk.navigate({ appId: 'ai-video', path })).toThrow(/路径/);
     // 宿主导航是外部跳转边界，非法输入必须在调用该边界前被拒绝。
@@ -156,10 +189,10 @@ describe('宿主检测与桥接', () => {
     ['settings', '/settings'],
     ['tasks?sort=new#recent', '/tasks?sort=new#recent'],
     ['/tasks/%E4%BB%BB%E5%8A%A1', '/tasks/%E4%BB%BB%E5%8A%A1'],
-  ])('宿主导航按独立模式规范化合法路径：%s', (path, expected) => {
+  ])('宿主导航按独立模式规范化合法路径：%s', async (path, expected) => {
     const { host } = hostFixture();
     window.portal = host;
-    const handle = track(bootstrapPortal({ appId: APP }));
+    const handle = await hosted();
     const target = { appId: 'ai-video', path };
     handle.sdk.navigate(target);
     expect(host.navigate).toHaveBeenCalledTimes(1);
@@ -170,10 +203,10 @@ describe('宿主检测与桥接', () => {
   it.each([
     { appId: 'ai-video' },
     { appId: 'ai-video', path: undefined },
-  ])('宿主导航保留省略或显式 undefined 路径的契约：%o', (target) => {
+  ])('宿主导航保留省略或显式 undefined 路径的契约：%o', async (target) => {
     const { host } = hostFixture();
     window.portal = host;
-    const handle = track(bootstrapPortal({ appId: APP }));
+    const handle = await hosted();
     handle.sdk.navigate({ ...target });
     expect(host.navigate).toHaveBeenCalledTimes(1);
     expect(vi.mocked(host.navigate).mock.calls[0]?.[0]).toStrictEqual(target);
@@ -183,13 +216,13 @@ describe('宿主检测与桥接', () => {
     const { host } = hostFixture();
     runtime.__MICRO_APP_ENVIRONMENT__ = true;
     runtime.microApp = { getData: () => ({ portal: host }) };
-    const handle = track(bootstrapPortal({ appId: APP }));
+    const handle = await hosted();
     expect(handle.mode).toBe('hosted');
     await expect(handle.sdk.auth.getToken()).resolves.toBe('host-token');
   });
 
-  it('无宿主时自动创建独立导航、登录入口和内容容器', () => {
-    const handle = track(bootstrapPortal({ appId: APP }));
+  it('无宿主时自动创建独立导航、登录入口和内容容器', async () => {
+    const handle = await hosted();
     expect(handle.mode).toBe('standalone');
     expect(document.querySelector('nav')).not.toBeNull();
     expect(document.querySelector('form')).not.toBeNull();
@@ -197,21 +230,21 @@ describe('宿主检测与桥接', () => {
     expect(handle.container.isConnected).toBe(true);
   });
 
-  it('有环境标记但无桥接时明确失败且不挂载独立壳', () => {
+  it('有环境标记但无桥接时明确失败且不挂载独立壳', async () => {
     runtime.__MICRO_APP_ENVIRONMENT__ = true;
-    expect(() => bootstrapPortal({ appId: APP })).toThrow(/桥接/);
+    await expect(bootstrapPortal({ appId: APP })).rejects.toThrow(/桥接/);
     expect(document.body.childElementCount).toBe(0);
   });
 
-  it('读取注入数据失败时不静默降级', () => {
+  it('读取注入数据失败时不静默降级', async () => {
     runtime.microApp = { getData: () => { throw new Error('数据不可读'); } };
-    expect(() => bootstrapPortal({ appId: APP })).toThrow(/桥接/);
+    await expect(bootstrapPortal({ appId: APP })).rejects.toThrow(/桥接/);
     expect(document.body.childElementCount).toBe(0);
   });
 
-  it('拒绝残缺宿主对象', () => {
+  it('拒绝残缺宿主对象', async () => {
     window.portal = {} as PortalSDK;
-    expect(() => bootstrapPortal({ appId: APP })).toThrow(/桥接/);
+    await expect(bootstrapPortal({ appId: APP })).rejects.toThrow(/桥接/);
   });
 
   it('显式独立启动不能绕过 micro-app 环境标记', () => {
@@ -219,15 +252,15 @@ describe('宿主检测与桥接', () => {
     expect(() => bootstrapStandalone({ appId: APP })).toThrow(/桥接/);
   });
 
-  it('拒绝非法应用标识', () => {
-    expect(() => bootstrapPortal({ appId: '../other' })).toThrow(/appId/);
+  it('拒绝非法应用标识', async () => {
+    await expect(bootstrapPortal({ appId: '../other' })).rejects.toThrow(/appId/);
     expect(document.body.childElementCount).toBe(0);
   });
 
-  it('宿主权限仅接受本应用合法码并尊重宿主拒绝', () => {
+  it('宿主权限仅接受本应用合法码并尊重宿主拒绝', async () => {
     const { host } = hostFixture();
     window.portal = host;
-    const handle = track(bootstrapPortal({ appId: APP }));
+    const handle = await hosted();
     expect(handle.sdk.permission.can(CODE)).toBe(true);
     expect(handle.sdk.permission.can('other-app:task:create')).toBe(false);
     expect(handle.sdk.permission.can('ai-image:task:*')).toBe(false);
@@ -235,18 +268,18 @@ describe('宿主检测与桥接', () => {
     expect(handle.sdk.permission.can(CODE)).toBe(false);
   });
 
-  it('复用并修改启动配置不会改变本实例的权限命名空间', () => {
+  it('复用并修改启动配置不会改变本实例的权限命名空间', async () => {
     const { host } = hostFixture();
     vi.mocked(host.permission.can).mockReturnValue(true);
     window.portal = host;
     const options = { appId: APP };
-    const handle = track(bootstrapPortal(options));
+    const handle = track(await bootstrapPortal(options));
     options.appId = 'ai-video';
     expect(handle.sdk.permission.can(CODE)).toBe(true);
     expect(handle.sdk.permission.can('ai-video:task:create')).toBe(false);
   });
 
-  it('宿主销毁只清理本实例订阅和自建内容节点', () => {
+  it('宿主销毁只清理本实例订阅和自建内容节点', async () => {
     const { host, handlers } = hostFixture();
     window.portal = host;
     const mount = document.createElement('section');
@@ -255,7 +288,7 @@ describe('宿主检测与桥接', () => {
     document.body.append(mount);
     const external = vi.fn();
     host.event.on(EVENT, external);
-    const handle = track(bootstrapPortal({ appId: APP, mount }));
+    const handle = await hosted({ mount });
     const own = vi.fn();
     handle.sdk.event.on(EVENT, own);
     handle.destroy();
@@ -274,12 +307,50 @@ describe('宿主检测与桥接', () => {
     const { host } = hostFixture();
     host.auth.getToken = () => pending.promise;
     window.portal = host;
-    const handle = track(bootstrapPortal({ appId: APP }));
+    const handle = await hosted();
     const result = handle.sdk.auth.getToken();
     handle.destroy();
     pending.resolve('late-host-token');
     await expect(result).rejects.toThrow(/销毁/);
     expect(handle.sdk.permission.can(CODE)).toBe(false);
+  });
+});
+
+describe('waitForHost 有界等待（auth-injection 契约）', () => {
+  it('portal:ready 事件立即唤醒等待者', async () => {
+    const { host } = hostFixture();
+    const waiting = waitForHost();
+    // 宿主在 iframe load 后写入 portal 并派发事件——SDK 已在监听。
+    window.portal = host;
+    window.dispatchEvent(new Event(PORTAL_READY_EVENT));
+    await expect(waiting).resolves.toBe(host);
+  });
+
+  it('事件失灵时 250ms 轮询兜底仍能等到注入', async () => {
+    const { host } = hostFixture();
+    const waiting = waitForHost();
+    window.portal = host;
+    await vi.advanceTimersByTimeAsync(250);
+    await expect(waiting).resolves.toBe(host);
+  });
+
+  it('超时明确拒绝，绝不假装拿到宿主', async () => {
+    const expectation = expect(waitForHost({ timeoutMs: 5_000 })).rejects.toThrow(
+      '宿主桥接缺失：等待宿主注入 portal 超时',
+    );
+    await vi.advanceTimersByTimeAsync(5_000);
+    await expectation;
+  });
+
+  it('残缺桥接不立即失败：继续等到超时，给宿主重写合法 portal 的机会', async () => {
+    window.portal = {} as PortalSDK;
+    const expectation = expect(waitForHost({ timeoutMs: 5_000 })).rejects.toThrow(/超时/);
+    await vi.advanceTimersByTimeAsync(5_000);
+    await expectation;
+  });
+
+  it('jsdom 顶层窗口按未嵌入处理', () => {
+    expect(isFramedWindow()).toBe(false);
   });
 });
 

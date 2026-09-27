@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>子应用桥接自检</title>
+<style>
+  /* 版式目标：任意视口都铺满画布（被门户嵌入时即整个容器）——
+     main 占满高、单列卡片纵向均分剩余高度、横向去 max-width 改用 5vw 留白。
+     此前 max-width:560px + 居中，在大屏工作区里内容缩成中间一小块灰底包围。 */
+  html, body { height: 100%; }
+  body { margin: 0; font: 16px/1.7 -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; color: #1f2329; background: #f7f8fa; }
+  main { box-sizing: border-box; min-height: 100%; display: flex; flex-direction: column; padding: 24px 5vw; }
+  h1 { font-size: 20px; margin: 0 0 12px; }
+  #status { font-weight: 600; }
+  #status.ok { color: #0c7c43; }
+  #status.bad { color: #b25404; }
+  ul { list-style: none; padding: 0; margin: 12px 0 0; flex: 1; display: flex; flex-direction: column; }
+  li { flex: 1; display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; margin: 4px 0; background: #fff; border: 1px solid #e5e6eb; border-radius: 10px; }
+  li b { font-weight: 600; flex: none; }
+  li span { text-align: right; word-break: break-all; }
+</style>
+</head>
+<body>
+<main>
+  <h1>子应用桥接自检页</h1>
+  <p>这个页面用于验证门户容器与宿主桥：把它作为入口地址配置到应用清单，再从门户工作区打开。
+     独立直接打开时应显示「未检测到宿主」，属正常。本页不被构建处理（public 原样拷贝），
+     脚本保持 ES5 写法以兼容 iOS 12 目标。</p>
+  <p id="status" role="status">正在等待宿主注入（最多 5 秒）…</p>
+  <ul id="checks"></ul>
+</main>
+<script>
+(function () {
+  'use strict';
+  var statusEl = document.getElementById('status');
+  var checksEl = document.getElementById('checks');
+  var items = [
+    ['窗口形态', ''],
+    ['宿主桥接', ''],
+    ['身份令牌', '—'],
+    ['权限判断', '—'],
+    ['跨应用导航', '—'],
+    ['钉钉能力', '—']
+  ];
+  function isPortal(value) {
+    return !!value && typeof value === 'object' &&
+      typeof value.auth === 'object' && typeof value.auth.getToken === 'function' &&
+      typeof value.permission === 'object' && typeof value.permission.can === 'function' &&
+      typeof value.event === 'object' && typeof value.event.on === 'function' &&
+      typeof value.navigate === 'function' && typeof value.invoke === 'function';
+  }
+  function textOf(error) {
+    if (error && error.message) return error.message;
+    return String(error);
+  }
+  function draw() {
+    checksEl.innerHTML = '';
+    for (var i = 0; i < items.length; i++) {
+      var li = document.createElement('li');
+      var b = document.createElement('b');
+      b.textContent = items[i][0];
+      var span = document.createElement('span');
+      span.textContent = items[i][1];
+      li.appendChild(b);
+      li.appendChild(span);
+      checksEl.appendChild(li);
+    }
+  }
+  function render(portal) {
+    items[0][1] = window.self === window.top ? '顶层窗口（独立打开）' : '被门户嵌入';
+    items[1][1] = portal ? '已接通（window.portal）' : '未检测到宿主';
+    statusEl.textContent = portal ? '宿主桥接已接通' : '未检测到宿主（独立打开时属正常）';
+    statusEl.className = portal ? 'ok' : 'bad';
+    if (portal) {
+      items[3][1] = '可用';
+      items[4][1] = '可用';
+      portal.auth.getToken().then(function (token) {
+        items[2][1] = '已取得（长度 ' + String(token).length + '）';
+        draw();
+      }, function (error) {
+        items[2][1] = '未取得：' + textOf(error);
+        draw();
+      });
+      portal.invoke('probe.ping', {}).then(function () {
+        items[5][1] = '不应成功（JSAPI 未接入）';
+        draw();
+      }, function (error) {
+        items[5][1] = '按预期拒绝：' + textOf(error);
+        draw();
+      });
+    }
+    draw();
+  }
+  var deadline = Date.now() + 5000;
+  function poll() {
+    if (window.portal && isPortal(window.portal)) { render(window.portal); return; }
+    if (Date.now() >= deadline) { render(null); return; }
+    window.setTimeout(poll, 100);
+  }
+  window.addEventListener('portal:ready', function () {
+    if (window.portal && isPortal(window.portal)) render(window.portal);
+  });
+  poll();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,219 @@
+/*
+ * 演示子应用自持样式：刻意不依赖门户的 ui-tokens（子应用独立于门户设计系统正是
+ * 演示的一部分）。硬性要求：铺满画布——被门户嵌入时就是整个 iframe 容器
+ * （批次 C 探针页教训：布局验收量两层，元素盒与内容盒）。
+ *
+ * SDK 的挂载容器 main[data-portal-content] 由 SDK 追加到 body（不在 #app 里），
+ * 高度链必须显式接到它：html/body 100% → 容器 100% → .board 100%。
+ */
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font: 15px/1.6 -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  color: #1f2329;
+  background: #f7f8fa;
+}
+
+[data-portal-content] {
+  height: 100%;
+}
+
+.board {
+  box-sizing: border-box;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 20px clamp(16px, 4vw, 48px);
+}
+
+.board__bar {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex: none;
+}
+
+.board__bar h1 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.board__mode {
+  font-size: 13px;
+  color: #0c7c43;
+  background: #e8f5ee;
+  border-radius: 999px;
+  padding: 2px 10px;
+}
+
+.board__who {
+  font-size: 13px;
+  color: #4e5969;
+  margin-left: auto;
+}
+
+.board__panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.board__sdk {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 12px 14px;
+  list-style: none;
+  background: #fff;
+  border: 1px solid #e5e6eb;
+  border-radius: 10px;
+}
+
+.board__sdk li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #4e5969;
+}
+
+.board__sdk li b {
+  font-weight: 600;
+  color: #1f2329;
+}
+
+.board__sdk .is-ok { color: #0c7c43; }
+.board__sdk .is-bad { color: #b25404; }
+
+.board__tasks {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border: 1px solid #e5e6eb;
+  border-radius: 10px;
+  padding: 14px;
+}
+
+.board__add {
+  display: flex;
+  gap: 8px;
+  flex: none;
+}
+
+.board__add input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid #e5e6eb;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font: inherit;
+}
+
+.board__add button,
+.board__row button,
+.board__sdk button {
+  border: 0;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font: inherit;
+  cursor: pointer;
+  background: #1f6fff;
+  color: #fff;
+}
+
+button[disabled] {
+  background: #f2f3f5;
+  color: #a9aeb8;
+  cursor: not-allowed;
+}
+
+.board__deny {
+  font-size: 12px;
+  color: #b25404;
+  align-self: center;
+  margin-left: 8px;
+}
+
+.board__list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.board__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: #f7f8fa;
+  border-radius: 8px;
+}
+
+.board__row span {
+  flex: 1;
+  min-width: 0;
+  word-break: break-all;
+}
+
+.board__row button {
+  background: transparent;
+  color: #b25404;
+  padding: 4px 10px;
+}
+
+/* 独立壳铺满（批次 D）：SDK 壳的 section 高度是 auto，[data-portal-content]
+   的 height:100% 对 auto 父级不解析，看板只会占内容高（探针页教训的独立形态
+   翻版）。壳本体无样式，由子应用补：section 拉满视口 + 纵向 flex，内容区
+   flex:1；宿主形态没有 [data-portal-standalone] 祖先，仍走 height:100% 路径。 */
+[data-portal-standalone] {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+[data-portal-standalone] > header {
+  flex: none;
+}
+
+[data-portal-standalone] > [data-portal-content] {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+/* .board 的 height:100% 对 height:auto 的 flex 项父级不解析（工作区 iframe
+   同源教训），这里改用 flex 拉伸铺满，不依赖百分比高度。 */
+[data-portal-standalone] > [data-portal-content] > .board {
+  flex: 1;
+}
+
+.board__listnote {
+  margin: 12px 0 0;
+  font-size: 13px;
+  color: #86909c;
+}
+
+.board__creator {
+  font-size: 12px;
+  color: #86909c;
+  white-space: nowrap;
+}
