@@ -1,51 +1,32 @@
-import { useNavigate } from 'react-router-dom';
-import { Button, Card, Input, InputNumber, Radio, Select, Steps } from 'dingtalk-design-desktop';
-import { AddOutlined, CheckOutlined, DeleteOutlined, InProcessOutlined } from 'dd-icons';
-import { DEMO_ORGANIZATIONS } from '../../store/demoDirectory';
+import { useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { Button, Card, Input, InputNumber, Radio, Select, Steps, message } from 'dingtalk-design-desktop';
+import { createApplication, updateApplication } from '../../api/yudao';
+import type { ApplicationRow } from '../../api/yudao';
 
 /**
- * 应用发布：业务团队自助提交新应用的入口。
+ * 应用发布（批次 H Step 2 真实化）：受控表单直连 portal-app/create；
+ * 应用列表的「编辑」带整行记录经 location.state 跳进来，同一张表单走
+ * updateApplication（整行展开再覆盖，防字段清空）。刷新丢 state 回新建模式，
+ * 是可接受的简化（拒绝为它引入全局 store，见批次 H 笔记 Alternatives 2）。
  *
- * 整张表单以示例内容呈现且全部禁用——发布链路还没有后台服务，
- * 让人在这里填完一整页再告诉他保存不了，比一开始就说明不可用更糟。
- * 提交与检查按钮同样禁用，表单提交不产生任何跳转。
+ * 字段取舍：只保留后端真实存在的字段（演示期的负责团队/功能分类/可见范围/
+ * 应用介绍/功能清单编辑器无后端落点，全部删除——「能填但存不了」比没有更糟）。
+ * 装载方式固定 iframe（当前唯一在用的方式，值不进界面文案）。
  *
- * 版式取舍：
- * - 页面顶部一句话讲清「这是一页填写示例、现在保存不了」，表单本身不再靠灰掉的控件
- *   暗示；原来这句话压在表单底部的按钮旁边，用户要先滚到底才知道为什么点了没反应；
- * - 字段栅格与右侧说明栏分开：左边只放要填的东西，右边放流程与发布方式说明；
- * - 功能清单每行末尾加一个禁用删除按钮，让「这里以后可以增删」的结构看得见；
- * - 右侧「发布方式说明」三条并列，不再用一个无序列表面板堆文字。
+ * 版式沿用批次二：字段栅格与右侧说明栏分开；右侧「发布流程/发布方式说明」
+ * 与左侧表单同屏，让第一次发布的人不离开页面就明白两种方式的差别。
  */
 
-const TEAM_OPTIONS = DEMO_ORGANIZATIONS.filter((org) => org.type !== '临时').map((org) => ({
-  value: org.name,
-  label: org.name,
-}));
-
-const CATEGORY_OPTIONS = [
-  { value: 'image', label: '图像生成' },
-  { value: 'video', label: '视频生成' },
-  { value: 'review', label: '内容审核' },
-  { value: 'asset', label: '素材管理' },
-  { value: 'insight', label: '数据分析' },
-];
-
-const SCOPE_OPTIONS = [
-  { value: 'all', label: '全员可见' },
-  { value: 'org', label: '指定组织可见' },
-  { value: 'role', label: '指定角色可见' },
-];
-
-const SAMPLE_FUNCTIONS = [
-  { name: '创建生图任务', desc: '选择商品图与风格模板，提交生成' },
-  { name: '导出成品图', desc: '把生成结果下载或推送到素材库' },
+const FRAMEWORK_OPTIONS = [
+  { value: 'react', label: 'React' },
+  { value: 'vue3', label: 'Vue 3' },
 ];
 
 const PUBLISH_STEPS = [
-  { title: '提交应用信息', description: '填写名称、介绍与这个应用能做的事' },
-  { title: '审核与检查', description: '平台确认内容与可见范围是否合适' },
-  { title: '发布上线', description: '通过后出现在应用市场，成员即可使用' },
+  { title: '提交应用信息', description: '填写名称、版本与访问地址' },
+  { title: '平台登记', description: '系统登记应用与路由信息' },
+  { title: '发布上线', description: '出现在应用市场，成员即可使用' },
 ];
 
 const RELEASE_MODES = [
@@ -55,121 +36,250 @@ const RELEASE_MODES = [
   },
   {
     title: '正式发布',
-    desc: '一次性开放给可见范围内的全部成员，适合已经在其他渠道验证过的应用。',
-  },
-  {
-    title: '停用',
-    desc: '应用从应用市场下架，已经在使用的人会看到「已停用」提示，不会再有新成员进入。',
+    desc: '一次性开放给全部成员，适合已经在其他渠道验证过的应用。',
   },
 ];
 
+interface PublishForm {
+  appId: string;
+  name: string;
+  version: string;
+  framework: string;
+  entry: string;
+  backendApi: string;
+  baseRoute: string;
+  mode: 'stable' | 'canary';
+  canaryVersion: string;
+  canaryRatio: number;
+}
+
+/** 必填项：键与提示名，缺哪个就点名哪个。 */
+const REQUIRED_FIELDS: Array<{ key: keyof PublishForm; label: string }> = [
+  { key: 'appId', label: '应用标识' },
+  { key: 'name', label: '应用名称' },
+  { key: 'version', label: '版本号' },
+  { key: 'entry', label: '访问入口' },
+  { key: 'backendApi', label: '后端服务地址' },
+  { key: 'baseRoute', label: '路由前缀' },
+];
+
+function initialForm(row?: ApplicationRow): PublishForm {
+  if (row) {
+    return {
+      appId: row.appId,
+      name: row.name,
+      version: row.version,
+      framework: row.framework || 'react',
+      entry: row.entry,
+      backendApi: row.backendApi,
+      baseRoute: row.baseRoute,
+      mode: row.channel === 'canary' ? 'canary' : 'stable',
+      canaryVersion: row.canaryVersion ?? '',
+      canaryRatio: row.canaryRatio ?? 10,
+    };
+  }
+  return {
+    appId: '',
+    name: '',
+    version: '',
+    framework: 'react',
+    entry: '',
+    backendApi: '',
+    baseRoute: '',
+    mode: 'stable',
+    canaryVersion: '',
+    canaryRatio: 10,
+  };
+}
+
 export default function PublishPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const editing = (location.state as { app?: ApplicationRow } | null)?.app;
+  const [form, setForm] = useState<PublishForm>(() => initialForm(editing));
+  const [submitting, setSubmitting] = useState(false);
+
+  const setField = (key: keyof PublishForm, value: string | number) =>
+    setForm((prev) => ({ ...prev, [key]: value }));
+
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    if (submitting) return;
+    const missing = REQUIRED_FIELDS.filter((field) => !String(form[field.key]).trim()).map(
+      (field) => field.label,
+    );
+    if (form.mode === 'canary' && !form.canaryVersion.trim()) {
+      missing.push('试运行版本');
+    }
+    if (missing.length > 0) {
+      message.warning(`请先填写：${missing.join('、')}。`);
+      return;
+    }
+    setSubmitting(true);
+    try {
+      if (editing) {
+        await updateApplication(editing, {
+          name: form.name.trim(),
+          version: form.version.trim(),
+          framework: form.framework,
+          entry: form.entry.trim(),
+          backendApi: form.backendApi.trim(),
+          baseRoute: form.baseRoute.trim(),
+          ...(form.mode === 'canary'
+            ? { canaryVersion: form.canaryVersion.trim(), canaryRatio: form.canaryRatio }
+            : { canaryVersion: '', canaryRatio: 0 }),
+        });
+        message.success('应用信息已保存。');
+      } else {
+        await createApplication({
+          appId: form.appId.trim(),
+          name: form.name.trim(),
+          version: form.version.trim(),
+          framework: form.framework,
+          entry: form.entry.trim(),
+          backendApi: form.backendApi.trim(),
+          baseRoute: form.baseRoute.trim(),
+          sandbox: 'iframe',
+          ...(form.mode === 'canary'
+            ? { canaryVersion: form.canaryVersion.trim(), canaryRatio: form.canaryRatio }
+            : {}),
+          status: 0,
+        });
+        message.success('应用已提交，随后出现在应用市场。');
+      }
+      navigate('/preview/apps');
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : '提交没有成功，请稍后再试。');
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   return (
     <div className="ui-page">
       <div className="admin-toolbar-row">
         <p className="ui-pagehead__lead">
-          填写应用的基本信息并提交，审核通过后就会出现在应用市场。下面是一页填写示例。
+          {editing
+            ? `正在编辑「${editing.name}」的应用信息，保存后立即生效。`
+            : '填写应用的基本信息并提交，新应用提交后立即上架到应用市场，随时可以调整发布通道或下架。'}
         </p>
         <div className="ui-pagehead__actions">
           <Button onClick={() => navigate('/preview/apps')}>返回应用列表</Button>
         </div>
       </div>
 
-      <div className="admin-publish-hint" role="note" aria-label="发布开通说明">
-        <InProcessOutlined />
-        <span>
-          发布功能还没开通，填写、检查与提交暂时都不可用；下面每一栏的内容都只是示例，
-          用来展示将来填写的样子。
-        </span>
-      </div>
-
       <div className="admin-publish-layout">
-        <Card className="ui-card" title="应用信息">
-          <form aria-label="应用发布" onSubmit={(event) => event.preventDefault()}>
+        <Card className="ui-card" title={editing ? '编辑应用信息' : '应用信息'}>
+          <form aria-label="应用发布" onSubmit={handleSubmit}>
             <div className="ui-form-grid">
               <label className="ui-field">
                 <span className="ui-field__label">应用名称</span>
-                <Input value="AI 商品图生成" disabled />
-              </label>
-
-              <label className="ui-field">
-                <span className="ui-field__label">版本号</span>
-                <Input value="1.4.0" disabled />
-              </label>
-
-              <label className="ui-field">
-                <span className="ui-field__label">负责团队</span>
-                <Select value="视觉算法组" options={TEAM_OPTIONS} disabled />
-              </label>
-
-              <label className="ui-field">
-                <span className="ui-field__label">功能分类</span>
-                <Select value="image" options={CATEGORY_OPTIONS} disabled />
-              </label>
-
-              <label className="ui-field ui-field--full">
-                <span className="ui-field__label">应用介绍</span>
-                <Input.TextArea
-                  rows={3}
-                  value="上传商品图，选择风格模板，几分钟后拿到可以直接投放的成品图。适合需要批量出图的运营团队。"
-                  disabled
+                <Input
+                  value={form.name}
+                  onChange={(event) => setField('name', event.target.value)}
+                  placeholder="例如：图像工坊"
                 />
               </label>
 
               <label className="ui-field">
-                <span className="ui-field__label">可见范围</span>
-                <Select value="org" options={SCOPE_OPTIONS} disabled />
+                <span className="ui-field__label">版本号</span>
+                <Input
+                  value={form.version}
+                  onChange={(event) => setField('version', event.target.value)}
+                  placeholder="例如：1.4.0"
+                />
               </label>
 
               <label className="ui-field">
-                <span className="ui-field__label">试运行比例</span>
-                <InputNumber value={20} min={1} max={100} addonAfter="%" disabled />
+                <span className="ui-field__label">
+                  应用标识
+                  <span>{editing ? '标识创建后不可修改' : '英文与小写，创建后不可修改'}</span>
+                </span>
+                <Input
+                  value={form.appId}
+                  disabled={Boolean(editing)}
+                  onChange={(event) => setField('appId', event.target.value)}
+                  placeholder="例如：image-studio"
+                />
+              </label>
+
+              <label className="ui-field">
+                <span className="ui-field__label">技术框架</span>
+                <Select
+                  value={form.framework}
+                  options={FRAMEWORK_OPTIONS}
+                  onChange={(value) => setField('framework', value)}
+                />
+              </label>
+
+              <label className="ui-field">
+                <span className="ui-field__label">访问入口</span>
+                <Input
+                  value={form.entry}
+                  onChange={(event) => setField('entry', event.target.value)}
+                  placeholder="应用页面地址，例如：/subapps/image-studio/"
+                />
+              </label>
+
+              <label className="ui-field">
+                <span className="ui-field__label">路由前缀</span>
+                <Input
+                  value={form.baseRoute}
+                  onChange={(event) => setField('baseRoute', event.target.value)}
+                  placeholder="例如：/image-studio"
+                />
+              </label>
+
+              <label className="ui-field ui-field--full">
+                <span className="ui-field__label">后端服务地址</span>
+                <Input
+                  value={form.backendApi}
+                  onChange={(event) => setField('backendApi', event.target.value)}
+                  placeholder="应用调用的服务地址，例如：http://jbslab.bili:48080/admin-api"
+                />
               </label>
 
               <div className="ui-field ui-field--full">
                 <span className="ui-field__label">发布方式</span>
-                <Radio.Group value="canary" disabled>
-                  <Radio value="canary">试运行（先给一小部分人用）</Radio>
-                  <Radio value="stable">正式发布（可见范围内全部开放）</Radio>
+                <Radio.Group
+                  value={form.mode}
+                  onChange={(event) => setField('mode', event.target.value)}
+                >
+                  <Radio value="stable">正式发布（全部成员立即可用）</Radio>
+                  <Radio value="canary">试运行（先给一小部分成员使用）</Radio>
                 </Radio.Group>
               </div>
 
-              <div className="ui-field ui-field--full">
-                <span className="ui-field__label">
-                  这个应用能做什么
-                  <span>成员看到的可用功能清单</span>
-                </span>
-                <div className="admin-func-editor">
-                  {SAMPLE_FUNCTIONS.map((item) => (
-                    <div className="admin-func-row" key={item.name}>
-                      <Input value={item.name} disabled />
-                      <Input value={item.desc} disabled />
-                      <Button
-                        type="text"
-                        icon={<DeleteOutlined />}
-                        disabled
-                        aria-label={`删除功能 ${item.name}（暂不可用）`}
-                      />
-                    </div>
-                  ))}
-                  <Button icon={<AddOutlined />} disabled>
-                    添加功能（暂不可用）
-                  </Button>
-                </div>
-              </div>
+              {form.mode === 'canary' ? (
+                <>
+                  <label className="ui-field">
+                    <span className="ui-field__label">试运行版本</span>
+                    <Input
+                      value={form.canaryVersion}
+                      onChange={(event) => setField('canaryVersion', event.target.value)}
+                      placeholder="例如：1.5.0-rc.1"
+                    />
+                  </label>
+                  <label className="ui-field">
+                    <span className="ui-field__label">试运行比例</span>
+                    <InputNumber
+                      value={form.canaryRatio}
+                      min={1}
+                      max={100}
+                      addonAfter="%"
+                      onChange={(value) => setField('canaryRatio', value ?? 10)}
+                    />
+                  </label>
+                </>
+              ) : null}
             </div>
 
             <div className="ui-form-actions">
-              <Button type="primary" htmlType="submit" disabled>
-                提交上架（暂不可用）
-              </Button>
-              <Button icon={<CheckOutlined />} disabled>
-                检查内容（暂不可用）
+              <Button type="primary" htmlType="submit" loading={submitting}>
+                {editing ? '保存修改' : '提交上架'}
               </Button>
               <p className="ui-form-actions__note">
-                发布功能还没开通，填写、检查与提交暂时都不可用；页面里的内容只是示例。
+                提交后立即生效；发布方式、版本与上下架状态之后都能在应用列表里调整。
               </p>
             </div>
           </form>

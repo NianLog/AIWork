@@ -332,6 +332,9 @@ export interface ApplicationInput {
   canaryVersion?: string;
   canaryRatio?: number;
   status: CommonStatus;
+  /** update 全量语义透传字段（create 可省略，后端自定默认）。 */
+  latestVersion?: string;
+  audit?: number;
 }
 
 export async function createApplication(input: ApplicationInput): Promise<number> {
@@ -363,9 +366,11 @@ function applicationPayload(row: ApplicationRow): ApplicationInput {
     version: row.version,
     framework: row.framework,
     sandbox: row.sandbox,
+    latestVersion: row.latestVersion,
     canaryVersion: row.canaryVersion,
     canaryRatio: row.canaryRatio,
     status: row.status,
+    audit: row.audit,
   };
 }
 

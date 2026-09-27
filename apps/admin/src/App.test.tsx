@@ -382,8 +382,11 @@ describe('应用列表的真实数据通道', () => {
   });
 });
 
+/** 仍是演示数据的页面（批次 H Step 2 起应用列表/发布两页写操作已解禁走真实接口）。 */
+const DEMO_PAGE_ROUTES = ['/preview/users', '/preview/roles', '/preview/organizations'];
+
 describe('演示数据只读，不提供变更能力', () => {
-  it.each(PREVIEW_ROUTES)('%s 上的写意图按钮全部禁用，点击不产生跳转', async (path) => {
+  it.each(DEMO_PAGE_ROUTES)('%s 上的写意图按钮全部禁用，点击不产生跳转', async (path) => {
     openAdmin(path);
     // 批次 G 起五页全部懒加载（apps 页还要等接口数据）：先等页面挂载、写按钮
     // 存在再断言——否则同步查询落在骨架期，空数组让「至少一个」断言空转通过
@@ -490,27 +493,74 @@ describe('演示数据只读，不提供变更能力', () => {
     expect(screen.getByText('共 1 位成员')).toBeTruthy();
   });
 
-  it('应用发布表单整体只读，提交不产生任何跳转', async () => {
+  it('应用发布表单真实可提交：新建走发布接口并回到应用列表（批次 H）', async () => {
+    const calls: Array<{ url: string; method: string; body: Record<string, unknown> }> = [];
+    fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      calls.push({
+        url,
+        method: String(init?.method ?? 'GET'),
+        body: init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {},
+      });
+      return jsonResponse(
+        url.includes('/portal-app/page')
+          ? { code: 0, data: { list: FIXTURE_APPS, total: FIXTURE_APPS.length }, msg: '' }
+          : { code: 0, data: 4, msg: '' },
+      );
+    });
     openAdmin('/preview/publish');
-    // 批次 G 起页面懒加载：表单要等 chunk 挂载后才在场
     const form = await screen.findByRole('form', { name: '应用发布' });
 
-    const fields = Array.from(
-      form.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('input, textarea'),
-    );
-    expect(fields.length).toBeGreaterThan(0);
-    fields.forEach((field) => {
-      const hint = field.placeholder || field.value || field.type;
-      expect(field.disabled, `发布表单不应存在可编辑控件：${hint}`).toBe(true);
+    // 标签内嵌提示 span，可访问名是整段文本：用正则匹配
+    const values: Array<[RegExp, string]> = [
+      [/应用名称/, '巡检助手'],
+      [/应用标识/, 'patrol-helper'],
+      [/版本号/, '0.1.0'],
+      [/访问入口/, '/subapps/patrol-helper/'],
+      [/后端服务地址/, 'http://jbslab.bili:48080/admin-api'],
+      [/路由前缀/, '/patrol-helper'],
+    ];
+    for (const [matcher, value] of values) {
+      fireEvent.change(screen.getByLabelText(matcher), { target: { value } });
+    }
+    fireEvent.submit(form);
+
+    await waitFor(() => expect(window.location.pathname).toBe('/preview/apps'));
+    const create = calls.find((call) => call.url.includes('/portal-app/create'));
+    expect(create?.method).toBe('POST');
+    expect(create?.body).toMatchObject({ name: '巡检助手', appId: 'patrol-helper', status: 0 });
+    expectBusinessLanguage();
+  });
+
+  it('应用列表写操作解禁：重新上架走整行更新接口（批次 H）', async () => {
+    const calls: Array<{ url: string; method: string; body: Record<string, unknown> }> = [];
+    fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      calls.push({
+        url,
+        method: String(init?.method ?? 'GET'),
+        body: init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {},
+      });
+      return jsonResponse(
+        url.includes('/portal-app/page')
+          ? { code: 0, data: { list: FIXTURE_APPS, total: FIXTURE_APPS.length }, msg: '' }
+          : { code: 0, data: true, msg: '' },
+      );
     });
+    openAdmin('/preview/apps');
+    await screen.findByText('素材仓库');
 
-    expect(fireEvent.submit(form)).toBe(false);
-    expect(window.location.pathname).toBe('/preview/publish');
-    expect(form.textContent).toContain('发布功能还没开通');
+    // 默认按最近更新排序，第一行是停用中的素材仓库 → 操作是「重新上架」
+    fireEvent.click(screen.getAllByRole('button', { name: '更多操作' })[0]);
+    fireEvent.click(await screen.findByText('重新上架'));
+    fireEvent.click(await screen.findByRole('button', { name: '确认上架' }));
 
-    // 唯一的可用操作是返回应用列表，走的仍然是后台内部路由
-    fireEvent.click(screen.getByRole('button', { name: '返回应用列表' }));
-    expect(window.location.pathname).toBe('/preview/apps');
+    await waitFor(() => {
+      const update = calls.find((call) => call.url.includes('/portal-app/update'));
+      expect(update?.method).toBe('PUT');
+      // 整行展开再覆盖：未改字段原样在载荷里，status 翻转
+      expect(update?.body).toMatchObject({ id: 3, appId: 'asset-house', name: '素材仓库', status: 0 });
+    });
   });
 
   it('全站不存在外部链接，演示地址不可能被导航到', async () => {

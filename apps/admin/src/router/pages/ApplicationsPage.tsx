@@ -1,34 +1,40 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button, Card, Input, SegmentedControl, Table, Tag } from 'dingtalk-design-desktop';
+import {
+  Button,
+  Card,
+  Input,
+  InputNumber,
+  Modal,
+  Radio,
+  SegmentedControl,
+  Table,
+  Tag,
+  message,
+} from 'dingtalk-design-desktop';
 import type { TableColumnsType } from 'dingtalk-design-desktop';
-import { fetchApplications } from '../../api/yudao';
+import { fetchApplications, updateApplication } from '../../api/yudao';
 import type { ApplicationRow } from '../../api/yudao';
 import { CHANNEL_META } from '../../store/domain';
-import type { AppChannel } from '../../store/domain';
+import type { AppChannel, CommonStatus } from '../../store/domain';
 import RowActions from '../parts/RowActions';
 import { useAdminData } from '../parts/useAdminData';
 
 /**
  * 应用列表：后台的第一屏，回答「现在有哪些应用、各自处于什么状态」。
  *
- * 数据来源（批次 B 起）：真实接口 /admin-api/portal-app/page（字段映射与状态口径
- * 见 api/yudao.ts）。批次 H 起数据装载收敛到 useAdminData（四态 + reload +
- * 401 跳登录 + 竞态取消），本页不再自持 useEffect；未登录由路由守卫拦截。
+ * 数据（批次 B 起 /admin-api/portal-app/page）经 useAdminData 装载（批次 H 收敛：
+ * 四态 + reload + 401 跳登录 + 竞态取消）；未登录由路由守卫拦截。
  *
- * 只展示业务用户看得懂的信息（名称、版本、发布状态、最近更新时间），
- * 不渲染任何部署细节。写操作按钮保持禁用：编辑与调整通道的表单链路
- * 在批次 H Step 2 解禁（「能点但保存不了」比「不能点」更容易被误当成真实能力）。
+ * 批次 H Step 2 写操作解禁：
+ * - 编辑 → 携整行记录跳发布页（location.state.app，同表单走 update）；
+ * - 调整发布通道 → 确认对话框里选方式，正式版会把试运行字段清零；
+ * - 下架 / 重新上架 → 确认对话框翻转 status；
+ * 全部走 updateApplication 整行展开再覆盖（Yudao PUT 全量语义，防字段清空），
+ * 成功后 message 反馈并 reload，失败把接口的人话错误透出来。
  *
- * 版式与交互（批次二/四）：
- * - 统计卡可点：点哪张卡切到对应筛选（aria-pressed 表达选中），总数卡切回全部；
- * - 最近更新列可排序，默认最新在前；
- * - 分页 10 条一页且单页隐藏——数据少时不出分页器，数据多时自然出现；
- * - 操作列用 RowActions：文字主操作 + 「···」下拉收纳次要动作；
- * - 「刷新」随真实数据一起回归：重新拉取并走一遍 loading 态。
- *
- * 页头（h1）由外壳统一渲染：后台五个页面同构，标题写在 route handle 里，
- * 页面只负责标题下面的操作与内容。
+ * 版式与交互（批次二/四）：统计卡可点切筛选；最近更新列可排序默认最新在前；
+ * 分页 10 条单页隐藏；操作列 RowActions 文字主操作 + 「···」收纳次要动作。
  */
 
 type ChannelFilter = 'all' | AppChannel;
@@ -45,11 +51,71 @@ function resolveChannel(app: ApplicationRow): AppChannel {
   return app.status === 0 ? app.channel : 'paused';
 }
 
+/** 下架 / 重新上架共用的确认对话框状态。 */
+interface PendingStatus {
+  row: ApplicationRow;
+  next: CommonStatus;
+}
+
 export default function ApplicationsPage() {
   const navigate = useNavigate();
   const [keyword, setKeyword] = useState('');
   const [channel, setChannel] = useState<ChannelFilter>('all');
   const { view, reload } = useAdminData(fetchApplications);
+
+  const [busy, setBusy] = useState(false);
+  const [pendingStatus, setPendingStatus] = useState<PendingStatus | null>(null);
+  const [channelTarget, setChannelTarget] = useState<ApplicationRow | null>(null);
+  const [channelMode, setChannelMode] = useState<'stable' | 'canary'>('stable');
+  const [canaryVersion, setCanaryVersion] = useState('');
+  const [canaryRatio, setCanaryRatio] = useState(10);
+
+  /** 写操作统一动线：busy 锁按钮 → 成功 message+reload → 失败透出人话错误。 */
+  async function runWrite(successText: string, action: () => Promise<void>): Promise<void> {
+    setBusy(true);
+    try {
+      await action();
+      message.success(successText);
+      reload();
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : '操作没有成功，请稍后再试。');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function openChannelDialog(row: ApplicationRow) {
+    setChannelTarget(row);
+    setChannelMode(row.channel === 'canary' ? 'canary' : 'stable');
+    setCanaryVersion(row.canaryVersion ?? '');
+    setCanaryRatio(row.canaryRatio ?? 10);
+  }
+
+  async function confirmChannel() {
+    if (!channelTarget) return;
+    if (channelMode === 'canary' && !canaryVersion.trim()) {
+      message.warning('试运行需要填写版本号。');
+      return;
+    }
+    await runWrite('发布通道已调整。', async () => {
+      await updateApplication(
+        channelTarget,
+        channelMode === 'canary'
+          ? { canaryVersion: canaryVersion.trim(), canaryRatio }
+          : { canaryVersion: '', canaryRatio: 0 },
+      );
+      setChannelTarget(null);
+    });
+  }
+
+  async function confirmStatus() {
+    if (!pendingStatus) return;
+    const { row, next } = pendingStatus;
+    await runWrite(next === 1 ? '应用已下架。' : '应用已重新上架。', async () => {
+      await updateApplication(row, { status: next });
+      setPendingStatus(null);
+    });
+  }
 
   const rows = useMemo(() => {
     const query = keyword.trim().toLowerCase();
@@ -130,20 +196,18 @@ export default function ApplicationsPage() {
             {
               key: 'edit',
               label: '编辑',
-              disabled: true,
-              ariaLabel: `编辑 ${record.name}（暂不可用）`,
+              ariaLabel: `编辑 ${record.name}`,
+              onClick: () => navigate('/preview/publish', { state: { app: record } }),
             },
             {
               key: 'channel',
               label: '调整发布通道',
-              disabled: true,
-              reason: '后台服务尚未接入，暂不可用',
+              onClick: () => openChannelDialog(record),
             },
             {
-              key: 'unpublish',
-              label: '下架应用',
-              disabled: true,
-              reason: '后台服务尚未接入，暂不可用',
+              key: record.status === 0 ? 'unpublish' : 'republish',
+              label: record.status === 0 ? '下架应用' : '重新上架',
+              onClick: () => setPendingStatus({ row: record, next: record.status === 0 ? 1 : 0 }),
             },
           ]}
         />
@@ -158,7 +222,6 @@ export default function ApplicationsPage() {
       <div className="admin-toolbar-row">
         <p className="ui-pagehead__lead">这里列出所有已经上架到应用市场的应用，以及它们当前的版本和发布状态。</p>
         <div className="ui-pagehead__actions">
-          {/* 真实数据回来了，「刷新」随之回归：重新拉取并走一遍 loading 态 */}
           <Button onClick={reload}>刷新</Button>
           <Button type="primary" onClick={() => navigate('/preview/publish')}>
             发布新应用
@@ -231,6 +294,67 @@ export default function ApplicationsPage() {
           )}
         </Card>
       </section>
+
+      {/* 下架 / 重新上架确认：翻转 status 走整行 update，配置全保留 */}
+      <Modal
+        open={pendingStatus !== null}
+        title={pendingStatus?.next === 1 ? '下架应用' : '重新上架'}
+        okText={pendingStatus?.next === 1 ? '确认下架' : '确认上架'}
+        cancelText="取消"
+        confirmLoading={busy}
+        onOk={confirmStatus}
+        onCancel={() => setPendingStatus(null)}
+      >
+        <p>
+          {pendingStatus?.next === 1
+            ? `下架后「${pendingStatus?.row.name}」立即从应用市场消失，正在使用的成员会看到已停用提示；配置保留，可随时重新上架。`
+            : `「${pendingStatus?.row.name}」将重新出现在应用市场，成员可以再次进入使用。`}
+        </p>
+      </Modal>
+
+      {/* 调整发布通道：正式发布会把试运行版本与比例清零 */}
+      <Modal
+        open={channelTarget !== null}
+        title="调整发布通道"
+        okText="确认调整"
+        cancelText="取消"
+        confirmLoading={busy}
+        onOk={confirmChannel}
+        onCancel={() => setChannelTarget(null)}
+      >
+        <p>
+          「{channelTarget?.name}」当前的发布方式调整后立即生效，成员下次进入应用时按新通道获取版本。
+        </p>
+        <Radio.Group
+          value={channelMode}
+          onChange={(event) => setChannelMode(event.target.value)}
+        >
+          <Radio value="stable">正式发布（全部成员使用当前版本）</Radio>
+          <Radio value="canary">试运行（一部分成员先试用新版本）</Radio>
+        </Radio.Group>
+        {channelMode === 'canary' ? (
+          <div className="ui-form-grid" style={{ marginTop: 12 }}>
+            <label className="ui-field">
+              <span className="ui-field__label">试运行版本</span>
+              <Input
+                value={canaryVersion}
+                onChange={(event) => setCanaryVersion(event.target.value)}
+                placeholder="例如：1.5.0-rc.1"
+              />
+            </label>
+            <label className="ui-field">
+              <span className="ui-field__label">试运行比例</span>
+              <InputNumber
+                value={canaryRatio}
+                min={1}
+                max={100}
+                addonAfter="%"
+                onChange={(value) => setCanaryRatio(value ?? 10)}
+              />
+            </label>
+          </div>
+        ) : null}
+      </Modal>
     </div>
   );
 }
