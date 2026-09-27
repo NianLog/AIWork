@@ -403,7 +403,7 @@ describe('演示数据只读，不提供变更能力', () => {
 
     // 搜索框在 success 分支才渲染：先等数据落地，再取控件
     await screen.findByText('图像工坊');
-    const searchbox = screen.getByPlaceholderText<HTMLInputElement>('搜索应用名称、负责团队或版本');
+    const searchbox = screen.getByPlaceholderText<HTMLInputElement>('搜索应用名称、标识或版本');
     expect(searchbox.disabled).toBe(false);
     expect(screen.getByText('共 3 个应用')).toBeTruthy();
 

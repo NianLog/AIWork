@@ -7,7 +7,7 @@ Scope: apps/portal/**,apps/admin/**,apps/gateway/**
 
 负责人 2026-09-27 拍板三项后的落地批次：①砍 legacy 双构建（内部工具+钉钉现代容器，无 iOS12/Android5 用户）；②路由级代码分割 + vendor 拆分（现状零分割：入口单 chunk admin 875KB/portal 417KB，业务发版全量失效缓存）；③全站零安全响应头（设计文档 §600 把 CSP 挂在网关批次，从未落地）。48080 公网暴露维持现状 + 记录风险（推荐项）。
 
-## 方案
+## 决策
 
 1. **砍 legacy 三处/端**：vite.config 删插件行；package.json 删 `@vitejs/plugin-legacy` 与 `terser`（后者全仓零引用的死依赖，esbuild 默认压缩在用）；删 `browserslist` 段（唯一潜在读者是 legacy 插件）。不设 `build.target`（vite 5 默认 modules ≈ es2020 即新基线）；兜老设备一行 `build.target: 'es2018'`，不预设。诚实口径：现代浏览器本就不加载 legacy chunk，收益是 dist 减半（admin 2.58MB→~1.29MB）、构建时间与部署带宽，**不是**首屏体积。
 2. **懒加载分界**：LoginPage/NotFoundPage/外壳/守卫/store 同步（守卫落点+测试同步断言+首屏）；业务页全懒（portal 4 页、admin 5 页）。**顺序不变式：守卫必须在 Suspense 上方**（未登录深链 lazy chunk 零请求）；**禁止把 sessionStore/守卫挪进 lazy chunk**（模块级同步水合必须先于一切 lazy 页）。Suspense 单点放外壳内容区 Outlet——h1/导航/披露条在边界外，chunk 加载期标题导航即时正确。
@@ -39,7 +39,7 @@ Scope: apps/portal/**,apps/admin/**,apps/gateway/**
 - 部署依赖负责人面板操作（extension 槽位「编辑」粘贴 + 重载）：花括号截断坑已知，指引明确走「编辑」不走「预览」。
 - CSS 死代码增量（admin +279KB / portal +227KB，gzip +36/+15KB）：提取范围变化的精确机制未定谳（stash 对照含批次 F 代码的混淆变量，但 import 全集枚举已排除「旧构建丢样式」的解释），按 gzip 量级接受，根治归组件库按需批次。
 
-## 验收标准
+## Verification
 
 已回填（2026-09-27 实测）：
 

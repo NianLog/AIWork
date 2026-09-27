@@ -1,23 +1,24 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button, Card, Input, SegmentedControl, Table, Tag } from 'dingtalk-design-desktop';
 import type { TableColumnsType } from 'dingtalk-design-desktop';
-import { ApiError, fetchApplications } from '../../api/yudao';
-import { CHANNEL_META } from '../../store/demoDirectory';
-import type { DataView, DemoApplicationRecord } from '../../store/demoDirectory';
+import { fetchApplications } from '../../api/yudao';
+import type { ApplicationRow } from '../../api/yudao';
+import { CHANNEL_META } from '../../store/domain';
+import type { AppChannel } from '../../store/domain';
 import RowActions from '../parts/RowActions';
+import { useAdminData } from '../parts/useAdminData';
 
 /**
  * 应用列表：后台的第一屏，回答「现在有哪些应用、各自处于什么状态」。
  *
  * 数据来源（批次 B 起）：真实接口 /admin-api/portal-app/page（字段映射与状态口径
- * 换算见 api/yudao.ts）。页面仍只认 DataView 的「status + data + error」形状，
- * loading / error / success 三态都来自真实请求；未登录由路由守卫拦截、
- * 401 终局自动跳登录页（批次 F），页面不再维护「先登录」引导态。
+ * 见 api/yudao.ts）。批次 H 起数据装载收敛到 useAdminData（四态 + reload +
+ * 401 跳登录 + 竞态取消），本页不再自持 useEffect；未登录由路由守卫拦截。
  *
- * 只展示业务用户看得懂的信息（名称、负责团队、版本、发布状态、最近更新时间），
- * 不渲染任何部署细节。写操作按钮保持禁用：编辑与调整通道需要完整的表单链路
- * （后续批次落地），「能点但保存不了」比「不能点」更容易被误当成真实能力。
+ * 只展示业务用户看得懂的信息（名称、版本、发布状态、最近更新时间），
+ * 不渲染任何部署细节。写操作按钮保持禁用：编辑与调整通道的表单链路
+ * 在批次 H Step 2 解禁（「能点但保存不了」比「不能点」更容易被误当成真实能力）。
  *
  * 版式与交互（批次二/四）：
  * - 统计卡可点：点哪张卡切到对应筛选（aria-pressed 表达选中），总数卡切回全部；
@@ -30,7 +31,7 @@ import RowActions from '../parts/RowActions';
  * 页面只负责标题下面的操作与内容。
  */
 
-type ChannelFilter = 'all' | DemoApplicationRecord['channel'];
+type ChannelFilter = 'all' | AppChannel;
 
 const CHANNEL_OPTIONS: Array<{ value: ChannelFilter; label: string }> = [
   { value: 'all', label: '全部' },
@@ -40,51 +41,15 @@ const CHANNEL_OPTIONS: Array<{ value: ChannelFilter; label: string }> = [
 ];
 
 /** 应用被下架时，无论原发布通道是什么，对外都只说「已停用」（status 0=启用 1=停用，批次 C 已与后端同口径）。 */
-function resolveChannel(app: DemoApplicationRecord): DemoApplicationRecord['channel'] {
+function resolveChannel(app: ApplicationRow): AppChannel {
   return app.status === 0 ? app.channel : 'paused';
 }
 
 export default function ApplicationsPage() {
   const navigate = useNavigate();
-  const location = useLocation();
   const [keyword, setKeyword] = useState('');
   const [channel, setChannel] = useState<ChannelFilter>('all');
-  const [view, setView] = useState<DataView<DemoApplicationRecord>>({ status: 'loading', data: [] });
-  const [reloadCount, setReloadCount] = useState(0);
-
-  useEffect(() => {
-    let cancelled = false;
-    setView({ status: 'loading', data: [] });
-    fetchApplications()
-      .then((data) => {
-        if (!cancelled) {
-          setView({ status: 'success', data });
-        }
-      })
-      .catch((error: unknown) => {
-        if (!cancelled) {
-          // 会话过期/被顶号（code 401）：api 层已静默刷新失败并清掉死会话，
-          // 这里直接送登录页并带 expired 标记与来路（批次 F，守卫语义由跳转闭环）。
-          if (error instanceof ApiError && error.code === 401) {
-            navigate('/login', {
-              replace: true,
-              state: { from: location.pathname + location.search, expired: true },
-            });
-            return;
-          }
-          setView({
-            status: 'error',
-            data: [],
-            error: error instanceof Error ? error.message : '应用列表暂时没有加载出来。',
-          });
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [navigate, location.pathname, location.search, reloadCount]);
-
-  const reload = () => setReloadCount((count) => count + 1);
+  const { view, reload } = useAdminData(fetchApplications);
 
   const rows = useMemo(() => {
     const query = keyword.trim().toLowerCase();
@@ -95,7 +60,7 @@ export default function ApplicationsPage() {
       if (!query) {
         return true;
       }
-      return [app.name, app.ownerTeam, app.version].some((field) =>
+      return [app.name, app.appId, app.version].some((field) =>
         field.toLowerCase().includes(query),
       );
     });
@@ -113,7 +78,7 @@ export default function ApplicationsPage() {
     ];
   }, [view.data]);
 
-  const columns: TableColumnsType<DemoApplicationRecord> = [
+  const columns: TableColumnsType<ApplicationRow> = [
     {
       title: '应用',
       dataIndex: 'name',
@@ -121,9 +86,7 @@ export default function ApplicationsPage() {
       render: (_, record) => (
         <span>
           <span className="ui-cell-title">{record.name}</span>
-          <span className="ui-cell-sub">
-            {record.ownerTeam ? `由 ${record.ownerTeam} 负责` : '负责团队尚未登记'}
-          </span>
+          <span className="ui-cell-sub">应用标识 {record.appId}</span>
         </span>
       ),
     },
@@ -244,7 +207,7 @@ export default function ApplicationsPage() {
                 <Input
                   className="ui-toolbar__search"
                   allowClear
-                  placeholder="搜索应用名称、负责团队或版本"
+                  placeholder="搜索应用名称、标识或版本"
                   value={keyword}
                   onChange={(event) => setKeyword(event.target.value)}
                 />
@@ -257,7 +220,7 @@ export default function ApplicationsPage() {
                 </div>
                 <span className="ui-toolbar__count">共 {rows.length} 个应用</span>
               </div>
-              <Table<DemoApplicationRecord>
+              <Table<ApplicationRow>
                 rowKey="appId"
                 columns={columns}
                 dataSource={rows}

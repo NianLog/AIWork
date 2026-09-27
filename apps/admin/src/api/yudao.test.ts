@@ -1,14 +1,31 @@
 // @vitest-environment jsdom
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { SESSION_KEY, fetchApplications, logoutRemote, readSession } from './yudao';
+import {
+  SESSION_KEY,
+  assignRoleMenus,
+  createApplication,
+  fetchApplications,
+  fetchAppPermissions,
+  fetchDepts,
+  fetchMenus,
+  fetchUserRoles,
+  fetchUsers,
+  logoutRemote,
+  readSession,
+  updateUser,
+  updateApplication,
+  updateUserStatus,
+} from './yudao';
 import type { ApiError } from './yudao';
+import type { ApplicationRow, UserRow } from './yudao';
 
 /**
  * 批次 F 核心机制测试（后台副本）：与 apps/portal/src/api/yudao.test.ts 同型
  * （两份客户端是批次 B Decision 2 的刻意副本，测试也各守一份）。
  * 后端实证：refresh-token 不轮换 refreshToken 但立即作废旧 access token——
  * 断言重点是 refresh-token 只发一次、并发请求共用同一枚新令牌重试。
+ * 批次 H 扩读写封装用例：URL/方法/载荷形态对着 2026-09-27 的实测口径锁死。
  */
 
 function jsonResponse(body: unknown, status = 200) {
@@ -30,6 +47,10 @@ function seedSession() {
 function bearerOf(init?: RequestInit): string {
   const headers = init?.headers as Record<string, string> | undefined;
   return headers?.Authorization ?? '';
+}
+
+function bodyOf(init?: RequestInit): Record<string, unknown> {
+  return JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>;
 }
 
 function refreshBody() {
@@ -146,5 +167,215 @@ describe('真实登出（批次 F）', () => {
 
     expect(urls.some((url) => url.includes('/auth/logout'))).toBe(true);
     expect(sessionStorage.getItem(SESSION_KEY)).toBeNull();
+  });
+});
+
+describe('读通道封装（批次 H）', () => {
+  it('fetchUsers 映射分页记录：deptName/loginDate 原样带回，status 收敛两态', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        jsonResponse({
+          code: 0,
+          msg: '',
+          data: {
+            total: 1,
+            list: [
+              {
+                id: 249, username: 'gwtest', nickname: '网关验收', deptId: 103, deptName: '研发部门',
+                mobile: '', email: '', sex: 0, avatar: '', postIds: null, remark: null,
+                status: 0, loginDate: 1790445984000, createTime: 1790445025000,
+              },
+            ],
+          },
+        }),
+      ),
+    );
+
+    const rows = await fetchUsers();
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      id: 249, deptName: '研发部门', loginDate: 1790445984000, status: 0, remark: '',
+    } satisfies Partial<UserRow>);
+  });
+
+  it('fetchDepts / fetchMenus 吃裸数组，fetchAppPermissions 吃分页信封', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes('/dept/list')) {
+          return jsonResponse({
+            code: 0, msg: '', data: [
+              { id: 100, name: '芋道源码', parentId: 0, sort: 0, leaderUserId: 1, phone: '158', email: 'ry@qq.com', status: 0, createTime: 1 },
+            ],
+          });
+        }
+        if (url.includes('/menu/list')) {
+          return jsonResponse({
+            code: 0, msg: '', data: [
+              { id: 1, name: '新建任务', parentId: 2, type: 3, permission: 'demo:task:create', status: 0, sort: 0 },
+            ],
+          });
+        }
+        return jsonResponse({
+          code: 0, msg: '',
+          data: { total: 1, list: [{ id: 1, appId: 'demo-vue', code: 'demo-vue:task:create', name: '新建任务', description: '', module: 'task', createTime: 1 }] },
+        });
+      }),
+    );
+
+    const [depts, menus, perms] = await Promise.all([fetchDepts(), fetchMenus(), fetchAppPermissions()]);
+
+    expect(depts[0]).toMatchObject({ id: 100, parentId: 0, status: 0 });
+    expect(menus[0]).toMatchObject({ id: 1, type: 3, permission: 'demo:task:create' });
+    expect(perms[0]).toMatchObject({ appId: 'demo-vue', code: 'demo-vue:task:create', name: '新建任务' });
+  });
+
+  it('fetchUserRoles 返回角色 id 数组（分配对话框回显用）', async () => {
+    const urls: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        urls.push(String(input));
+        return jsonResponse({ code: 0, msg: '', data: [1, 2] });
+      }),
+    );
+
+    await expect(fetchUserRoles(249)).resolves.toEqual([1, 2]);
+    expect(urls[0]).toContain('/system/permission/list-user-roles?userId=249');
+  });
+});
+
+describe('写通道封装（批次 H）', () => {
+  it('updateUserStatus 发 PUT {id, status} 到 update-status（实测 body 形态）', async () => {
+    const calls: Array<{ url: string; method: string; body: Record<string, unknown> }> = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        calls.push({ url: String(input), method: String(init?.method), body: bodyOf(init) });
+        return jsonResponse({ code: 0, msg: '', data: true });
+      }),
+    );
+
+    await updateUserStatus(249, 1);
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0].url).toContain('/system/user/update-status');
+    expect(calls[0].method).toBe('PUT');
+    expect(calls[0].body).toEqual({ id: 249, status: 1 });
+  });
+
+  it('updateUser 整行展开再覆盖：未改字段原样回传，展示字段不上行', async () => {
+    const bodies: Record<string, unknown>[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+        bodies.push(bodyOf(init));
+        return jsonResponse({ code: 0, msg: '', data: true });
+      }),
+    );
+
+    const row: UserRow = {
+      id: 249, username: 'gwtest', nickname: '网关验收', deptId: 103, deptName: '研发部门',
+      mobile: '', email: 'old@x', sex: 0, avatar: '', postIds: null, remark: '',
+      status: 0, loginDate: 1790445984000, createTime: 1790445025000,
+    };
+    await updateUser(row, { nickname: '网关验收-改名', password: 'new-pass' });
+
+    expect(bodies).toHaveLength(1);
+    expect(bodies[0]).toMatchObject({ id: 249, username: 'gwtest', nickname: '网关验收-改名', password: 'new-pass', deptId: 103, postIds: [] });
+    // 展示字段绝不能混进 save VO（后端无此字段，混入即脏载荷）
+    expect(bodies[0]).not.toHaveProperty('deptName');
+    expect(bodies[0]).not.toHaveProperty('loginDate');
+    expect(bodies[0]).not.toHaveProperty('createTime');
+  });
+
+  it('assignRoleMenus 发 POST {roleId, menuIds}', async () => {
+    const calls: Array<{ url: string; body: Record<string, unknown> }> = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        calls.push({ url: String(input), body: bodyOf(init) });
+        return jsonResponse({ code: 0, msg: '', data: true });
+      }),
+    );
+
+    await assignRoleMenus(2, [1, 2, 3]);
+
+    expect(calls[0].url).toContain('/system/permission/assign-role-menu');
+    expect(calls[0].body).toEqual({ roleId: 2, menuIds: [1, 2, 3] });
+  });
+
+  it('fetchApplications 行映射：canary 派生与 vue3 如实上屏', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        jsonResponse({
+          code: 0, msg: '',
+          data: {
+            total: 1,
+            list: [
+              {
+                id: 1, appId: 'demo-vue', name: '演示应用', entry: '/subapps/demo-vue/', backendApi: 'http://127.0.0.1:48080/admin-api',
+                baseRoute: '/demo-vue', icon: null, version: '0.1.0', framework: 'vue3', sandbox: 'iframe',
+                latestVersion: null, canaryVersion: '0.2.0-rc1', canaryRatio: 20, status: 0, audit: 0, createTime: 1790445024000,
+              },
+            ],
+          },
+        }),
+      ),
+    );
+
+    const rows = await fetchApplications();
+
+    expect(rows[0]).toMatchObject({
+      framework: 'vue3', sandbox: 'iframe', channel: 'canary', canaryRatio: 20, status: 0,
+    } satisfies Partial<ApplicationRow>);
+  });
+
+  it('updateApplication 整行展开：通道调整只 patch canary 字段，其余字段原样保活', async () => {
+    const bodies: Record<string, unknown>[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+        bodies.push(bodyOf(init));
+        return jsonResponse({ code: 0, msg: '', data: true });
+      }),
+    );
+
+    const row: ApplicationRow = {
+      id: 1, appId: 'demo-vue', name: '演示应用', entry: '/subapps/demo-vue/', backendApi: 'http://x/admin-api',
+      baseRoute: '/demo-vue', icon: undefined, version: '0.1.0', framework: 'vue3', sandbox: 'iframe',
+      latestVersion: undefined, canaryVersion: undefined, canaryRatio: undefined, status: 0, audit: 0,
+      channel: 'stable', publishedAt: '2026-09-27 10:00',
+    };
+    await updateApplication(row, { canaryVersion: '0.2.0-rc1', canaryRatio: 20 });
+
+    expect(bodies[0]).toMatchObject({ id: 1, appId: 'demo-vue', name: '演示应用', framework: 'vue3', status: 0, canaryVersion: '0.2.0-rc1', canaryRatio: 20 });
+    // 派生展示字段不上行
+    expect(bodies[0]).not.toHaveProperty('channel');
+    expect(bodies[0]).not.toHaveProperty('publishedAt');
+  });
+
+  it('createApplication 发 POST 表单载荷', async () => {
+    const calls: Array<{ url: string; method: string; body: Record<string, unknown> }> = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        calls.push({ url: String(input), method: String(init?.method), body: bodyOf(init) });
+        return jsonResponse({ code: 0, msg: '', data: 2 });
+      }),
+    );
+
+    await createApplication({
+      appId: 'new-app', name: '新应用', entry: '/subapps/new-app/', backendApi: 'http://x/admin-api',
+      baseRoute: '/new-app', version: '0.1.0', framework: 'react', sandbox: 'iframe', status: 0,
+    });
+
+    expect(calls[0].url).toContain('/portal-app/create');
+    expect(calls[0].method).toBe('POST');
+    expect(calls[0].body).toMatchObject({ appId: 'new-app', framework: 'react', status: 0 });
   });
 });

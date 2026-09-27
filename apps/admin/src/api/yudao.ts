@@ -1,14 +1,22 @@
-import type { DemoApplicationRecord } from '../store/demoDirectory';
+import type { AppChannel, CommonStatus } from '../store/domain';
 
 /**
  * 后台真实接口客户端（批次 B，2026-09-26）：登录会话与应用列表的数据通道。
  * 批次 F 增加单飞刷新、401 自动重试与真实登出。
+ * 批次 H（2026-09-27）扩全五页读写封装：system user/role/dept/menu、permission
+ * 的用户-角色与角色-菜单分配、portal-app 发布闭环、portal-app-permission 权限码。
+ * 行类型与封装同址住本文件，不拆 system.ts（request 底座保持私有共享，
+ * 见 .agents/notes/proposed/architecture/2026-09-27-batch-h-admin-real-data.md）。
  *
  * - 双令牌按引导文档 §8.4 [锁定] 只落 sessionStorage（页面关闭即释放，符合免登语义），
  *   每次请求显式带 Authorization: Bearer，不写 localStorage、不用 Cookie；
  * - 多租户当前只有默认租户，tenant-id 固定为 1；
  * - 开发期同源：vite 把 /admin-api 代理到云上后端（见 vite.config.ts），
  *   代码里全部走相对路径，联调机不需要知道后端地址。
+ * - update 系全部「整行展开再覆盖」：Yudao PUT 是全量语义，只发增量会把
+ *   未传字段当空值处理（批次 H 风险条目一），页面侧禁止手工拼半截行。
+ * - 端点与字段形状均于 2026-09-27 对 jbslab.bili:48080 实测；分页读统一
+ *   pageSize=100 单页拉全（ponytail 口径，过百再接真分页）。
  */
 const TENANT_ID = '1';
 
@@ -214,6 +222,8 @@ export async function logoutRemote(): Promise<void> {
   clearSession();
 }
 
+/* ────────────────────────── 应用（portal-app） ────────────────────────── */
+
 /** 应用分页接口的原始记录（后端字段原样，status 口径 0=启用 1=停用）。 */
 interface AppPageItem {
   id: number;
@@ -225,12 +235,41 @@ interface AppPageItem {
   icon: string | null;
   version: string | null;
   framework: string | null;
-  sandbox: string;
+  sandbox: string | null;
   latestVersion: string | null;
   canaryVersion: string | null;
   canaryRatio: number | null;
   status: number;
+  audit: number;
   createTime: number;
+}
+
+/**
+ * 应用页行记录：携带 update 全量语义所需的全部后端字段（id/appId/…/audit），
+ * 外加两个派生展示字段（channel、publishedAt——不回传）。
+ * 批次 H 起取代演示时代的 DemoApplicationRecord：framework 如实为 string
+ * （后端真实取值有 'vue3'），演示字段 permissions/ownerTeam/tileTone 删除。
+ */
+export interface ApplicationRow {
+  id: number;
+  appId: string;
+  name: string;
+  entry: string;
+  backendApi: string;
+  baseRoute: string;
+  icon: string | undefined;
+  version: string;
+  framework: string;
+  sandbox: string;
+  latestVersion: string | undefined;
+  canaryVersion: string | undefined;
+  canaryRatio: number | undefined;
+  status: CommonStatus;
+  audit: number;
+  /** 派生展示字段：停用优先；启用且配置试运行版本与比例视为试运行，否则正式版。 */
+  channel: AppChannel;
+  /** 派生展示字段：'YYYY-MM-DD HH:mm'，字典序即时间序（最近更新列排序用）。 */
+  publishedAt: string;
 }
 
 /** 'YYYY-MM-DD HH:mm'：列表「最近更新」列按这个字符串排序（字典序即时间序）。 */
@@ -241,18 +280,20 @@ function formatDateTime(epochMs: number): string {
 }
 
 /**
- * 拉取应用列表并映射成页面记录（DemoApplicationRecord）。
- *
- * 状态口径：AppRegistry 契约已于 2026-09-26（批次 C）翻转为后端口径 0=启用 1=停用，
- * 批次 B 遗留的边界换算已删除——两个前端从此与后端同一语义。
- * 发布通道：停用优先；启用且配置了试运行版本与比例视为试运行，否则正式版。
+ * 拉取应用列表并映射成页面行记录。状态口径：0=启用 1=停用（批次 C 起与后端
+ * 同一语义，无换算）。
  */
 // ponytail: 单页拉全量（pageSize=100），应用数过百再接真分页
-export async function fetchApplications(): Promise<DemoApplicationRecord[]> {
+export async function fetchApplications(): Promise<ApplicationRow[]> {
   const page = await request<{ list: AppPageItem[]; total: number }>(
     '/admin-api/portal-app/page?pageNo=1&pageSize=100',
   );
-  return page.list.map((app) => ({
+  return page.list.map(toApplicationRow);
+}
+
+function toApplicationRow(app: AppPageItem): ApplicationRow {
+  return {
+    id: app.id,
     appId: app.appId,
     name: app.name,
     entry: app.entry,
@@ -260,19 +301,442 @@ export async function fetchApplications(): Promise<DemoApplicationRecord[]> {
     baseRoute: app.baseRoute,
     icon: app.icon ?? undefined,
     version: app.version ?? '',
-    framework: (app.framework ?? 'react') as DemoApplicationRecord['framework'],
-    sandbox: app.sandbox as DemoApplicationRecord['sandbox'],
-    status: app.status,
-    permissions: [],
+    framework: app.framework ?? '',
+    sandbox: app.sandbox ?? '',
+    latestVersion: app.latestVersion ?? undefined,
+    canaryVersion: app.canaryVersion ?? undefined,
+    canaryRatio: app.canaryRatio ?? undefined,
+    status: (app.status === 1 ? 1 : 0) as CommonStatus,
+    audit: app.audit ?? 0,
     channel:
       app.status !== 0
         ? 'paused'
         : app.canaryVersion && (app.canaryRatio ?? 0) > 0
           ? 'canary'
           : 'stable',
-    canaryRatio: app.canaryRatio ?? undefined,
     publishedAt: formatDateTime(app.createTime ?? 0),
-    ownerTeam: '',
-    tileTone: 'brand',
+  };
+}
+
+/** 发布表单载荷（PublishPage 受控表单 → createApplication）。 */
+export interface ApplicationInput {
+  appId: string;
+  name: string;
+  entry: string;
+  backendApi: string;
+  baseRoute: string;
+  icon?: string;
+  version: string;
+  framework: string;
+  sandbox: string;
+  canaryVersion?: string;
+  canaryRatio?: number;
+  status: CommonStatus;
+}
+
+export async function createApplication(input: ApplicationInput): Promise<number> {
+  return request<number>('/admin-api/portal-app/create', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+/** 编辑 / 上下架 / 通道调整统一入口：整行展开再覆盖，防字段清空。 */
+export async function updateApplication(
+  row: ApplicationRow,
+  patch: Partial<ApplicationInput>,
+): Promise<void> {
+  await request<void>('/admin-api/portal-app/update', {
+    method: 'PUT',
+    body: JSON.stringify({ ...applicationPayload(row), ...patch, id: row.id }),
+  });
+}
+
+function applicationPayload(row: ApplicationRow): ApplicationInput {
+  return {
+    appId: row.appId,
+    name: row.name,
+    entry: row.entry,
+    backendApi: row.backendApi,
+    baseRoute: row.baseRoute,
+    icon: row.icon,
+    version: row.version,
+    framework: row.framework,
+    sandbox: row.sandbox,
+    canaryVersion: row.canaryVersion,
+    canaryRatio: row.canaryRatio,
+    status: row.status,
+  };
+}
+
+/* ────────────────────────── 用户（system/user） ────────────────────────── */
+
+/** 用户页行记录：page 接口原样字段 + deptName 展示冗余（update 不回传）。 */
+export interface UserRow {
+  id: number;
+  username: string;
+  nickname: string;
+  deptId: number | null;
+  /** page 接口冗余带回的部门名，仅展示用（save VO 无此字段）。 */
+  deptName: string;
+  mobile: string;
+  email: string;
+  sex: number;
+  avatar: string;
+  postIds: number[] | null;
+  remark: string;
+  status: CommonStatus;
+  /** epoch 毫秒；0=从未登录（演示态「待激活」语义已删，空显示「—」）。 */
+  loginDate: number;
+  createTime: number;
+}
+
+interface UserPageItem {
+  id: number;
+  username: string;
+  nickname: string;
+  deptId: number | null;
+  deptName: string | null;
+  mobile: string | null;
+  email: string | null;
+  sex: number | null;
+  avatar: string | null;
+  postIds: number[] | null;
+  remark: string | null;
+  status: number;
+  loginDate: number | null;
+  createTime: number | null;
+}
+
+// ponytail: 单页拉全量（pageSize=100），人员过百再接真分页
+export async function fetchUsers(): Promise<UserRow[]> {
+  const page = await request<{ list: UserPageItem[]; total: number }>(
+    '/admin-api/system/user/page?pageNo=1&pageSize=100',
+  );
+  return page.list.map((user) => ({
+    id: user.id,
+    username: user.username,
+    nickname: user.nickname,
+    deptId: user.deptId,
+    deptName: user.deptName ?? '',
+    mobile: user.mobile ?? '',
+    email: user.email ?? '',
+    sex: user.sex ?? 0,
+    avatar: user.avatar ?? '',
+    postIds: user.postIds,
+    remark: user.remark ?? '',
+    status: (user.status === 1 ? 1 : 0) as CommonStatus,
+    loginDate: user.loginDate ?? 0,
+    createTime: user.createTime ?? 0,
   }));
+}
+
+/** 用户创建/编辑表单载荷（编辑时 password 留空=不改）。 */
+export interface UserInput {
+  username: string;
+  nickname: string;
+  password?: string;
+  deptId?: number;
+  mobile?: string;
+  email?: string;
+  sex?: number;
+  remark?: string;
+}
+
+export async function createUser(input: UserInput): Promise<number> {
+  return request<number>('/admin-api/system/user/create', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+/** 整行展开再覆盖：deptName/loginDate/createTime 是展示字段，不上行。 */
+export async function updateUser(row: UserRow, patch: Partial<UserInput>): Promise<void> {
+  await request<void>('/admin-api/system/user/update', {
+    method: 'PUT',
+    body: JSON.stringify({
+      id: row.id,
+      username: row.username,
+      nickname: row.nickname,
+      mobile: row.mobile,
+      email: row.email,
+      sex: row.sex,
+      avatar: row.avatar,
+      deptId: row.deptId ?? undefined,
+      postIds: row.postIds ?? [],
+      remark: row.remark ?? '',
+      ...patch,
+    }),
+  });
+}
+
+/** 独立停用/启用端点（2026-09-27 实测 body 形态 {id, status}）。 */
+export async function updateUserStatus(id: number, status: CommonStatus): Promise<void> {
+  await request<void>('/admin-api/system/user/update-status', {
+    method: 'PUT',
+    body: JSON.stringify({ id, status }),
+  });
+}
+
+export async function deleteUser(id: number): Promise<void> {
+  await request<void>(`/admin-api/system/user/delete?id=${id}`, { method: 'DELETE' });
+}
+
+/* ────────────────────────── 角色（system/role） ────────────────────────── */
+
+export interface RoleRow {
+  id: number;
+  name: string;
+  code: string;
+  sort: number;
+  status: CommonStatus;
+  /** 1=内置 2=自定义：内置角色（如超级管理员）后端拒绝改名/删除，报错如实上屏。 */
+  type: number;
+  /** 数据范围 1-5（全部/本部门/本部门及以下/仅本人/指定部门），页内做人话映射。 */
+  dataScope: number;
+  remark: string;
+  createTime: number;
+}
+
+interface RolePageItem {
+  id: number;
+  name: string;
+  code: string;
+  sort: number | null;
+  status: number;
+  type: number | null;
+  dataScope: number | null;
+  remark: string | null;
+  createTime: number | null;
+}
+
+// ponytail: 单页拉全量（pageSize=100），角色过百再接真分页
+export async function fetchRoles(): Promise<RoleRow[]> {
+  const page = await request<{ list: RolePageItem[]; total: number }>(
+    '/admin-api/system/role/page?pageNo=1&pageSize=100',
+  );
+  return page.list.map((role) => ({
+    id: role.id,
+    name: role.name,
+    code: role.code,
+    sort: role.sort ?? 0,
+    status: (role.status === 1 ? 1 : 0) as CommonStatus,
+    type: role.type ?? 2,
+    dataScope: role.dataScope ?? 1,
+    remark: role.remark ?? '',
+    createTime: role.createTime ?? 0,
+  }));
+}
+
+export interface RoleInput {
+  name: string;
+  code: string;
+  sort: number;
+  remark: string;
+}
+
+export async function createRole(input: RoleInput): Promise<number> {
+  return request<number>('/admin-api/system/role/create', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateRole(row: RoleRow, patch: Partial<RoleInput>): Promise<void> {
+  await request<void>('/admin-api/system/role/update', {
+    method: 'PUT',
+    body: JSON.stringify({
+      id: row.id,
+      name: row.name,
+      code: row.code,
+      sort: row.sort,
+      remark: row.remark ?? '',
+      ...patch,
+    }),
+  });
+}
+
+export async function deleteRole(id: number): Promise<void> {
+  await request<void>(`/admin-api/system/role/delete?id=${id}`, { method: 'DELETE' });
+}
+
+/* ───────────────────────── 组织（system/dept，全量树） ───────────────────────── */
+
+export interface DeptRow {
+  id: number;
+  parentId: number;
+  name: string;
+  sort: number;
+  /** 负责人只有裸 id，后端不带名字——不上屏（批次 H 决策）。 */
+  leaderUserId: number | null;
+  phone: string;
+  email: string;
+  status: CommonStatus;
+  createTime: number;
+}
+
+interface DeptListItem {
+  id: number;
+  parentId: number;
+  name: string;
+  sort: number | null;
+  leaderUserId: number | null;
+  phone: string | null;
+  email: string | null;
+  status: number;
+  createTime: number | null;
+}
+
+/** 组织是全量树接口（/list 而非 /page），页面自己按 parentId 组树。 */
+export async function fetchDepts(): Promise<DeptRow[]> {
+  const list = await request<DeptListItem[]>('/admin-api/system/dept/list');
+  return list.map((dept) => ({
+    id: dept.id,
+    parentId: dept.parentId,
+    name: dept.name,
+    sort: dept.sort ?? 0,
+    leaderUserId: dept.leaderUserId,
+    phone: dept.phone ?? '',
+    email: dept.email ?? '',
+    status: (dept.status === 1 ? 1 : 0) as CommonStatus,
+    createTime: dept.createTime ?? 0,
+  }));
+}
+
+export interface DeptInput {
+  parentId: number;
+  name: string;
+  sort: number;
+  phone?: string;
+  email?: string;
+  leaderUserId?: number;
+}
+
+export async function createDept(input: DeptInput): Promise<number> {
+  return request<number>('/admin-api/system/dept/create', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateDept(row: DeptRow, patch: Partial<DeptInput>): Promise<void> {
+  await request<void>('/admin-api/system/dept/update', {
+    method: 'PUT',
+    body: JSON.stringify({
+      id: row.id,
+      parentId: row.parentId,
+      name: row.name,
+      sort: row.sort,
+      phone: row.phone,
+      email: row.email,
+      leaderUserId: row.leaderUserId ?? undefined,
+      ...patch,
+    }),
+  });
+}
+
+export async function deleteDept(id: number): Promise<void> {
+  await request<void>(`/admin-api/system/dept/delete?id=${id}`, { method: 'DELETE' });
+}
+
+/* ──────────────────── 菜单（system/menu，权限树原料） ──────────────────── */
+
+export interface MenuRow {
+  id: number;
+  parentId: number;
+  name: string;
+  /** 1=目录 2=菜单 3=按钮（按钮型作权限树叶子，permission 才有码）。 */
+  type: 1 | 2 | 3;
+  permission: string;
+  status: CommonStatus;
+  sort: number;
+}
+
+interface MenuListItem {
+  id: number;
+  parentId: number;
+  name: string;
+  type: number;
+  permission: string | null;
+  status: number;
+  sort: number | null;
+}
+
+/** 全量菜单（目录/菜单/按钮），MenuPermDialog 按 parentId 组树渲染勾选。 */
+export async function fetchMenus(): Promise<MenuRow[]> {
+  const list = await request<MenuListItem[]>('/admin-api/system/menu/list');
+  return list.map((menu) => ({
+    id: menu.id,
+    parentId: menu.parentId,
+    name: menu.name,
+    type: (menu.type === 1 || menu.type === 3 ? menu.type : 2) as MenuRow['type'],
+    permission: menu.permission ?? '',
+    status: (menu.status === 1 ? 1 : 0) as CommonStatus,
+    sort: menu.sort ?? 0,
+  }));
+}
+
+/* ────────────── 应用权限码（portal-app-permission，角色页权限卡） ────────────── */
+
+export interface AppPermissionRow {
+  id: number;
+  appId: string;
+  code: string;
+  name: string;
+  description: string;
+  module: string;
+  createTime: number;
+}
+
+interface AppPermissionPageItem {
+  id: number;
+  appId: string;
+  code: string;
+  name: string | null;
+  description: string | null;
+  module: string | null;
+  createTime: number | null;
+}
+
+// ponytail: 单页拉全量（pageSize=100），权限码过百再接真分页
+export async function fetchAppPermissions(): Promise<AppPermissionRow[]> {
+  const page = await request<{ list: AppPermissionPageItem[]; total: number }>(
+    '/admin-api/portal-app-permission/page?pageNo=1&pageSize=100',
+  );
+  return page.list.map((item) => ({
+    id: item.id,
+    appId: item.appId,
+    code: item.code,
+    name: item.name ?? item.code,
+    description: item.description ?? '',
+    module: item.module ?? '',
+    createTime: item.createTime ?? 0,
+  }));
+}
+
+/* ──────────────── 用户-角色 / 角色-菜单 分配（permission） ──────────────── */
+
+/** 某用户当前持有的角色 id 列表（RoleAssignDialog 回显勾选）。 */
+export async function fetchUserRoles(userId: number): Promise<number[]> {
+  return request<number[]>(`/admin-api/system/permission/list-user-roles?userId=${userId}`);
+}
+
+/** 某角色当前勾选的菜单 id 列表（含父节点 id，MenuPermDialog 回显用）。 */
+export async function fetchRoleMenus(roleId: number): Promise<number[]> {
+  return request<number[]>(`/admin-api/system/permission/list-role-menus?roleId=${roleId}`);
+}
+
+export async function assignUserRoles(userId: number, roleIds: number[]): Promise<void> {
+  await request<void>('/admin-api/system/permission/assign-user-role', {
+    method: 'POST',
+    body: JSON.stringify({ userId, roleIds }),
+  });
+}
+
+/** menuIds 须是 [...checked, ...halfChecked] 全集（Yudao 存父节点 id，漏父丢勾）。 */
+export async function assignRoleMenus(roleId: number, menuIds: number[]): Promise<void> {
+  await request<void>('/admin-api/system/permission/assign-role-menu', {
+    method: 'POST',
+    body: JSON.stringify({ roleId, menuIds }),
+  });
 }
