@@ -13,8 +13,8 @@ import {
   message,
 } from 'dingtalk-design-desktop';
 import type { TableColumnsType } from 'dingtalk-design-desktop';
-import { fetchApplications, updateApplication } from '../../api/yudao';
-import type { ApplicationRow } from '../../api/yudao';
+import { fetchApplications, fetchAppVersions, updateApplication } from '../../api/yudao';
+import type { ApplicationRow, AppVersionRow } from '../../api/yudao';
 import { CHANNEL_META } from '../../store/domain';
 import type { AppChannel, CommonStatus } from '../../store/domain';
 import RowActions from '../parts/RowActions';
@@ -70,6 +70,12 @@ export default function ApplicationsPage() {
   const [canaryVersion, setCanaryVersion] = useState('');
   const [canaryRatio, setCanaryRatio] = useState(10);
 
+  /** 版本与回滚弹窗（批次 I）：目标行 + 磁盘版本目录 + 回滚二次确认。 */
+  const [versionsTarget, setVersionsTarget] = useState<ApplicationRow | null>(null);
+  const [versions, setVersions] = useState<AppVersionRow[]>([]);
+  const [versionsLoading, setVersionsLoading] = useState(false);
+  const [rollbackTarget, setRollbackTarget] = useState<AppVersionRow | null>(null);
+
   /** 写操作统一动线：busy 锁按钮 → 成功 message+reload → 失败透出人话错误。 */
   async function runWrite(successText: string, action: () => Promise<void>): Promise<void> {
     setBusy(true);
@@ -116,6 +122,33 @@ export default function ApplicationsPage() {
     await runWrite(next === 1 ? '应用已下架。' : '应用已重新上架。', async () => {
       await updateApplication(row, { status: next });
       setPendingStatus(null);
+    });
+  }
+
+  async function openVersions(row: ApplicationRow) {
+    setVersionsTarget(row);
+    setVersions([]);
+    setVersionsLoading(true);
+    try {
+      setVersions(await fetchAppVersions(row.appId));
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : '版本列表加载失败。');
+      setVersionsTarget(null);
+    } finally {
+      setVersionsLoading(false);
+    }
+  }
+
+  /** 稳定版回滚=指针拨回（版本目录不可变）；canary 撤退走「调整发布通道」清字段。 */
+  async function confirmRollback() {
+    if (!versionsTarget || !rollbackTarget) return;
+    await runWrite(`已回滚到 ${rollbackTarget.version}。`, async () => {
+      await updateApplication(versionsTarget, {
+        version: rollbackTarget.version,
+        latestVersion: rollbackTarget.version,
+      });
+      setRollbackTarget(null);
+      setVersions(await fetchAppVersions(versionsTarget.appId));
     });
   }
 
@@ -205,6 +238,11 @@ export default function ApplicationsPage() {
               key: 'channel',
               label: '调整发布通道',
               onClick: () => openChannelDialog(record),
+            },
+            {
+              key: 'versions',
+              label: '版本与回滚',
+              onClick: () => openVersions(record),
             },
             {
               key: record.status === 0 ? 'unpublish' : 'republish',
@@ -356,6 +394,82 @@ export default function ApplicationsPage() {
             </label>
           </div>
         ) : null}
+      </Modal>
+
+      {/* 版本与回滚（批次 I）：磁盘版本目录 + 指针徽标；旧目录不可变，回滚即改指针 */}
+      <Modal
+        open={versionsTarget !== null}
+        title={`版本与回滚 · ${versionsTarget?.name ?? ''}`}
+        footer={null}
+        onCancel={() => setVersionsTarget(null)}
+      >
+        <p className="ui-cell-sub" style={{ marginBottom: 8 }}>
+          版本目录不可变：回滚只是把展示指针拨回旧版，旧版本文件原样保留，随时可再切回。
+        </p>
+        <Table<AppVersionRow>
+          rowKey="version"
+          size="small"
+          loading={versionsLoading}
+          dataSource={versions}
+          pagination={false}
+          columns={[
+            {
+              title: '版本',
+              dataIndex: 'version',
+              key: 'version',
+              render: (value: string) => <span className="ui-num">{value}</span>,
+            },
+            {
+              title: '发布时间',
+              dataIndex: 'buildTime',
+              key: 'buildTime',
+              render: (value: string | null) => <span className="ui-num">{value ?? '—'}</span>,
+            },
+            {
+              title: '发布人',
+              dataIndex: 'uploader',
+              key: 'uploader',
+              render: (value: string | null) => value ?? '—',
+            },
+            {
+              title: '指针',
+              key: 'flags',
+              render: (_, record) => (
+                <>
+                  {record.isDisplay ? <Tag color="blue" size="small">当前展示</Tag> : null}
+                  {record.isCanary ? <Tag color="orange" size="small">试运行</Tag> : null}
+                  {record.isLatest ? <Tag size="small">稳定最新</Tag> : null}
+                </>
+              ),
+            },
+            {
+              title: '操作',
+              key: 'actions',
+              width: 116,
+              render: (_, record) => (
+                <Button size="small" disabled={record.isDisplay} onClick={() => setRollbackTarget(record)}>
+                  回滚到此版
+                </Button>
+              ),
+            },
+          ]}
+        />
+      </Modal>
+
+      {/* 回滚二次确认 */}
+      <Modal
+        open={rollbackTarget !== null}
+        title="回滚确认"
+        okText={`回滚到 ${rollbackTarget?.version ?? ''}`}
+        cancelText="取消"
+        confirmLoading={busy}
+        onOk={confirmRollback}
+        onCancel={() => setRollbackTarget(null)}
+      >
+        <p>
+          「{versionsTarget?.name}」将回滚到 {rollbackTarget?.version}，成员下次进入应用即回到该版本；
+          当前版本文件不会被删除，随时可再切回。
+        </p>
       </Modal>
     </div>
   );
