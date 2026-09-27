@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Button, Card, Input, InputNumber, Radio, Select, Steps, message } from 'dingtalk-design-desktop';
-import { createApplication, updateApplication } from '../../api/yudao';
+import { createApplication, updateApplication, uploadPackage } from '../../api/yudao';
 import type { ApplicationRow } from '../../api/yudao';
 
 /**
@@ -98,6 +98,9 @@ export default function PublishPage() {
   const editing = (location.state as { app?: ApplicationRow } | null)?.app;
   const [form, setForm] = useState<PublishForm>(() => initialForm(editing));
   const [submitting, setSubmitting] = useState(false);
+  const [zipFile, setZipFile] = useState<File | null>(null);
+  /** 上传通道（批次 I）：选中 zip 后，版本/入口等字段以包内 manifest 为准，表单隐藏。 */
+  const manifestDriven = !editing && zipFile !== null;
 
   const setField = (key: keyof PublishForm, value: string | number) =>
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -105,10 +108,13 @@ export default function PublishPage() {
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     if (submitting) return;
-    const missing = REQUIRED_FIELDS.filter((field) => !String(form[field.key]).trim()).map(
-      (field) => field.label,
-    );
-    if (form.mode === 'canary' && !form.canaryVersion.trim()) {
+    const required = zipFile
+      ? REQUIRED_FIELDS.filter((field) => field.key === 'appId')
+      : REQUIRED_FIELDS;
+    const missing = required
+      .filter((field) => !String(form[field.key]).trim())
+      .map((field) => field.label);
+    if (!zipFile && form.mode === 'canary' && !form.canaryVersion.trim()) {
       missing.push('试运行版本');
     }
     if (missing.length > 0) {
@@ -117,7 +123,19 @@ export default function PublishPage() {
     }
     setSubmitting(true);
     try {
-      if (editing) {
+      if (zipFile) {
+        const result = await uploadPackage({
+          appId: form.appId.trim(),
+          channel: form.mode,
+          ...(form.mode === 'canary' ? { canaryRatio: form.canaryRatio } : {}),
+          file: zipFile,
+        });
+        message.success(
+          result.previousVersion
+            ? `已发布 ${result.version}（原版本 ${result.previousVersion}）。`
+            : `已发布 ${result.version}。`,
+        );
+      } else if (editing) {
         await updateApplication(editing, {
           name: form.name.trim(),
           version: form.version.trim(),
@@ -172,23 +190,41 @@ export default function PublishPage() {
         <Card className="ui-card" title={editing ? '编辑应用信息' : '应用信息'}>
           <form aria-label="应用发布" onSubmit={handleSubmit}>
             <div className="ui-form-grid">
-              <label className="ui-field">
-                <span className="ui-field__label">应用名称</span>
-                <Input
-                  value={form.name}
-                  onChange={(event) => setField('name', event.target.value)}
-                  placeholder="例如：图像工坊"
-                />
-              </label>
+              {editing ? null : (
+                <label className="ui-field ui-field--full">
+                  <span className="ui-field__label">
+                    产物包（.zip）
+                    <span>可选：上传后名称、版本等发布信息以包内清单文件为准</span>
+                  </span>
+                  <input
+                    type="file"
+                    accept=".zip"
+                    onChange={(event) => setZipFile(event.target.files?.[0] ?? null)}
+                  />
+                </label>
+              )}
 
-              <label className="ui-field">
-                <span className="ui-field__label">版本号</span>
-                <Input
-                  value={form.version}
-                  onChange={(event) => setField('version', event.target.value)}
-                  placeholder="例如：1.4.0"
-                />
-              </label>
+              {manifestDriven ? null : (
+                <>
+                  <label className="ui-field">
+                    <span className="ui-field__label">应用名称</span>
+                    <Input
+                      value={form.name}
+                      onChange={(event) => setField('name', event.target.value)}
+                      placeholder="例如：图像工坊"
+                    />
+                  </label>
+
+                  <label className="ui-field">
+                    <span className="ui-field__label">版本号</span>
+                    <Input
+                      value={form.version}
+                      onChange={(event) => setField('version', event.target.value)}
+                      placeholder="例如：1.4.0"
+                    />
+                  </label>
+                </>
+              )}
 
               <label className="ui-field">
                 <span className="ui-field__label">
@@ -203,41 +239,45 @@ export default function PublishPage() {
                 />
               </label>
 
-              <label className="ui-field">
-                <span className="ui-field__label">技术框架</span>
-                <Select
-                  value={form.framework}
-                  options={FRAMEWORK_OPTIONS}
-                  onChange={(value) => setField('framework', value)}
-                />
-              </label>
+              {manifestDriven ? null : (
+                <>
+                  <label className="ui-field">
+                    <span className="ui-field__label">技术框架</span>
+                    <Select
+                      value={form.framework}
+                      options={FRAMEWORK_OPTIONS}
+                      onChange={(value) => setField('framework', value)}
+                    />
+                  </label>
 
-              <label className="ui-field">
-                <span className="ui-field__label">访问入口</span>
-                <Input
-                  value={form.entry}
-                  onChange={(event) => setField('entry', event.target.value)}
-                  placeholder="应用页面地址，例如：/subapps/image-studio/"
-                />
-              </label>
+                  <label className="ui-field">
+                    <span className="ui-field__label">访问入口</span>
+                    <Input
+                      value={form.entry}
+                      onChange={(event) => setField('entry', event.target.value)}
+                      placeholder="应用页面地址，例如：/subapps/image-studio/"
+                    />
+                  </label>
 
-              <label className="ui-field">
-                <span className="ui-field__label">路由前缀</span>
-                <Input
-                  value={form.baseRoute}
-                  onChange={(event) => setField('baseRoute', event.target.value)}
-                  placeholder="例如：/image-studio"
-                />
-              </label>
+                  <label className="ui-field">
+                    <span className="ui-field__label">路由前缀</span>
+                    <Input
+                      value={form.baseRoute}
+                      onChange={(event) => setField('baseRoute', event.target.value)}
+                      placeholder="例如：/image-studio"
+                    />
+                  </label>
 
-              <label className="ui-field ui-field--full">
-                <span className="ui-field__label">后端服务地址</span>
-                <Input
-                  value={form.backendApi}
-                  onChange={(event) => setField('backendApi', event.target.value)}
-                  placeholder="应用调用的服务地址，例如：http://jbslab.bili:48080/admin-api"
-                />
-              </label>
+                  <label className="ui-field ui-field--full">
+                    <span className="ui-field__label">后端服务地址</span>
+                    <Input
+                      value={form.backendApi}
+                      onChange={(event) => setField('backendApi', event.target.value)}
+                      placeholder="应用调用的服务地址，例如：http://jbslab.bili:48080/admin-api"
+                    />
+                  </label>
+                </>
+              )}
 
               <div className="ui-field ui-field--full">
                 <span className="ui-field__label">发布方式</span>
@@ -252,14 +292,16 @@ export default function PublishPage() {
 
               {form.mode === 'canary' ? (
                 <>
-                  <label className="ui-field">
-                    <span className="ui-field__label">试运行版本</span>
-                    <Input
-                      value={form.canaryVersion}
-                      onChange={(event) => setField('canaryVersion', event.target.value)}
-                      placeholder="例如：1.5.0-rc.1"
-                    />
-                  </label>
+                  {manifestDriven ? null : (
+                    <label className="ui-field">
+                      <span className="ui-field__label">试运行版本</span>
+                      <Input
+                        value={form.canaryVersion}
+                        onChange={(event) => setField('canaryVersion', event.target.value)}
+                        placeholder="例如：1.5.0-rc.1"
+                      />
+                    </label>
+                  )}
                   <label className="ui-field">
                     <span className="ui-field__label">试运行比例</span>
                     <InputNumber

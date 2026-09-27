@@ -18,6 +18,8 @@ import {
   updateDept,
   updateRole,
   updateUserStatus,
+  uploadPackage,
+  fetchAppVersions,
 } from './yudao';
 import type { ApiError } from './yudao';
 import type { ApplicationRow, DeptRow, RoleRow, UserRow } from './yudao';
@@ -429,5 +431,66 @@ describe('写通道封装（批次 H）', () => {
     expect(calls[0].url).toContain('/portal-app/create');
     expect(calls[0].method).toBe('POST');
     expect(calls[0].body).toMatchObject({ appId: 'new-app', framework: 'react', status: 0 });
+  });
+});
+
+describe('产物包上传通道（批次 I）', () => {
+  it('uploadPackage 发 FormData：不设手工 Content-Type，multipart 字段齐全', async () => {
+    seedSession();
+    const calls: Array<RequestInit | undefined> = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+        calls.push(init);
+        return jsonResponse({
+          code: 0,
+          msg: '',
+          data: {
+            appId: 'demo-vue', version: '1.0.0', entry: '/subapps/demo-vue/1.0.0/',
+            checksumSha256: 'a'.repeat(64), previousVersion: null,
+            rewriteStats: { scriptRewritten: 1, linkRewritten: 0, cssUrlRewritten: 0 },
+            permissionsUpserted: [],
+          },
+        });
+      }),
+    );
+
+    const file = new File([new Uint8Array([80, 75, 3, 4])], 'pkg.zip', { type: 'application/zip' });
+    const result = await uploadPackage({ appId: 'demo-vue', channel: 'canary', canaryRatio: 30, file });
+
+    const init = calls[0];
+    expect(init?.body).toBeInstanceOf(FormData);
+    // FormData 分支不设手工 Content-Type（boundary 由浏览器生成）
+    expect((init?.headers as Record<string, string>)['Content-Type']).toBeUndefined();
+    expect((init?.headers as Record<string, string>)['tenant-id']).toBe('1');
+    const body = init?.body as FormData;
+    expect(body.get('appId')).toBe('demo-vue');
+    expect(body.get('channel')).toBe('canary');
+    expect(body.get('canaryRatio')).toBe('30');
+    expect(body.get('file')).toBe(file);
+    expect(result.entry).toBe('/subapps/demo-vue/1.0.0/');
+  });
+
+  it('fetchAppVersions 走 versions 端点并透传 appId', async () => {
+    seedSession();
+    const urls: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        urls.push(String(input));
+        return jsonResponse({
+          code: 0,
+          msg: '',
+          data: [
+            { version: '2.0.0', buildTime: '2026-09-27T10:00:00', uploader: 'admin',
+              sha256: 'b'.repeat(64), isLatest: true, isCanary: false, isDisplay: true },
+          ],
+        });
+      }),
+    );
+
+    const versions = await fetchAppVersions('demo-vue');
+    expect(urls[0]).toBe('/admin-api/portal-app/versions?appId=demo-vue');
+    expect(versions[0]).toMatchObject({ version: '2.0.0', isLatest: true });
   });
 });

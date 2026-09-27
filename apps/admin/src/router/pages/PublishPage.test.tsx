@@ -15,6 +15,7 @@ import PublishPage from './PublishPage';
 
 const createApplication = vi.fn();
 const updateApplication = vi.fn();
+const uploadPackage = vi.fn();
 
 vi.mock('../../api/yudao', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../api/yudao')>();
@@ -22,6 +23,7 @@ vi.mock('../../api/yudao', async (importOriginal) => {
     ...actual,
     createApplication: (...args: unknown[]) => createApplication(...args),
     updateApplication: (...args: unknown[]) => updateApplication(...args),
+    uploadPackage: (...args: unknown[]) => uploadPackage(...args),
   };
 });
 
@@ -138,5 +140,64 @@ describe('发布页真实表单（批次 H）', () => {
     expect(row).toMatchObject({ id: 2, appId: 'video-studio' });
     expect(patch).toMatchObject({ name: '视频工坊-改名', framework: 'vue3', canaryVersion: '1.3.0-rc.1', canaryRatio: 20 });
     expect(createApplication).not.toHaveBeenCalled();
+  });
+});
+
+describe('发布页上传通道（批次 I）', () => {
+  beforeEach(() => {
+    uploadPackage.mockReset().mockResolvedValue({
+      appId: 'image-studio-2',
+      version: '0.3.0',
+      entry: '/subapps/image-studio-2/0.3.0/',
+      checksumSha256: 'a'.repeat(64),
+      previousVersion: null,
+      rewriteStats: { scriptRewritten: 1, linkRewritten: 0, cssUrlRewritten: 0 },
+      permissionsUpserted: [{ code: 'image-studio-2:task:create', action: 'created' }],
+    });
+  });
+
+  it('选中 zip 后隐藏 manifest 决定的字段，提交走 uploadPackage', async () => {
+    renderPage();
+    await screen.findByRole('form', { name: '应用发布' });
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File([new Uint8Array([80, 75, 3, 4])], 'pkg.zip', { type: 'application/zip' });
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    // manifest 决定的字段整体隐藏（防止假控制感），应用标识保留为身份锚点
+    expect(screen.queryByLabelText('版本号')).toBeNull();
+    expect(screen.queryByLabelText('应用名称')).toBeNull();
+    expect(screen.queryByLabelText('访问入口')).toBeNull();
+
+    fireEvent.change(screen.getByLabelText(/应用标识/), { target: { value: 'image-studio-2' } });
+    fireEvent.submit(screen.getByRole('form', { name: '应用发布' }));
+
+    await waitFor(() => expect(screen.getByText('apps-page')).toBeTruthy());
+    expect(uploadPackage).toHaveBeenCalledTimes(1);
+    expect(uploadPackage.mock.calls[0][0]).toMatchObject({
+      appId: 'image-studio-2',
+      channel: 'stable',
+      file,
+    });
+    expect(createApplication).not.toHaveBeenCalled();
+  });
+
+  it('上传失败文案如实上屏（如 appId 与 manifest 不一致）', async () => {
+    uploadPackage.mockRejectedValue(new Error('表单应用标识(image-studio-2)与包内 manifest(other-app)不一致'));
+    renderPage();
+    await screen.findByRole('form', { name: '应用发布' });
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(fileInput, {
+      target: { files: [new File([new Uint8Array([80, 75, 3, 4])], 'pkg.zip')] },
+    });
+    fireEvent.change(screen.getByLabelText(/应用标识/), { target: { value: 'image-studio-2' } });
+    fireEvent.submit(screen.getByRole('form', { name: '应用发布' }));
+
+    await waitFor(() => expect(screen.getByText(/与包内 manifest\(other-app\)不一致/)).toBeTruthy());
+  });
+
+  it('编辑模式不出现上传通道', async () => {
+    renderPage({ app: EDIT_ROW });
+    await screen.findByRole('form', { name: '应用发布' });
+    expect(document.querySelector('input[type="file"]')).toBeNull();
   });
 });

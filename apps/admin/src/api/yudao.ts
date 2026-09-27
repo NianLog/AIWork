@@ -5,6 +5,8 @@ import type { AppChannel, CommonStatus } from '../store/domain';
  * 批次 F 增加单飞刷新、401 自动重试与真实登出。
  * 批次 H（2026-09-27）扩全五页读写封装：system user/role/dept/menu、permission
  * 的用户-角色与角色-菜单分配、portal-app 发布闭环、portal-app-permission 权限码。
+ * 批次 I（2026-09-27）加产物包上传通道：request 底座识别 FormData（不设
+ * Content-Type，boundary 由浏览器生成），portal-app/upload-package 与 versions。
  * 行类型与封装同址住本文件，不拆 system.ts（request 底座保持私有共享，
  * 见 .agents/notes/proposed/architecture/2026-09-27-batch-h-admin-real-data.md）。
  *
@@ -137,7 +139,8 @@ async function request<T>(
   const response = await fetch(path, {
     ...init,
     headers: {
-      'Content-Type': 'application/json',
+      // FormData 不设 Content-Type：浏览器按 multipart boundary 自设（批次 I 上传通道）
+      ...(init.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
       'tenant-id': TENANT_ID,
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...init.headers,
@@ -372,6 +375,60 @@ function applicationPayload(row: ApplicationRow): ApplicationInput {
     status: row.status,
     audit: row.audit,
   };
+}
+
+/* ────────────────── 产物包发布（portal-app，批次 I） ────────────────── */
+
+/** 上传结果：entry 已是版本化绝对路径（/subapps/{appId}/{version}/）。 */
+export interface AppPackageUploadResult {
+  appId: string;
+  version: string;
+  entry: string;
+  checksumSha256: string;
+  previousVersion: string | null;
+  rewriteStats: { scriptRewritten: number; linkRewritten: number; cssUrlRewritten: number };
+  permissionsUpserted: Array<{ code: string; action: string }>;
+}
+
+/** 版本目录行（GET /versions）：isXxx 指针标记由后端 Boolean 包装类型保键名。 */
+export interface AppVersionRow {
+  version: string;
+  buildTime: string | null;
+  uploader: string | null;
+  sha256: string | null;
+  isLatest: boolean;
+  isCanary: boolean;
+  isDisplay: boolean;
+}
+
+/**
+ * zip 产物包上传（multipart）：版本号只来自包内 micro-app.config.json，
+ * 表单不传 version。canary 缺省比例由后端补 10。
+ */
+export async function uploadPackage(input: {
+  appId: string;
+  channel: 'stable' | 'canary';
+  canaryRatio?: number;
+  file: File;
+}): Promise<AppPackageUploadResult> {
+  const form = new FormData();
+  form.append('file', input.file);
+  form.append('appId', input.appId);
+  form.append('channel', input.channel);
+  if (input.channel === 'canary' && input.canaryRatio != null) {
+    form.append('canaryRatio', String(input.canaryRatio));
+  }
+  return request<AppPackageUploadResult>('/admin-api/portal-app/upload-package', {
+    method: 'POST',
+    body: form,
+  });
+}
+
+/** 某应用的已发布版本目录（语义版本倒序，新在前）。 */
+export async function fetchAppVersions(appId: string): Promise<AppVersionRow[]> {
+  return request<AppVersionRow[]>(
+    `/admin-api/portal-app/versions?appId=${encodeURIComponent(appId)}`,
+  );
 }
 
 /* ────────────────────────── 用户（system/user） ────────────────────────── */
