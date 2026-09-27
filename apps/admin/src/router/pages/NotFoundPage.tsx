@@ -1,6 +1,5 @@
 import { useNavigate } from 'react-router-dom';
 import { Button } from 'dingtalk-design-desktop';
-import { DEMO_DISCLOSURE } from '../../store/demoDirectory';
 
 /**
  * 兜底页：地址不存在时的落脚点。
@@ -32,9 +31,6 @@ export default function NotFoundPage() {
           </Button>
           <Button onClick={() => navigate('/login')}>返回登录页</Button>
         </div>
-        <p className="ui-fallback__note" role="note" aria-label="体验说明">
-          {DEMO_DISCLOSURE}：当前是界面功能体验，不含真实业务数据，也不授予任何管理权限。
-        </p>
       </div>
     </main>
   );

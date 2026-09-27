@@ -1,7 +1,7 @@
 import { Suspense, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { Alert, Avatar, Breadcrumb, Button, Input, Menu, Tag } from 'dingtalk-design-desktop';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Avatar, Breadcrumb, Button, Input, Menu, Tag } from 'dingtalk-design-desktop';
 import {
   AiDiagonalStarsFilled,
   AppletOutlined,
@@ -13,24 +13,24 @@ import {
   SearchOutlined,
   UploadOutlined,
 } from 'dd-icons';
-import { DEMO_DISCLOSURE, DEMO_EXPLANATION, DEMO_OPERATOR } from '../store/demoDirectory';
 import { logoutRemote, readSession } from '../api/yudao';
 import { useRouteMeta } from '../shell/useRouteMeta';
 import type { RouteMeta } from '../shell/useRouteMeta';
 import PageFallback from '../router/PageFallback';
 
 /**
- * 后台外壳：左侧分组导航 + 顶部面包屑与身份区 + 披露提示条。
+ * 后台外壳：左侧分组导航 + 顶部面包屑与身份区（批次 H 起五页全部真实接口，
+ * 演示披露条与未登录占位身份随 demoDirectory 一起退役）。
  *
- * 导航点击只切换后台内部路由，不产生任何外部跳转。身份区随会话切换（批次 B 起）：
- * 登录后显示账号信息并提供「退出登录」（批次 F 起吊销后端双令牌并清空会话回登录页）；未登录预览时是占位身份，
- * 退出按钮保持禁用——没有登录态就不存在退出动作，可用的退出按钮会让人误以为已经登录。
+ * 导航点击只切换后台内部路由，不产生任何外部跳转。身份区显示登录账号
+ * （批次 F 起退出登录吊销后端双令牌并清空会话回登录页）；/preview 由
+ * RequireAdminSession 在外壳之前拦截，无会话时外壳根本不渲染。
  *
  * 版式取舍：
  * - 不再用组件库 Layout/Sider 的自动折叠（breakpoint="lg" 到 992px 会把 216px 侧栏
  *   压成 80px 图标栏，菜单项变成一排认不出的图标）。窄屏改成「侧栏滑出 + 遮罩」，
  *   宽屏是固定的 240px 侧栏；同一份菜单 DOM，靠一个类切换位置，不做两份。
- * - 披露提示条压在内容区顶部而不是横跨整个窗口：它属于内容，不属于导航。
+ * - 顶部只有标题一行（演示期与标题同排的披露条已随批次 H 退役）。
  * - 内容区只有一条左右基准线：侧栏是固定宽度，主区自己居中版心，
  *   不再用 max((100% - 版心)/2) 去猜另一侧的宽度。
  */
@@ -226,7 +226,7 @@ export default function AdminShell() {
               prefix={<SearchOutlined />}
             />
             <Tag className="admin-header__env" color="default">
-              {session ? '联调环境' : DEMO_OPERATOR.envLabel}
+              联调环境
             </Tag>
             <span className="admin-header__divider" aria-hidden="true" />
             {session ? (
@@ -239,15 +239,7 @@ export default function AdminShell() {
                   <span className="admin-operator__role">账号 {session.user.username}</span>
                 </span>
               </span>
-            ) : (
-              <Link className="admin-operator" to="/login" aria-label="返回登录页">
-                <Avatar className="admin-operator__avatar">管</Avatar>
-                <span className="admin-operator__text">
-                  <span className="admin-operator__name">{DEMO_OPERATOR.displayName}</span>
-                  <span className="admin-operator__role">{DEMO_OPERATOR.roleLabel}</span>
-                </span>
-              </Link>
-            )}
+            ) : null}
             <Button
               className="admin-header__logout"
               disabled={!session}
@@ -257,7 +249,7 @@ export default function AdminShell() {
                 navigate('/login');
               }}
             >
-              {session ? '退出登录' : '退出登录（尚未登录）'}
+              退出登录
             </Button>
           </div>
         </header>
@@ -277,19 +269,8 @@ export default function AdminShell() {
               {/*
                 页面主标题（h1）由外壳统一渲染：后台五个页面同构，各页再写一遍标题
                 只会在某天出现两个 h1 或者一个都没有。标题数据来自路由 handle（见 useRouteMeta）。
-
-                DOM 上 h1 在披露条之前：读屏先读到页面名、再读整段披露，信息主次才对。
-                视觉位置不变——.admin-pagehead__title 的 order: 2 让它仍然靠右。
               */}
               <h1 className="admin-pagehead__title">{meta.title}</h1>
-
-              <Alert
-                className="admin-banner"
-                type="info"
-                role="note"
-                message={DEMO_DISCLOSURE}
-                description={DEMO_EXPLANATION}
-              />
             </div>
 
             <main className="admin-content" id="admin-main" tabIndex={-1} ref={mainRef}>

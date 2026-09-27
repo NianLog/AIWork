@@ -5,7 +5,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
 import { SESSION_KEY } from './api/yudao';
 import type { AdminSession } from './api/yudao';
-import { DEMO_DISCLOSURE, DEMO_EXPLANATION } from './store/demoDirectory';
 
 /**
  * 后台测试：锁安全语义与「说人话」，不锁具体版式。
@@ -13,15 +12,16 @@ import { DEMO_DISCLOSURE, DEMO_EXPLANATION } from './store/demoDirectory';
  * 六条不可协商的性质：
  * 1. 登录真实可用（批次 B 起）：凭据只换取 sessionStorage 会话（引导文档 §8.4），
  *    退出登录即清空；未登录访问数据页被守卫拦截到登录页（批次 F），而不是数据；
- * 2. 体验界面持续声明演示态（role="note" + DEMO_DISCLOSURE + DEMO_EXPLANATION）；
- * 3. 示例数据只读——写意图按钮全部禁用且点击无效，只读控件（检索、状态筛选）保持可用；
+ * 2. 五个业务页全部走真实接口（批次 H 起，演示目录已删）：页面行为由 URL 分流的
+ *    fetch mock 锁定，演示态断言组随之退役；
+ * 3. 写操作真实可用：载荷形态由各页测试锁死，本文件守链路与整体文案口径；
  * 4. 全站不存在外部链接，演示 entry / backendApi（.invalid 保留域）不可能被导航到；
  * 5. 界面文案不得出现工程术语——终端用户看不懂的表述等于没有表述；
- * 6. 界面不得摊出内部标识（角色编码、记录主键、权限码）——那是给程序看的，不是给人看的。
+ * 6. 界面不得摊出内部标识（角色编码、权限码）——那是给程序看的，不是给人看的。
  *
- * 批次 B 起 /preview/apps 的数据来自真实接口：这里全局 mock fetch 返回固定三应用
- * （正式版 / 试运行 / 停用各一），会话经 sessionStorage 预置；需要未登录场景的用例
- * 在开头显式清掉。登录 / 失败 / 重试的请求都走同一个 mock，按 URL 分流。
+ * 批次 H 起五页数据均来自真实接口：这里全局 mock fetch（按 URL 分流返回固定记录），
+ * 会话经 sessionStorage 预置；需要未登录场景的用例在开头显式清掉。
+ * 登录 / 失败 / 重试的请求都走同一个 mock。
  *
  * 版式、组件选型与措辞可以自由调整，只要这六条不破，测试就不该红。
  *
@@ -66,9 +66,6 @@ const ENGINEERING_TERMS = [
 const INTERNAL_IDENTIFIERS = [
   'platform:admin',
   'ai-image-gen:task:create',
-  'r-01',
-  'u-1001',
-  'o-01',
 ];
 
 /** 预置会话：大多数用例以「已登录」姿态渲染，未登录用例自己清掉。 */
@@ -207,11 +204,6 @@ function openAdmin(path = '/') {
   return render(<App />);
 }
 
-/** 所有 role="note" 的文本合并，便于断言披露语义是否持续在场。 */
-function allNotes() {
-  return screen.getAllByRole('note').map((note) => note.textContent ?? '');
-}
-
 function allHrefs() {
   return Array.from(document.querySelectorAll('a[href]')).map((anchor) =>
     anchor.getAttribute('href') ?? '',
@@ -316,21 +308,18 @@ describe('后台登录页', () => {
   });
 });
 
-describe('后台体验界面', () => {
-  it.each(PREVIEW_ROUTES)('%s 持续声明演示态', async (path) => {
+describe('后台业务界面', () => {
+  it.each(PREVIEW_ROUTES)('%s 页面文案保持业务语言', async (path) => {
     openAdmin(path);
-    // 批次 G 起五页懒加载：等页面内容真正挂载，术语检查才覆盖页面文本（防空转）
+    // 五页懒加载：等页面内容真正挂载，术语检查才覆盖页面文本（防空转）
     await waitFor(() =>
       expect(document.querySelector('.admin-content')?.textContent ?? '').not.toBe(''),
     );
 
-    const notes = allNotes().join('\n');
-    expect(notes).toContain(DEMO_DISCLOSURE);
-    expect(notes).toContain(DEMO_EXPLANATION);
     expectBusinessLanguage();
   });
 
-  it('侧边导航覆盖五个管理页，逐页切换后披露仍在场', () => {
+  it('侧边导航覆盖五个管理页，逐页切换后标题跟随', () => {
     openAdmin('/preview/apps');
     const menu = screen.getByRole('menu', { name: '后台导航' });
 
@@ -354,7 +343,6 @@ describe('后台体验界面', () => {
 
       expect(window.location.pathname).toBe(path);
       expect(screen.getByRole('heading', { level: 1, name: headingName })).toBeTruthy();
-      expect(allNotes().join('\n')).toContain(DEMO_DISCLOSURE);
     }
   });
 
@@ -679,7 +667,6 @@ describe('未知地址', () => {
     openAdmin(path);
 
     expect(screen.getByText('页面不存在')).toBeTruthy();
-    expect(allNotes().join('\n')).toContain(DEMO_DISCLOSURE);
     expectBusinessLanguage();
 
     fireEvent.click(screen.getByRole('button', { name: '返回管理后台' }));
