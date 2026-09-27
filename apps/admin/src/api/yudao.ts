@@ -15,8 +15,10 @@ import type { AppChannel, CommonStatus } from '../store/domain';
  * - 多租户当前只有默认租户，tenant-id 固定为 1；
  * - 开发期同源：vite 把 /admin-api 代理到云上后端（见 vite.config.ts），
  *   代码里全部走相对路径，联调机不需要知道后端地址。
- * - update 系全部「整行展开再覆盖」：Yudao PUT 是全量语义，只发增量会把
- *   未传字段当空值处理（批次 H 风险条目一），页面侧禁止手工拼半截行。
+ * - update 系全部「整行展开再覆盖」：后端 updateById 走 MyBatis-Plus 非空更新
+ *   策略——漏传字段与 null 都保持 DB 原值不清空，清空必须显式传空串（通道调整
+ *   发 canaryVersion: '' 正踩此行为）。整行展开不为清空，为的是不依赖这条隐
+ *   式契约（Hyrum 定律：改 FieldStrategy 会破坏它，前端永远发全量最稳）。
  * - 端点与字段形状均于 2026-09-27 对 jbslab.bili:48080 实测；分页读统一
  *   pageSize=100 单页拉全（ponytail 口径，过百再接真分页）。
  */

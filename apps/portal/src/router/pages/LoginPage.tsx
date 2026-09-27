@@ -39,8 +39,12 @@ export default function LoginPage() {
   const [failure, setFailure] = useState('');
 
   const state = location.state as { from?: string; expired?: boolean } | null;
-  /** 回跳目标：只收站内路径（守卫写入，仍做一行防御），默认工作台。 */
-  const target = state?.from?.startsWith('/') && !state.from.startsWith('//') ? state.from : '/preview';
+  /** 回跳目标：只收站内路径（守卫写入，仍做一行防御）——反斜杠也拒：
+   *  浏览器把 /\ 当 // 归一化，放行即 open redirect（react-router GHSA-wrjc-x8rr-h8h6 载体）。 */
+  const target =
+    state?.from?.startsWith('/') && !state.from.startsWith('//') && !state.from.includes('\\')
+      ? state.from
+      : '/preview';
   const expired = state?.expired === true;
 
   async function completeLogin(establish: () => Promise<PortalSession>) {
