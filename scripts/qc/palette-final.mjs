@@ -1,11 +1,12 @@
 /**
- * 最终配色核验（临时工具，算完即删）。
+ * 最终配色核验（临时工具，算完即删）。2026-09-28 品牌换蓝后重跑：
+ * P 调色板与 brandInk 已随 tokens.css 更新（蓝版），C 段叙事按蓝系反转。
  *
- * 前两步的结论：
- *   1. #ED7D33 上的白字只有 2.77:1 —— 永不达 AA，所以品牌橙只做「非文字载体」
- *      （图标、描边、选中条、色块、图表），以及 ≥24px 大字；
- *   2. 钉钉原警示橙 #FF9200 与品牌橙 OKLab 距离 0.066 —— 品牌一旦用橙，
- *      警示色必须换色相，否则「品牌」与「警示」分不出来；
+ * 前两步的结论（橙时代定下的地基，换蓝后仍成立的部分）：
+ *   1. 橙时代 #ED7D33 白字仅 2.77:1，立下「品牌主色不做文字」的规矩；蓝版反转：
+ *      #2563EB 白字 5.17:1 达 AA，品牌色块上的文字取白（--ui-brand-ink）；
+ *   2. 语义色整体换相是橙时代的决策（#FF9200 与品牌橙 Δ 0.066）；换蓝后语义色
+ *      与品牌蓝的 OKLab 距离只增不减（D 段实测为证），保留为独立谱系；
  *   3. 旧的 muted #A9AEB3（2.24:1）与 subtle #878F95（3.28:1）都不达 AA。
  *
  * 这一步把手工定下的色板逐对核验，输出「哪些组合合规、哪些不许用」。
@@ -49,19 +50,19 @@ const delta = (a, b) => {
 };
 
 const P = {
-  brand: '#ed7d33',
-  brandStrong: '#a64a12',
-  brandText: '#a64a12',
-  brandSoft8: tint('#ed7d33', 0.08),
-  brandSoft12: tint('#ed7d33', 0.12),
+  brand: '#2563eb',
+  brandStrong: '#1d4ed8',
+  brandText: '#1d4ed8',
+  brandSoft8: '#f6f9fe',   /* 与 tokens.css --ui-brand-soft-weak 同值（硬编码消除计算漂移） */
+  brandSoft12: '#eff4fd',  /* 与 tokens.css --ui-brand-soft 同值 */
   success: '#0f7b45',
   successSoft: tint('#0f7b45', 0.08),
   warning: '#8a6100',
   warningSoft: tint('#8a6100', 0.08),
   danger: '#c0342f',
   dangerSoft: tint('#c0342f', 0.08),
-  info: '#2563a8',
-  infoSoft: tint('#2563a8', 0.08),
+  info: '#0e7490',
+  infoSoft: tint('#0e7490', 0.08),
   accent: '#0b727f',
   accentSoft: tint('#0d7c8c', 0.08),
   textStrong: '#171a1d',
@@ -107,15 +108,14 @@ check('brandStrong 白字底色', '#ffffff', P.brandStrong, 4.5);
 check('brandText 在白底', P.brandText, P.surfaceCard, 4.5);
 check('brandText 在 品牌淡底12%', P.brandText, P.brandSoft12, 4.5);
 check('brandText 在 品牌淡底8%', P.brandText, P.brandSoft8, 4.5);
-const brandOnWhite = contrast(P.brand, P.surfaceCard);
-const brandInk = '#2e1408';
-console.log(`  ! #ED7D33 纯色在白底 = ${fmt(brandOnWhite)}:1  → 达不到图形所需的 3:1`);
-console.log('    ⇒ 所以 #ED7D33 只允许出现在「大面积色块」上（顶栏品牌条、hero、图标瓦片底、');
-console.log('      渐变的浅端）。这类载体靠面积与色相被识别，不承载信息、不镶细线，');
-console.log('      WCAG 1.4.11（非文字对比）不适用；');
-console.log('      所有「细线 / 小图标 / 文字」一律取 brandStrong（同色相压暗），保证 ≥4.5:1。');
-check('白字 on #ED7D33（仍不达，故不采用）', '#ffffff', P.brand, 3);
-check(`brandInk ${brandInk} on #ED7D33 色块上的文字`, brandInk, P.brand, 4.5);
+const brandInk = '#ffffff';
+console.log(`  · #2563EB 纯色在白底 = ${fmt(contrast(P.brand, P.surfaceCard))}:1 ≥ 3:1，作图形与色块本身达标`);
+console.log('    ⇒ 令牌纪律不因达标而放松：文字 / 细线 / 小图标仍一律取 brandStrong（#1D4ED8，');
+console.log('      白底 6.64:1）——单一「深一档做前景」规则，避免两档蓝同屏打架；');
+console.log('      品牌色块（顶栏品牌条、登录 hero）上的文字取白（--ui-brand-ink，5.17:1）；');
+console.log('      深墨在蓝底仅 2.85:1 不可用——这是与橙时代正反互换的关键差异。');
+check('白字 on 品牌蓝 #2563EB（达标，采用为 brand-ink）', '#ffffff', P.brand, 4.5);
+check(`brandInk ${brandInk}（白）on 品牌蓝色块上的文字`, brandInk, P.brand, 4.5);
 
 console.log('\n===== D. 语义色与品牌色的 OKLab 距离（需 > 0.12）=====');
 for (const [name, hex] of Object.entries({
@@ -126,7 +126,7 @@ for (const [name, hex] of Object.entries({
   if (!ok) failures += 1;
   console.log(`  ${ok ? '✓' : '✗'} ${name.padEnd(6)} ${hex}  Δ=${d.toFixed(3)}`);
 }
-console.log('  对照：钉钉原警示 #FF9200 Δ=0.066、原危险 #FF5219 Δ=0.079 —— 都不够，这就是必须换色的原因');
+console.log('  （历史对照：橙时代 #FF9200 与品牌橙 Δ=0.066 逼出了语义色换相；蓝版下各语义色距离只增不减）');
 
 console.log('\n===== E. 应用图标瓦片（装饰件，图标形状与底色需 ≥3:1）=====');
 const TILES = { violet: '#7c5cf0', cyan: '#0e9aad', emerald: '#12a150', amber: '#856100', rose: '#d9455c', slate: '#6e7b87' };
@@ -141,15 +141,5 @@ for (const [name, hue] of Object.entries(TILES)) {
 }
 
 console.log('\n===== 结论 =====');
-console.log(failures === 0 ? '  全部合规（上面唯一标 ✗ 的是刻意留作反例的白字 on #ED7D33）' : `  有 ${failures} 项不达标，需要调整`);
-console.log('\n粘贴进 tokens.css：');
-console.log(`  --ui-brand:          ${P.brand};
-  --ui-brand-strong:   ${P.brandStrong};
-  --ui-brand-text:     ${P.brandText};
-  --ui-brand-soft:     ${P.brandSoft12};
-  --ui-brand-soft-weak:${P.brandSoft8};
-  --ui-tone-success:   ${P.success} / ${P.successSoft};
-  --ui-tone-warning:   ${P.warning} / ${P.warningSoft};
-  --ui-tone-danger:    ${P.danger} / ${P.dangerSoft};
-  --ui-tone-info:      ${P.info} / ${P.infoSoft};
-  --ui-tone-accent:    ${P.accent} / ${P.accentSoft};`);
+console.log(failures === 0 ? '  全部合规（2026-09-28 换蓝版：品牌族 / 语义色 / 瓦片色调逐对过线）' : `  有 ${failures} 项不达标，需要调整`);
+console.log('\n（tokens.css 即事实源，本工具只做核验——曾打印粘贴建议块，与实际值漂移后已删。）');

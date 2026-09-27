@@ -328,13 +328,9 @@
 }
 
 /*
- * 首屏问候卡是整页唯一的「大面积品牌色」载体。
- * 渐变只许往浅走（brand → lift）：tokens.css 头部第 4 条硬约束——
- * 状态审计实测 ink 在 --ui-brand-active(#8F3F0D) 上只有 2.37:1，
- * 原来 brand → active 的往深渐变把整张 hero 的文字全部打到不及格。
- * 现在两端分别是 ink 6.22:1 与 7.98:1。
- * 文字一律 --ui-brand-ink 实色：原来给副标题/统计标签叠的 opacity 0.82
- * 等效把对比度拉回 3 字头，压暗不是层次，字号字重才是层次。
+ * 首屏问候卡（2026-09-28 视觉重设计）：白卡片 + 细边框 + 轻投影——对齐企业
+ * OA 参考图语言，大面积品牌色块退出首屏，品牌蓝只保留在统计数字等小面积
+ * 强调位。文字回灰阶三档：层次靠字号字重，不靠把字压到品牌色块上。
  */
 .portal-hero {
   display: flex;
@@ -343,8 +339,10 @@
   flex-wrap: wrap;
   padding: var(--ui-space-5);
   border-radius: var(--ui-radius-l);
-  background: linear-gradient(110deg, var(--ui-brand) 0%, var(--ui-brand-lift) 100%);
-  color: var(--ui-brand-ink);
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-line);
+  box-shadow: var(--ui-shadow-card);
+  color: var(--ui-text-strong);
 }
 
 .portal-hero__main {
@@ -357,14 +355,14 @@
   font-size: var(--ui-font-md);
   font-weight: var(--ui-weight-semibold);
   line-height: var(--ui-leading-tight);
-  color: var(--ui-brand-ink);
+  color: var(--ui-text-strong);
 }
 
 .portal-hero__sub {
   margin: var(--ui-space-2) 0 0;
   font-size: var(--ui-font-sm);
   line-height: var(--ui-leading-base);
-  color: var(--ui-brand-ink);
+  color: var(--ui-text-soft);
 }
 
 /*
@@ -375,10 +373,10 @@
   flex: none;
   align-self: flex-start;
   padding: var(--ui-space-1) var(--ui-space-3);
-  border: 1px solid var(--ui-brand-ink);
+  border: 1px solid var(--ui-line-strong);
   border-radius: var(--ui-radius-pill);
   background: transparent;
-  color: var(--ui-brand-ink);
+  color: var(--ui-text-soft);
   font-size: var(--ui-font-2xs);
   font-weight: var(--ui-weight-medium);
   line-height: var(--ui-leading-tight);
@@ -402,13 +400,13 @@
    与角标边框同源；不承载信息），数字大、标签小，扫一眼比出量级 */
 .portal-hero__stat + .portal-hero__stat {
   padding-left: var(--ui-space-6);
-  border-left: 1px solid var(--ui-brand-ink-line);
+  border-left: 1px solid var(--ui-line);
 }
 
 .portal-hero__stat dt {
   font-size: var(--ui-font-xs);
   line-height: var(--ui-leading-tight);
-  color: var(--ui-brand-ink);
+  color: var(--ui-text-soft);
 }
 
 .portal-hero__stat dd {
@@ -416,7 +414,7 @@
   font-size: var(--ui-font-xl);
   font-weight: var(--ui-weight-semibold);
   line-height: var(--ui-leading-num);
-  color: var(--ui-brand-ink);
+  color: var(--ui-brand-strong);
 }
 
 /*
@@ -1087,7 +1085,7 @@
 }
 
 /*
- * 品牌侧（批次 F 起）：portal-hero 同款品牌渐变面板——左栏不再是漂在浅底上
+ * 品牌侧（批次 F 起；2026-09-28 随品牌换蓝改纯色面板）——左栏不再是漂在浅底上
  * 的文字，有色场锚住品牌。文字/图标一律 --ui-brand-ink 实色（不叠 opacity：
  * 信息不许弱），装饰允许用 ink。只有宽屏出现，窄屏整块让位给表单。
  */
@@ -1100,7 +1098,7 @@
   flex: none;
   padding: var(--ui-space-6);
   border-radius: var(--ui-radius-l);
-  background: linear-gradient(110deg, var(--ui-brand) 0%, var(--ui-brand-lift) 100%);
+  background: var(--ui-brand);
   color: var(--ui-brand-ink);
 }
 
@@ -1118,7 +1116,7 @@
   height: 40px;
   border-radius: var(--ui-radius-m);
   background: var(--ui-brand-ink);
-  color: var(--ui-brand);
+  color: var(--ui-brand-strong);
   font-size: var(--ui-font-xl);
   line-height: var(--ui-leading-none);
 }
@@ -1166,7 +1164,7 @@
   height: var(--ui-control-m);
   border-radius: var(--ui-radius-m);
   background: var(--ui-brand-ink);
-  color: var(--ui-brand);
+  color: var(--ui-brand-strong);
   font-size: var(--ui-font-base);
   line-height: var(--ui-leading-none);
 }

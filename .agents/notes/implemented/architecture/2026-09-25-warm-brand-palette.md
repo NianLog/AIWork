@@ -6,6 +6,8 @@ Scope: packages/ui-tokens/**,apps/portal/src/styles.css,apps/admin/src/styles.cs
 
 Last-verified: 2026-09-25
 
+> 2026-09-28 更新：品牌色已换蓝（#2563EB），本文的色值结论（橙族取值、ink 取深墨）被 [2026-09-28-portal-visual-refresh](../feature/2026-09-28-portal-visual-refresh.md) 取代；方法论（OKLab 距离法、逐对核验、主题令牌改写）继续有效。
+
 ## Problem
 
 负责人指定系统主题色为 `#ED7D33`，并要求「思考调研如何调整其他色彩使得视觉体验搭配最舒适」。这一条与前两版决定正面冲突：
