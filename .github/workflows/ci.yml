@@ -84,3 +84,26 @@ jobs:
           path: pnpm-lock.yaml
           if-no-files-found: error
           retention-days: 7
+
+  audit:
+    name: 依赖安全审计
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: 检出源码
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: 配置固定版本 pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      # 批次 L2：锁文件级审计门禁，只拦 critical（生产运行时暴露面）。
+      # high 及以下归批次 O 随依赖大版本升级（react-router 7 / vite 6 /
+      # vitest 4）一并处理——现在强拦会卡在"无修复版本"的传递依赖上，
+      # 门禁永远红等于没有门禁。--prod 限定生产依赖：dev 依赖不进运行时，
+      # 构建链风险由锁文件冻结 + 本审计记录兜底。
+      - name: pnpm audit（critical 门禁）
+        run: pnpm audit --prod --audit-level=critical
