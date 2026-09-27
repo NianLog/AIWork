@@ -17,9 +17,9 @@
 | shared-sdk | 宿主检测与桥接、独立壳、回调式登录、会话刷新、权限与事件、导航检查、清理句柄 | 真实身份服务及 micro-app 联调；npm 发布 |
 | shared-types | 应用清单、运行时、权限码、网关头、五原语的共享类型 | 后端联调、完整运行时 Schema 校验 |
 | eslint-config-mfe | 子应用窗口访问、持久化存储及直接引入钉钉 SDK 等基础限制 | 别名绕过、资源泄漏、上传包与 CORS 等完整规范检查 |
-| 协作配套 | README、PR 模板、格式约定、Linux／Windows CI | 首次 CI 验证、依赖锁文件固化、仓库分支保护设置 |
+| 协作配套 | README、PR 模板、格式约定、Linux／Windows CI、DDE 决策笔记体系、pnpm 锁文件（2026-09-24 生成并本地全量校验） | 首次双系统 CI 运行确认、仓库分支保护设置、笔记校验脚本入库与 CI 接入 |
 
-**验证基线：**提交准备阶段仅做过静态核对，未在本机安装依赖或执行类型检查、lint、测试、构建、浏览器验收。此前本机包管理器受 NVM 安全检查阻塞，按维护者要求未绕过；后续运行结果以对应提交的 Actions 记录和实际验证为准。
+**验证基线：**2026-09-24 在本机（Node 24.17.0 + pnpm 9.15.9，经 corepack 按根 `packageManager` 固定版本）完成依赖安装与 `pnpm verify` 全量校验：类型检查、lint、140 项单元测试（eslint 规则 30 + portal 6 + admin 8 + SDK 96）、双前端构建全部通过；并完成两应用共 8 条预览路由的浏览器验收。`pnpm-lock.yaml` 由该次安装生成并随本批提交固化。本机 Node 24 与 CI Node 22 存在主版本差异，跨平台结论以 Actions 运行记录为准。
 
 ## 2. 技术选型与边界
 
@@ -61,6 +61,8 @@ AIWork/
 │   ├── shared-types/           # 共享 TypeScript 契约
 │   └── eslint-config-mfe/      # 子应用静态限制及规则测试
 ├── docs/                       # 开发引导文档
+├── .agents/
+│   └── notes/                  # DDE 决策笔记（{proposed,implemented,rejected,archived} × 6 class，按需创建）
 ├── .github/
 │   ├── workflows/ci.yml        # 双系统工程校验
 │   └── pull_request_template.md
@@ -95,20 +97,14 @@ cd AIWork
 pnpm --version
 ```
 
-确认版本为 `9.15.9`。初始协作提交暂不含 `pnpm-lock.yaml`，首次安装使用：
-
-```sh
-pnpm install --no-frozen-lockfile
-pnpm dev
-```
-
-锁文件经校验并提交后，后续安装应改用：
+确认版本为 `9.15.9`。仓库已提交 `pnpm-lock.yaml`（2026-09-24 由 pnpm 9.15.9 实际安装生成并经全量校验），日常安装使用：
 
 ```sh
 pnpm install --frozen-lockfile
+pnpm dev
 ```
 
-首次安装的依赖树不是严格可复现的；锁文件必须由实际安装生成，不手写。首次生成者应执行校验、复核变更并通过 PR 提交锁文件。
+锁文件必须由实际安装生成，不手写；依赖变更应在同一 PR 内更新锁文件，并附 `pnpm verify` 结果。若 corepack 全局启用受限（Windows 无管理员权限），可用 `corepack enable --install-directory <用户可写且在 PATH 中的目录> pnpm` 落地 shim，或直接以 `corepack pnpm <命令>` 调用，版本仍由根 `packageManager` 锁定。
 
 | 应用 | 地址 | 路由 |
 | --- | --- | --- |
@@ -149,7 +145,7 @@ Windows PowerShell 5.1 中请逐行执行命令，不使用 `&&` 拼接终端命
 
 ## 6. CI 与依赖锁定
 
-[工程校验工作流](.github/workflows/ci.yml)在分支推送、PR 和手动触发时执行，覆盖 Ubuntu 与 Windows，使用 Node.js 22 和根声明的 pnpm 版本。
+[工程校验工作流](.github/workflows/ci.yml)在分支推送、PR 和手动触发时执行，覆盖 Ubuntu 与 Windows，使用 Node.js 22 和根声明的 pnpm 版本。仓库自 2026-09-24 起已提交锁文件，CI 走冻结安装；下方第 2、4 条的无锁文件分支是工作流保留的兜底逻辑。
 
 1. 有锁文件：执行 `pnpm install --frozen-lockfile`。
 2. 无锁文件：明确给出 warning，以非冻结模式完成首次安装。
@@ -166,6 +162,7 @@ CI 结果以实际运行记录为准。尚未完成的钉钉真机回归、权�
 - 小步提交，提交信息建议使用 `feat:`、`fix:`、`docs:`、`chore:` 前缀；一次 PR 聚焦一个模块或验收项。
 - PR 说明范围、契约影响、验证命令和结果。无法运行时明确写出原因，不能把“测试已写”标为“测试通过”。
 - 修改共享类型、权限码、网关头或容器接口前，先复查引导文档的锁定项；架构变更须获负责人确认。
+- 非机械的重要改动（行为、架构、跨文件契约、流程与工具链、测试策略、落盘／网络／配置格式）必须在同一 PR 附一篇 `.agents/notes/` 决策笔记，记录决策、被否备选与代价；机械改动（格式化、重命名、纯样式等）无需笔记。笔记校验脚本暂未入库，其入库与 CI 接入见后续 PR。
 - 子应用规则包用于子应用，不应直接强加到需要管理宿主窗口和钉钉初始化的门户代码。
 - 默认 UTF-8、两空格、LF；`.cmd`／`.bat` 使用 CRLF。遵循 `.editorconfig` 和 `.gitattributes`，不要混入全仓格式重排。
 - 不提交 `.env`、真实密钥、私钥、用户数据、`node_modules`、`dist` 或本机会话导出。`.gitignore` 是辅助，不代替人工核对。
@@ -178,7 +175,7 @@ CI 结果以实际运行记录为准。尚未完成的钉钉真机回归、权�
 
 按引导文档 P0 → P1 推进，每一步以真实验收为准：
 
-1. 恢复可用开发环境，完成首次双系统 CI，固化锁文件，并验证 `pnpm dev` 和浏览器预览。
+1. 恢复可用开发环境，固化锁文件，并验证 `pnpm dev` 和浏览器预览（2026-09-24 已完成本机部分；首次双系统 CI 以提交锁文件的 PR 的 Actions 记录为准）。
 2. 补齐门户宿主 SDK／状态／容器边界，接入 Yudao Cloud 真实登录与权限。
 3. 实现接口动态应用配置和 micro-app 装载，验证“不重启门户新增应用”。
 4. 实现 OpenResty 鉴权代理、透传头、后端权限二次校验及限流。
