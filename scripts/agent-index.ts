@@ -340,7 +340,9 @@ export function buildIndex(opts: BuildOptions = {}) {
     archivedDate: n.archivedDate || null,
     freshness: freshnessOf(n, now),
     summary: n.summary || null,
-    bodySha256: createHash("sha256").update(n.raw).digest("hex").slice(0, 16),
+    // eol-independent hash: a CRLF-bearing worktree file and its lf checkout differ byte-wise,
+    // so normalize before hashing (design rule 2: cross-machine stable)
+    bodySha256: createHash("sha256").update(n.raw.replace(/\r\n/g, "\n")).digest("hex").slice(0, 16),
     lines: n.lines,
     updateHint: `编辑 ${n.repoPath} 后运行：npx tsx scripts/notes.ts verify && npx tsx scripts/notes.ts index`,
   });
