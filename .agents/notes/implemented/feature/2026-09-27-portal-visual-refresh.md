@@ -13,6 +13,9 @@ docs/ 下两张企业 OA 参考图（蓝白灰语言：大面积白卡片、近�
 堆砌」这组取值本身。品牌色值由 [2026-09-25-warm-brand-palette](../architecture/2026-09-25-warm-brand-palette.md)
 定下，本次推翻其色值、保留其方法论。
 
+
+> **2026-09-28 复审翻转**：换色落地后用户判定构图仍不达标，工作台信息架构重排见 [2026-09-27-portal-workbench-revamp](2026-09-27-portal-workbench-revamp.md)——本文的令牌体系继续成立，「改值不改构」中对工作台的构图冻结不再有效。
+
 ## Decision
 
 **改值不改构**：令牌单一真源（tokens.css）使换色 = 改令牌值，两端（portal+admin）

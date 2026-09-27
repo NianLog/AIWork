@@ -261,11 +261,11 @@ describe('应用清单（注册表接口）', () => {
     openPortal('/preview');
 
     await screen.findByRole('button', { name: 'AI 图像工坊' });
-    const hero = screen.getByRole('region', { name: '欢迎信息' });
-    expect(within(hero).getByText('你好，联调管理员')).toBeTruthy();
-    expect(within(hero).getByText('可用应用')).toBeTruthy();
-    expect(within(hero).getByText('小范围试运行')).toBeTruthy();
-    expect(within(hero).getAllByRole('definition').map((dd) => dd.textContent)).toEqual(['2', '1']);
+    expect(screen.getByText('你好，联调管理员')).toBeTruthy();
+    const stats = screen.getByRole('region', { name: '应用统计' });
+    expect(within(stats).getByText('可用应用')).toBeTruthy();
+    expect(within(stats).getByText('小范围试运行')).toBeTruthy();
+    expect(within(stats).getAllByRole('definition').map((dd) => dd.textContent)).toEqual(['2', '1']);
   });
 
   it('C1 验收语义：接口新增应用配置，重进页面即可见，无需重启', async () => {
