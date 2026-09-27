@@ -1,3 +1,4 @@
+import { copyFileSync } from 'node:fs';
 import vue from '@vitejs/plugin-vue';
 import { defineConfig } from 'vitest/config';
 
@@ -15,7 +16,15 @@ import { defineConfig } from 'vitest/config';
  *   （token 校验 + 透传头在后端验证，§8）；dev 里由代理补足同源。
  */
 export default defineConfig({
-  plugins: [vue()],
+  plugins: [vue(), {
+      // 批次 I：清单进包契约——dist 必须自带 micro-app.config.json（上传链路校验+注册表事实源）。
+      // 根文件保留（src 四处 import 根路径），build 尾拷贝进 dist；dev 无运行时 fetch 不受影响。
+      apply: 'build',
+      name: 'copy-manifest',
+      closeBundle() {
+        copyFileSync('micro-app.config.json', 'dist/micro-app.config.json');
+      },
+    }],
   base: './',
   server: {
     host: '127.0.0.1',

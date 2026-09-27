@@ -1,10 +1,10 @@
 {
   "appId": "demo-vue",
   "name": "任务清单（Vue3 演示）",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "framework": "vue3",
   "baseRoute": "/demo-vue",
-  "backendApi": "http://jbslab.bili:48080",
+  "backendApi": "http://127.0.0.1:48080",
   "sandbox": "iframe",
   "permissions": [
     {
