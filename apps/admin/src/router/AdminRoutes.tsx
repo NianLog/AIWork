@@ -1,18 +1,50 @@
-import { Navigate, Route, Routes } from 'react-router-dom';
+import type { ReactNode } from 'react';
+import { lazy } from 'react';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import AdminShell from '../shell/AdminShell';
-import ApplicationsPage from './pages/ApplicationsPage';
+import { readSession } from '../api/yudao';
 import LoginPage from './pages/LoginPage';
 import NotFoundPage from './pages/NotFoundPage';
-import OrganizationsPage from './pages/OrganizationsPage';
-import PublishPage from './pages/PublishPage';
-import RolesPage from './pages/RolesPage';
-import UsersPage from './pages/UsersPage';
+
+/**
+ * 懒加载（批次 G 路由级代码分割）：五个业务页各自成 chunk，Suspense 由
+ * AdminShell 的 Outlet 统一承担（外壳 h1/导航/披露条在边界外同步渲染，chunk
+ * 加载期间只有内容区出骨架）。路由表因此只换 import，不加逐路由 Suspense。
+ *
+ * 顺序不变式（勿「优化」）：RequireAdminSession 必须位于任何 lazy 元素之外
+ * （同步短路，未登录深链零 chunk 请求）；readSession 在入口 chunk 就绪。
+ * LoginPage/NotFoundPage 保持同步：守卫落点/首屏与 404 同步断言。
+ */
+const ApplicationsPage = lazy(() => import('./pages/ApplicationsPage'));
+const PublishPage = lazy(() => import('./pages/PublishPage'));
+const UsersPage = lazy(() => import('./pages/UsersPage'));
+const RolesPage = lazy(() => import('./pages/RolesPage'));
+const OrganizationsPage = lazy(() => import('./pages/OrganizationsPage'));
+
+/**
+ * 会话守卫（批次 F）：/preview 要求登录。沿后台既有惯例「登录/退出必经路由跳转」
+ * 做非响应式检查（useLocation 让每次导航都重新求值）；401 终局由页面主动
+ * navigate('/login') 兜底。未登录落登录页并记录来路（state.from），登录后回跳。
+ */
+function RequireAdminSession({ children }: { children: ReactNode }) {
+  const location = useLocation();
+  if (!readSession()) {
+    return (
+      <Navigate
+        to="/login"
+        replace
+        state={{ from: location.pathname + location.search }}
+      />
+    );
+  }
+  return children;
+}
 
 /**
  * 后台路由：/preview/** 是工程预览命名空间。
  *
- * 身份服务接入后，这些路由必须由 RBAC 守卫；当前没有任何守卫，
- * 因为不存在会话，也就不存在「越权访问」的对象——但导航可见性绝不等于已授权。
+ * 批次 F 起 /preview 由 RequireAdminSession 会话守卫（未登录跳登录页并回跳）；
+ * 按钮级 RBAC 仍待身份体系后续接入——导航可见性绝不等于已授权。
  *
  * 各页的标题与说明通过 <Route handle> 挂在路由上，外壳用 shell/useRouteMeta.ts 读取
  * （声明式 <Routes> 不提供 useMatches）。这样「这一页叫什么」与「这一页挂在哪条路径」
@@ -23,7 +55,14 @@ export default function AdminRoutes() {
     <Routes>
       <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="/login" element={<LoginPage />} />
-      <Route path="/preview" element={<AdminShell />}>
+      <Route
+        path="/preview"
+        element={
+          <RequireAdminSession>
+            <AdminShell />
+          </RequireAdminSession>
+        }
+      >
         <Route index element={<Navigate to="apps" replace />} />
         <Route
           path="apps"

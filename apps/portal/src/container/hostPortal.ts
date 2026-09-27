@@ -1,12 +1,14 @@
 import type { PortalSDK } from '@ai-portal/shared-types';
 import { useSessionStore } from '../store/sessionStore';
+import { readSession, refreshSession } from '../api/yudao';
 
 /**
  * 宿主侧 PortalSDK 实现（批次 C，P0-4）：注入到同源子应用 iframe 的 window.portal。
  *
  * 五原语逐条的诚实边界：
- * - auth.getToken：给当前会话令牌；静默续期通道（refresh-token 轮换）开通前，
- *   过期就是过期，明确报「请先登录」，不造假令牌；
+ * - auth.getToken：给当前会话令牌；令牌临期或已过期时先静默刷新（批次 F：
+ *   单飞 refresh-token，刷新只写 sessionStorage 不进 store——store 订阅方只
+ *   消费身份字段，身份不变即不重挂子应用），刷新失败如实报错，不造假令牌；
  * - permission.can：精确匹配会话权限码。应用权限码（appId:resource:action）的
  *   分配体系还没建（菜单 SQL 未播种），现在对子应用权限码返回 false 是**真实状态**，
  *   不是缺陷；超级管理员同理——不搞通配符豁免；
@@ -51,9 +53,19 @@ export function setHostNavigator(fn: HostNavigator | undefined): void {
 export const portalHost: PortalSDK = {
   auth: {
     async getToken() {
-      const session = useSessionStore.getState().session;
+      // 读 storage 而非 store（批次 F）：storage 是事实源，刷新只写 storage 不进
+      // store，这里永远拿到最新令牌；无会话仍如实报错。
+      const session = readSession();
       if (!session?.accessToken) {
         throw new Error('宿主没有可用的登录会话，请先登录门户。');
+      }
+      // 临期（60 秒提前量防钟差）先静默刷新再发令牌：绝大多数子应用请求由此
+      // 连 401 都不会遇到；漏网的在途 401 由各端 request() 的反应式刷新兜底。
+      if (session.expiresAt > 0 && session.expiresAt - 60_000 <= Date.now()) {
+        if (!(await refreshSession())) {
+          throw new Error('登录已过期，请重新登录门户。');
+        }
+        return readSession()!.accessToken;
       }
       return session.accessToken;
     },

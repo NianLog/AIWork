@@ -5,14 +5,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
 import { SESSION_KEY } from './api/yudao';
 import type { AdminSession } from './api/yudao';
-import { DEMO_DISCLOSURE, DEMO_EXPLANATION, DEMO_OPERATOR } from './store/demoDirectory';
+import { DEMO_DISCLOSURE, DEMO_EXPLANATION } from './store/demoDirectory';
 
 /**
  * 后台测试：锁安全语义与「说人话」，不锁具体版式。
  *
  * 六条不可协商的性质：
  * 1. 登录真实可用（批次 B 起）：凭据只换取 sessionStorage 会话（引导文档 §8.4），
- *    退出登录即清空；未登录访问数据页得到「先登录」引导，而不是数据；
+ *    退出登录即清空；未登录访问数据页被守卫拦截到登录页（批次 F），而不是数据；
  * 2. 体验界面持续声明演示态（role="note" + DEMO_DISCLOSURE + DEMO_EXPLANATION）；
  * 3. 示例数据只读——写意图按钮全部禁用且点击无效，只读控件（检索、状态筛选）保持可用；
  * 4. 全站不存在外部链接，演示 entry / backendApi（.invalid 保留域）不可能被导航到；
@@ -75,6 +75,8 @@ const INTERNAL_IDENTIFIERS = [
 const FAKE_SESSION: AdminSession = {
   accessToken: 'test-access-token',
   refreshToken: 'test-refresh-token',
+  // 批次 F：会话带过期时刻；测试给远期值，避免主动刷新介入
+  expiresAt: 4_102_444_800_000,
   user: { id: 1, username: 'admin', nickname: '联调管理员' },
 };
 
@@ -219,8 +221,8 @@ describe('后台登录页', () => {
     });
     openAdmin('/login');
 
-    fireEvent.change(screen.getByPlaceholderText('请输入账号'), { target: { value: 'admin' } });
-    fireEvent.change(screen.getByPlaceholderText('请输入密码'), { target: { value: 'admin123' } });
+    fireEvent.change(screen.getByLabelText('账号'), { target: { value: 'admin' } });
+    fireEvent.change(screen.getByLabelText('密码'), { target: { value: 'admin123' } });
     fireEvent.submit(screen.getByRole('form', { name: '后台登录' }));
 
     await waitFor(() => expect(window.location.pathname).toBe('/preview/apps'));
@@ -236,8 +238,8 @@ describe('后台登录页', () => {
     );
     openAdmin('/login');
 
-    fireEvent.change(screen.getByPlaceholderText('请输入账号'), { target: { value: 'admin' } });
-    fireEvent.change(screen.getByPlaceholderText('请输入密码'), { target: { value: 'wrong' } });
+    fireEvent.change(screen.getByLabelText('账号'), { target: { value: 'admin' } });
+    fireEvent.change(screen.getByLabelText('密码'), { target: { value: 'wrong' } });
     fireEvent.submit(screen.getByRole('form', { name: '后台登录' }));
 
     expect(await screen.findByText('登录失败，账号密码不正确')).toBeTruthy();
@@ -245,28 +247,32 @@ describe('后台登录页', () => {
     expect(sessionStorage.getItem(SESSION_KEY)).toBeNull();
   });
 
-  it('登录页披露演示态，且不存在可在浏览器打开的外部地址', () => {
+  it('登录页环境披露在场（批次 F 起三层免责收敛为 hero 环境行+卡底注脚），且无外部地址', () => {
     openAdmin('/login');
 
-    expect(document.body.textContent ?? '').toContain(DEMO_DISCLOSURE);
+    // 登录页没有任何演示数据，等价披露是环境行；DEMO_DISCLOSURE 由 /preview 各页持续声明
+    expect(document.body.textContent ?? '').toContain('联调环境');
     expect(externalHrefs()).toEqual([]);
     expectBusinessLanguage();
   });
 
-  it('「先看看界面」仍然可用，登录不是浏览界面的前置条件', () => {
-    openAdmin('/login');
+  it('未登录访问数据页被守卫拦截到登录页（批次 F 全守卫，游客预览下线）', () => {
+    sessionStorage.removeItem(SESSION_KEY);
+    openAdmin('/preview/apps');
 
-    fireEvent.click(screen.getByRole('link', { name: /无需登录，先看看界面/ }));
-
-    expect(window.location.pathname).toBe('/preview/apps');
-    expect(screen.getByRole('heading', { level: 1, name: '应用列表' })).toBeTruthy();
-    expect(allNotes().join('\n')).toContain(DEMO_DISCLOSURE);
+    expect(window.location.pathname).toBe('/login');
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(screen.getByRole('heading', { level: 1, name: '登录管理后台' })).toBeTruthy();
   });
 });
 
 describe('后台体验界面', () => {
-  it.each(PREVIEW_ROUTES)('%s 持续声明演示态', (path) => {
+  it.each(PREVIEW_ROUTES)('%s 持续声明演示态', async (path) => {
     openAdmin(path);
+    // 批次 G 起五页懒加载：等页面内容真正挂载，术语检查才覆盖页面文本（防空转）
+    await waitFor(() =>
+      expect(document.querySelector('.admin-content')?.textContent ?? '').not.toBe(''),
+    );
 
     const notes = allNotes().join('\n');
     expect(notes).toContain(DEMO_DISCLOSURE);
@@ -302,27 +308,7 @@ describe('后台体验界面', () => {
     }
   });
 
-  it('未登录预览时：身份区是占位身份，退出登录不可用', () => {
-    sessionStorage.removeItem(SESSION_KEY);
-    openAdmin('/preview/apps');
-
-    expect(screen.getByPlaceholderText<HTMLInputElement>('搜索功能尚未开通').disabled).toBe(true);
-    expect(screen.getByText(DEMO_OPERATOR.envLabel)).toBeTruthy();
-    expect(screen.getByText(DEMO_OPERATOR.displayName)).toBeTruthy();
-    expect(screen.getByText(DEMO_OPERATOR.roleLabel)).toBeTruthy();
-
-    const logout = screen.getByRole<HTMLButtonElement>('button', { name: /退出登录/ });
-    expect(logout.disabled).toBe(true);
-
-    // 身份区唯一可用的链接回登录页，跳转链接只指向页内主内容锚点
-    expect(screen.getByRole('link', { name: '返回登录页' }).getAttribute('href')).toBe('/login');
-    expect(screen.getByRole('link', { name: '跳转到主要内容' }).getAttribute('href')).toBe(
-      '#admin-main',
-    );
-    expect(externalHrefs()).toEqual([]);
-  });
-
-  it('已登录时：身份区显示账号信息，退出登录清空会话并回登录页', () => {
+  it('已登录时：身份区显示账号信息，退出登录吊销后端令牌并回登录页', async () => {
     openAdmin('/preview/apps');
 
     expect(screen.getByText('联调管理员')).toBeTruthy();
@@ -332,21 +318,45 @@ describe('后台体验界面', () => {
     expect(logout.disabled).toBe(false);
     fireEvent.click(logout);
 
-    expect(window.location.pathname).toBe('/login');
-    expect(sessionStorage.getItem(SESSION_KEY)).toBeNull();
+    // 登出是异步吊销（void logoutRemote）：本地清理落在微任务里，等待其完成
+    await waitFor(() => {
+      expect(window.location.pathname).toBe('/login');
+      expect(sessionStorage.getItem(SESSION_KEY)).toBeNull();
+    });
+    // 批次 F：登出尽力通知后端吊销双令牌（成败都清本地）
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/auth/logout'))).toBe(true);
   });
 });
 
 describe('应用列表的真实数据通道', () => {
-  it('未登录时：不请求数据，给出先登录引导而不是数据', () => {
+  it('未登录深链被守卫拦截，登录成功回跳原路径', async () => {
     sessionStorage.removeItem(SESSION_KEY);
-    openAdmin('/preview/apps');
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/system/auth/login')) {
+        return jsonResponse({
+          code: 0,
+          data: { userId: 1, accessToken: 'at-new', refreshToken: 'rt-new', expiresTime: 4_102_444_800_000 },
+          msg: '',
+        });
+      }
+      if (url.includes('get-permission-info')) {
+        return jsonResponse({
+          code: 0,
+          data: { user: { id: 1, username: 'admin', nickname: '联调管理员' }, roles: [], permissions: [] },
+          msg: '',
+        });
+      }
+      return jsonResponse({ code: 0, data: { list: FIXTURE_APPS, total: FIXTURE_APPS.length }, msg: '' });
+    });
+    openAdmin('/preview/users');
 
-    expect(fetchMock).not.toHaveBeenCalled();
-    expect(screen.getByText('登录后才能查看真实的应用数据。')).toBeTruthy();
-
-    fireEvent.click(screen.getByRole('button', { name: '去登录' }));
     expect(window.location.pathname).toBe('/login');
+    fireEvent.change(screen.getByLabelText('账号'), { target: { value: 'admin' } });
+    fireEvent.change(screen.getByLabelText('密码'), { target: { value: 'admin123' } });
+    fireEvent.submit(screen.getByRole('form', { name: '后台登录' }));
+
+    await waitFor(() => expect(window.location.pathname).toBe('/preview/users'));
   });
 
   it('接口失败时：错误态给出原因与重试出口，重试真的会再发请求', async () => {
@@ -360,12 +370,13 @@ describe('应用列表的真实数据通道', () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
   });
 
-  it('会话过期（接口 401）：清死会话并转先登录引导，不当故障透传', async () => {
+  it('会话过期（接口 401）：静默刷新失败后清死会话并自动跳登录页', async () => {
     fetchMock.mockImplementation(async () => jsonResponse({ code: 401, data: null, msg: '账号未登录' }));
     openAdmin('/preview/apps');
 
+    // 刷新也 401 → 清会话 → 页面 401 终局带 expired 标记跳登录页
+    await waitFor(() => expect(window.location.pathname).toBe('/login'));
     expect(await screen.findByText('登录状态已过期，请重新登录。')).toBeTruthy();
-    expect(screen.getByRole('button', { name: '去登录' })).toBeTruthy();
     expect(sessionStorage.getItem(SESSION_KEY)).toBeNull();
     expect(screen.queryByText('账号未登录')).toBeNull();
   });
@@ -374,10 +385,9 @@ describe('应用列表的真实数据通道', () => {
 describe('演示数据只读，不提供变更能力', () => {
   it.each(PREVIEW_ROUTES)('%s 上的写意图按钮全部禁用，点击不产生跳转', async (path) => {
     openAdmin(path);
-    // 应用列表取数是异步的：先等数据落地，写按钮才存在（其余页仍是同步演示数据）
-    if (path === '/preview/apps') {
-      await screen.findByText('图像工坊');
-    }
+    // 批次 G 起五页全部懒加载（apps 页还要等接口数据）：先等页面挂载、写按钮
+    // 存在再断言——否则同步查询落在骨架期，空数组让「至少一个」断言空转通过
+    await waitFor(() => expect(writeIntentButtons().length).toBeGreaterThan(0));
 
     const writeButtons = writeIntentButtons();
     expect(writeButtons.length).toBeGreaterThan(0);
@@ -435,10 +445,10 @@ describe('演示数据只读，不提供变更能力', () => {
     fireEvent.click(screen.getByRole('button', { name: /应用总数/ }));
     expect(screen.getByText('共 3 个应用')).toBeTruthy();
 
-    // 用户页同一动线（仍是演示数据）
+    // 用户页同一动线（仍是演示数据；批次 G 起懒加载，先等页面挂载）
     cleanup();
     openAdmin('/preview/users');
-    fireEvent.click(screen.getByRole('button', { name: /待激活/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /待激活/ }));
     expect(screen.getByText('共 2 位成员')).toBeTruthy();
   });
 
@@ -450,10 +460,13 @@ describe('演示数据只读，不提供变更能力', () => {
     expect(firstTitle?.textContent).toBe('素材仓库');
   });
 
-  it('用户页的检索与状态筛选只作用于演示数据', () => {
+  it('用户页的检索与状态筛选只作用于演示数据', async () => {
     openAdmin('/preview/users');
 
-    const searchbox = screen.getByPlaceholderText<HTMLInputElement>('搜索姓名、账号、组织或角色');
+    // 批次 G 起页面懒加载：控件要等 chunk 挂载后才在场
+    const searchbox = await screen.findByPlaceholderText<HTMLInputElement>(
+      '搜索姓名、账号、组织或角色',
+    );
     expect(searchbox.disabled).toBe(false);
     expect(screen.getByText('共 7 位成员')).toBeTruthy();
 
@@ -477,9 +490,10 @@ describe('演示数据只读，不提供变更能力', () => {
     expect(screen.getByText('共 1 位成员')).toBeTruthy();
   });
 
-  it('应用发布表单整体只读，提交不产生任何跳转', () => {
+  it('应用发布表单整体只读，提交不产生任何跳转', async () => {
     openAdmin('/preview/publish');
-    const form = screen.getByRole('form', { name: '应用发布' });
+    // 批次 G 起页面懒加载：表单要等 chunk 挂载后才在场
+    const form = await screen.findByRole('form', { name: '应用发布' });
 
     const fields = Array.from(
       form.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('input, textarea'),
@@ -499,10 +513,18 @@ describe('演示数据只读，不提供变更能力', () => {
     expect(window.location.pathname).toBe('/preview/apps');
   });
 
-  it('全站不存在外部链接，演示地址不可能被导航到', () => {
+  it('全站不存在外部链接，演示地址不可能被导航到', async () => {
     for (const path of ['/login', '/preview', ...PREVIEW_ROUTES, '/missing', '/preview/missing']) {
       openAdmin(path);
 
+      // 批次 G 起五个业务页懒加载：必须等内容真正挂载再断言，否则页面未挂载时
+      // 断言的是空集（恒真，测试空转失效）。骨架无文本，内容出现即页面已挂载。
+      // /login 与 404 兜底不套外壳（无 .admin-content），本就同步渲染无需等待。
+      if (path === '/preview' || PREVIEW_ROUTES.includes(path)) {
+        await waitFor(() =>
+          expect(document.querySelector('.admin-content')?.textContent ?? '').not.toBe(''),
+        );
+      }
       expect(externalHrefs()).toEqual([]);
       expect(allHrefs().join('\n')).not.toContain('.invalid');
       cleanup();

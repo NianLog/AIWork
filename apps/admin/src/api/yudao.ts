@@ -2,6 +2,7 @@ import type { DemoApplicationRecord } from '../store/demoDirectory';
 
 /**
  * 后台真实接口客户端（批次 B，2026-09-26）：登录会话与应用列表的数据通道。
+ * 批次 F 增加单飞刷新、401 自动重试与真实登出。
  *
  * - 双令牌按引导文档 §8.4 [锁定] 只落 sessionStorage（页面关闭即释放，符合免登语义），
  *   每次请求显式带 Authorization: Bearer，不写 localStorage、不用 Cookie；
@@ -23,6 +24,11 @@ export interface AdminUser {
 export interface AdminSession {
   accessToken: string;
   refreshToken: string;
+  /**
+   * 访问令牌过期时刻（epoch 毫秒，登录/刷新响应的 expiresTime 原样）。
+   * 旧会话缺省 0=未知：不做主动刷新，仅靠 401 反应式刷新兜底。
+   */
+  expiresAt: number;
   user: AdminUser;
 }
 
@@ -45,8 +51,13 @@ interface CommonResult<T> {
 export function readSession(): AdminSession | null {
   try {
     const raw = sessionStorage.getItem(SESSION_KEY);
-    const parsed = raw ? (JSON.parse(raw) as AdminSession) : null;
-    return parsed?.accessToken ? parsed : null;
+    const parsed = raw ? (JSON.parse(raw) as Partial<AdminSession>) : null;
+    if (!parsed?.accessToken) return null;
+    // 批次 F 起会话带 expiresAt；读到旧格式补 0（未知）而不是报错。
+    return {
+      ...(parsed as AdminSession),
+      expiresAt: typeof parsed.expiresAt === 'number' ? parsed.expiresAt : 0,
+    };
   } catch {
     return null;
   }
@@ -60,7 +71,60 @@ export function clearSession(): void {
   sessionStorage.removeItem(SESSION_KEY);
 }
 
-async function request<T>(path: string, init: RequestInit = {}, accessToken?: string): Promise<T> {
+/**
+ * 单飞刷新（批次 F，与门户 yudao.ts 同型的刻意副本）：全局共享一个
+ * in-flight Promise。后端实证（2026-09-27）：刷新不轮换 refreshToken，但
+ * **立即作废旧 access token**——并发两次刷新会互相作废对方刚发的新令牌，
+ * 这是必须单飞的根因。回写前重读会话：登出竞态下不得复活已清掉的会话。
+ * ponytail: 网络抖动也按失败清会话（重登成本低）；要「明确拒绝才清」时按
+ * ApiError.code===401 分支再收窄。
+ */
+let refreshFlight: Promise<boolean> | undefined;
+
+export function refreshSession(): Promise<boolean> {
+  if (refreshFlight) return refreshFlight;
+  const session = readSession();
+  if (!session?.refreshToken) return Promise.resolve(false);
+  const refreshToken = session.refreshToken;
+  refreshFlight = (async () => {
+    try {
+      const tokens = await request<LoginResult>(
+        `/admin-api/system/auth/refresh-token?refreshToken=${encodeURIComponent(refreshToken)}`,
+        { method: 'POST' },
+        undefined,
+        false,
+      );
+      const current = readSession(); // 登出竞态：会话已被清掉就不再回写。
+      if (!current) return false;
+      saveSession({
+        ...current,
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+        expiresAt: tokens.expiresTime,
+      });
+      return true;
+    } catch {
+      clearSession();
+      return false;
+    } finally {
+      refreshFlight = undefined;
+    }
+  })();
+  return refreshFlight;
+}
+
+/**
+ * 统一请求入口。401 判定收口（批次 F）：网关 /api 返回真 HTTP 401，
+ * Yudao /admin-api 业务 401 是 HTTP 200 + body code 401（信封惯例）——两种都算
+ * 登录态失效：先静默刷新，成功则以新令牌重试恰一次（allowRefresh=false 防循环），
+ * 失败如实抛 401，由守卫与掉会话兜底接管。
+ */
+async function request<T>(
+  path: string,
+  init: RequestInit = {},
+  accessToken?: string,
+  allowRefresh = true,
+): Promise<T> {
   const token = accessToken ?? readSession()?.accessToken;
   const response = await fetch(path, {
     ...init,
@@ -71,6 +135,12 @@ async function request<T>(path: string, init: RequestInit = {}, accessToken?: st
       ...init.headers,
     },
   });
+  if (response.status === 401) {
+    if (allowRefresh && (await refreshSession())) {
+      return request<T>(path, init, undefined, false);
+    }
+    throw new ApiError(401, '登录状态已过期，请重新登录。');
+  }
   if (!response.ok) {
     throw new ApiError(
       response.status,
@@ -78,6 +148,12 @@ async function request<T>(path: string, init: RequestInit = {}, accessToken?: st
     );
   }
   const result = (await response.json()) as CommonResult<T>;
+  if (result.code === 401) {
+    if (allowRefresh && (await refreshSession())) {
+      return request<T>(path, init, undefined, false);
+    }
+    throw new ApiError(401, '登录状态已过期，请重新登录。');
+  }
   if (result.code !== 0) {
     throw new ApiError(result.code, result.msg || '请求没有成功，请稍后再试。');
   }
@@ -114,6 +190,7 @@ export async function loginWithPassword(username: string, password: string): Pro
   const session: AdminSession = {
     accessToken: tokens.accessToken,
     refreshToken: tokens.refreshToken,
+    expiresAt: tokens.expiresTime,
     user: {
       id: info.user.id,
       username: info.user.username,
@@ -122,6 +199,19 @@ export async function loginWithPassword(username: string, password: string): Pro
   };
   saveSession(session);
   return session;
+}
+
+/**
+ * 退出登录（批次 F）：尽力通知后端作废双令牌，无论成败都清本地会话——
+ * 后端失败只影响服务端令牌存活（下次 401 自愈），不阻塞界面跳转。
+ */
+export async function logoutRemote(): Promise<void> {
+  try {
+    await request<void>('/admin-api/system/auth/logout', { method: 'POST' }, undefined, false);
+  } catch {
+    // 吞错：本地必清，登出不能被网络失败卡住。
+  }
+  clearSession();
 }
 
 /** 应用分页接口的原始记录（后端字段原样，status 口径 0=启用 1=停用）。 */

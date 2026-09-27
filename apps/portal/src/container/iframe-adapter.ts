@@ -27,12 +27,35 @@ export class AppLoadError extends Error {
 const LOAD_TIMEOUT_MS = 15_000;
 const SANDBOX_TOKENS = 'allow-scripts allow-same-origin allow-forms allow-downloads';
 
+/**
+ * 同源子应用入口必须位于 /subapps/ 命名空间（批次 D 起的既定架构：dev 走门户
+ * 代理、生产走网关同一前缀）。2026-09-27 事故：entry 配成 /demo-vue/ 时门户
+ * SPA fallback 把门户 index.html 喂给 iframe，门户在 iframe 里自我递归嵌套。
+ * 白名单把这类配置错误在挂载前拦下（错误码 BAD_ENTRY 走工作区错误态）。
+ * 跨源入口不受此约束（外部应用挂自己的域名，无宿主桥、独立模式运行）。
+ */
+function assertEntryNamespace(url: URL): void {
+  if (url.origin !== window.location.origin) {
+    return;
+  }
+  const namespace = new URL('/subapps/', window.location.href);
+  // new URL 已做路径归一化，/subapps/../preview 这类绕过写法到不了这里。
+  if (!url.href.startsWith(namespace.href)) {
+    throw new AppLoadError(
+      'BAD_ENTRY',
+      '应用入口地址配置不正确（不在子应用专用目录内），请联系管理员检查。',
+    );
+  }
+}
+
 function resolveEntryUrl(entry: string): URL {
   try {
     const url = new URL(entry, window.location.href);
     if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new Error('bad protocol');
+    assertEntryNamespace(url);
     return url;
-  } catch {
+  } catch (error) {
+    if (error instanceof AppLoadError) throw error;
     throw new AppLoadError('BAD_ENTRY', '应用入口地址无法识别，请检查应用配置。');
   }
 }

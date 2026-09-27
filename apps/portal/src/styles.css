@@ -1086,12 +1086,22 @@
   background: var(--ui-surface-sunken);
 }
 
-/* 品牌侧：只有宽屏出现，窄屏整块让位给表单 */
+/*
+ * 品牌侧（批次 F 起）：portal-hero 同款品牌渐变面板——左栏不再是漂在浅底上
+ * 的文字，有色场锚住品牌。文字/图标一律 --ui-brand-ink 实色（不叠 opacity：
+ * 信息不许弱），装饰允许用 ink。只有宽屏出现，窄屏整块让位给表单。
+ */
 .portal-login__hero {
   display: none;
   flex-direction: column;
+  align-items: flex-start;
   gap: var(--ui-space-3);
-  max-width: 380px;
+  width: 380px;
+  flex: none;
+  padding: var(--ui-space-6);
+  border-radius: var(--ui-radius-l);
+  background: linear-gradient(110deg, var(--ui-brand) 0%, var(--ui-brand-lift) 100%);
+  color: var(--ui-brand-ink);
 }
 
 @media (min-width: 1024px) {
@@ -1106,34 +1116,34 @@
   justify-content: center;
   width: 40px;
   height: 40px;
-  border-radius: var(--ui-radius-l);
-  background: var(--ui-brand);
-  color: var(--ui-brand-ink);
+  border-radius: var(--ui-radius-m);
+  background: var(--ui-brand-ink);
+  color: var(--ui-brand);
   font-size: var(--ui-font-xl);
   line-height: var(--ui-leading-none);
 }
 
 .portal-login__brand {
-  margin: 0;
+  margin: var(--ui-space-2) 0 0;
   font-size: var(--ui-font-xl);
   font-weight: var(--ui-weight-semibold);
   line-height: var(--ui-leading-tight);
   letter-spacing: var(--ui-tracking-tight);
-  color: var(--ui-text-strong);
+  color: var(--ui-brand-ink);
 }
 
 .portal-login__slogan {
   margin: 0;
   font-size: var(--ui-font-sm);
   line-height: var(--ui-leading-base);
-  color: var(--ui-text-soft);
+  color: var(--ui-brand-ink);
 }
 
 .portal-login__points {
   display: flex;
   flex-direction: column;
   gap: var(--ui-space-3);
-  margin: var(--ui-space-3) 0 0;
+  margin: var(--ui-space-4) 0 0;
   padding: 0;
   list-style: none;
 }
@@ -1144,7 +1154,7 @@
   gap: var(--ui-space-3);
   font-size: var(--ui-font-sm);
   line-height: var(--ui-leading-base);
-  color: var(--ui-text);
+  color: var(--ui-brand-ink);
 }
 
 .portal-login__point-icon {
@@ -1155,8 +1165,8 @@
   width: var(--ui-control-m);
   height: var(--ui-control-m);
   border-radius: var(--ui-radius-m);
-  background: var(--ui-brand-soft);
-  color: var(--ui-brand-strong);
+  background: var(--ui-brand-ink);
+  color: var(--ui-brand);
   font-size: var(--ui-font-base);
   line-height: var(--ui-leading-none);
 }
@@ -1166,15 +1176,18 @@
   max-width: 400px;
 }
 
+/*
+ * 卡片（批次 F）：圆角统一 --ui-radius-l 档（内嵌块用 m）；免责三层收敛后
+ * 卡内只剩「标题块 / 表单 / 注脚」，视觉评审的逃生卡与分割线已随甲案删除。
+ */
 .portal-login__card {
   display: flex;
   flex-direction: column;
-  /* 卡片内各块 20px：表单、说明、分隔、入口之间层次清楚 */
   gap: var(--ui-space-5);
   padding: var(--ui-space-6);
   background: var(--ui-surface);
   border: 1px solid var(--ui-line);
-  border-radius: var(--ui-radius-xl);
+  border-radius: var(--ui-radius-l);
   box-shadow: var(--ui-shadow-card);
 }
 
@@ -1206,74 +1219,16 @@
   color: var(--ui-text-soft);
 }
 
-.portal-login__notice {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ui-space-2);
-}
-
 .portal-login__form {
   display: flex;
   flex-direction: column;
   gap: var(--ui-space-4);
 }
 
-/* 分隔语：两侧细线 + 中间小字，不用大标题，避免与卡片标题抢层次 */
-.portal-login__divider {
-  display: flex;
-  align-items: center;
-  gap: var(--ui-space-3);
+/* 卡底单一弱注脚（批次 F：三层免责收敛为一行） */
+.portal-login__foot {
   margin: 0;
-  font-size: var(--ui-font-xs);
-  line-height: var(--ui-leading-tight);
-  color: var(--ui-text-soft);
-}
-
-.portal-login__divider::before,
-.portal-login__divider::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: var(--ui-line);
-}
-
-/* 唯一可用的入口：整块主行动区，有底色、有悬停、有箭头 */
-.portal-login__preview {
-  display: flex;
-  align-items: center;
-  gap: var(--ui-space-3);
-  padding: var(--ui-space-4);
-  border: 1px solid var(--ui-brand-line);
-  border-radius: var(--ui-radius-l);
-  background: var(--ui-brand-soft);
-  color: var(--ui-brand-strong);
-  transition: var(--ui-transition-surface);
-}
-
-.portal-login__preview:hover {
-  background: var(--ui-brand-soft-weak);
-  color: var(--ui-brand-strong);
-  box-shadow: var(--ui-shadow-card);
-}
-
-.portal-login__preview-text {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ui-space-1);
-  flex: 1;
-  min-width: 0;
-}
-
-.portal-login__preview-text strong {
-  font-size: var(--ui-font-base);
-  font-weight: var(--ui-weight-semibold);
-  line-height: var(--ui-leading-tight);
-}
-
-.portal-login__preview-text span {
-  font-size: var(--ui-font-xs);
-  line-height: var(--ui-leading-tight);
-  color: var(--ui-text-soft);
+  text-align: center;
 }
 
 @media (max-width: 400px) {

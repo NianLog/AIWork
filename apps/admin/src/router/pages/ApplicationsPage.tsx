@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Button, Card, Input, SegmentedControl, Table, Tag } from 'dingtalk-design-desktop';
 import type { TableColumnsType } from 'dingtalk-design-desktop';
-import { ApiError, clearSession, fetchApplications, readSession } from '../../api/yudao';
+import { ApiError, fetchApplications } from '../../api/yudao';
 import { CHANNEL_META } from '../../store/demoDirectory';
 import type { DataView, DemoApplicationRecord } from '../../store/demoDirectory';
 import RowActions from '../parts/RowActions';
@@ -12,8 +12,8 @@ import RowActions from '../parts/RowActions';
  *
  * 数据来源（批次 B 起）：真实接口 /admin-api/portal-app/page（字段映射与状态口径
  * 换算见 api/yudao.ts）。页面仍只认 DataView 的「status + data + error」形状，
- * loading / error / success 三态都来自真实请求；未登录时给出「先登录」的引导
- * 而不是数据。
+ * loading / error / success 三态都来自真实请求；未登录由路由守卫拦截、
+ * 401 终局自动跳登录页（批次 F），页面不再维护「先登录」引导态。
  *
  * 只展示业务用户看得懂的信息（名称、负责团队、版本、发布状态、最近更新时间），
  * 不渲染任何部署细节。写操作按钮保持禁用：编辑与调整通道需要完整的表单链路
@@ -46,19 +46,13 @@ function resolveChannel(app: DemoApplicationRecord): DemoApplicationRecord['chan
 
 export default function ApplicationsPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [keyword, setKeyword] = useState('');
   const [channel, setChannel] = useState<ChannelFilter>('all');
   const [view, setView] = useState<DataView<DemoApplicationRecord>>({ status: 'loading', data: [] });
-  const [needsLogin, setNeedsLogin] = useState(false);
   const [reloadCount, setReloadCount] = useState(0);
 
   useEffect(() => {
-    if (!readSession()) {
-      setNeedsLogin(true);
-      setView({ status: 'error', data: [], error: '登录后才能查看真实的应用数据。' });
-      return;
-    }
-    setNeedsLogin(false);
     let cancelled = false;
     setView({ status: 'loading', data: [] });
     fetchApplications()
@@ -69,12 +63,13 @@ export default function ApplicationsPage() {
       })
       .catch((error: unknown) => {
         if (!cancelled) {
-          // 会话过期/被顶号（code 401，访问令牌 30 分钟有效期）：清死会话转「先登录」
-          // 引导，不当故障透传——与门户注册表 store 同一条语义。
+          // 会话过期/被顶号（code 401）：api 层已静默刷新失败并清掉死会话，
+          // 这里直接送登录页并带 expired 标记与来路（批次 F，守卫语义由跳转闭环）。
           if (error instanceof ApiError && error.code === 401) {
-            clearSession();
-            setNeedsLogin(true);
-            setView({ status: 'error', data: [], error: '登录状态已过期，请重新登录。' });
+            navigate('/login', {
+              replace: true,
+              state: { from: location.pathname + location.search, expired: true },
+            });
             return;
           }
           setView({
@@ -87,7 +82,7 @@ export default function ApplicationsPage() {
     return () => {
       cancelled = true;
     };
-  }, [reloadCount]);
+  }, [navigate, location.pathname, location.search, reloadCount]);
 
   const reload = () => setReloadCount((count) => count + 1);
 
@@ -240,13 +235,7 @@ export default function ApplicationsPage() {
                 {view.error ?? '网络暂时没有响应，稍后重试一般就能恢复。'}
               </p>
               <div className="ui-errorstate__actions">
-                {needsLogin ? (
-                  <Button type="primary" onClick={() => navigate('/login')}>
-                    去登录
-                  </Button>
-                ) : (
-                  <Button onClick={reload}>重试</Button>
-                )}
+                <Button onClick={reload}>重试</Button>
               </div>
             </div>
           ) : (

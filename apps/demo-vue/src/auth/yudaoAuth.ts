@@ -75,5 +75,26 @@ export function createYudaoAuth() {
         ),
       };
     },
+
+    /**
+     * 静默刷新（批次 F）：SDK 的 BootstrapOptions.refresh 钩子——访问令牌过期时
+     * 由 SDK 单飞调用（session.ts 内置 in-flight 去重与失败清理，已有测试覆盖）。
+     * 权限码沿用登录快照：刷新不改权限，要实时权限再补一次 get-permission-info。
+     */
+    async refresh(snapshot: Readonly<StandaloneSession>): Promise<StandaloneSession> {
+      if (!snapshot.refreshToken) {
+        throw new Error('没有可用的刷新令牌，请重新登录。');
+      }
+      const token = await request<LoginToken>(
+        `/admin-api/system/auth/refresh-token?refreshToken=${encodeURIComponent(snapshot.refreshToken)}`,
+        { method: 'POST' },
+      );
+      return {
+        accessToken: token.accessToken,
+        refreshToken: token.refreshToken,
+        expiresAt: token.expiresTime,
+        permissions: snapshot.permissions,
+      };
+    },
   };
 }

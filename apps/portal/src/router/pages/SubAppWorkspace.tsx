@@ -1,7 +1,6 @@
 import { useEffect } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { LeftArrowOutlined } from 'dd-icons';
-import { Button } from 'dingtalk-design-mobile';
 import AppMount from '../../container/AppMount';
 import { setHostNavigator } from '../../container/hostPortal';
 import { useAppRegistryStore } from '../../store/appRegistryStore';
@@ -27,7 +26,7 @@ import WorkspaceStage from '../parts/WorkspaceStage';
  *
  * 应用来自注册表接口（enabled-list）；舞台状态由容器层 AppMount 驱动：
  * loading →（iframe load）→ ready，失败/15s 超时 → error（重试=重新挂载）。
- * 未登录不拉清单、不挂子应用（身份快照需要会话），给「去登录」引导。
+ * 未登录由路由层 RequireSession 守卫拦截（批次 F），页面不再做「去登录」引导。
  *
  * 返回语义：「返回」是退一步（navigate(-1)），深链直落（location.key === 'default'）
  * 没有来路，才回退 /preview。移动端返回手势等价于浏览器返回。
@@ -40,7 +39,6 @@ export default function SubAppWorkspace() {
   const navigate = useNavigate();
   const location = useLocation();
   const view = useAppRegistryStore((state) => state.view);
-  const needsLogin = useAppRegistryStore((state) => state.needsLogin);
 
   useEffect(() => {
     void useAppRegistryStore.getState().fetch();
@@ -84,26 +82,7 @@ export default function SubAppWorkspace() {
         {app ? <span className="workspace__meta">版本 v{app.version}</span> : null}
       </header>
 
-      {needsLogin ? (
-        <div className="workspace__stage">
-          <div className="ui-card ui-card--center">
-            <div className="ui-errorstate" role="note">
-              <h2 className="ui-errorstate__title">登录后才能进入应用工作区</h2>
-              <p className="ui-errorstate__desc">
-                子应用工作区需要你的登录会话。登录后即可打开这里的应用。
-              </p>
-              <div className="ui-errorstate__actions">
-                <Button size="large" inline={false} onClick={() => navigate('/login')}>
-                  去登录
-                </Button>
-                <Button size="large" inline={false} onClick={exitWorkspace}>
-                  返回工作台
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : view.status === 'loading' ? (
+      {view.status === 'loading' ? (
         <div className="workspace__stage">
           <WorkspaceStage status="loading" app={{ name: appId ?? '应用' }} onRetry={() => {}} onExit={exitWorkspace} />
         </div>

@@ -15,7 +15,7 @@ import { useAppRegistryStore } from './store/appRegistryStore';
  * 五条不可协商的性质：
  * 1. 登录真实可用：凭据只换取 sessionStorage 会话（§8.4 [锁定]），失败给
  *    人话原因，不创建半截会话；
- * 2. 未登录不发清单请求，给「先登录」引导而不是把 401 当故障；
+ * 2. 未登录访问受守卫页面（批次 F 全守卫）自动跳登录页，不发清单请求；
  * 3. 通往子应用的唯一路径是工作区；工作区全屏接管（无门户导航）、
  *    同源桥接注入（window.portal + 身份快照）；写意图操作永久不可用；
  * 4. C1 硬验收：接口新增应用配置，门户不重启、页面一进就能看到；
@@ -50,6 +50,8 @@ const ENGINEERING_TERMS = [
 const SESSION = {
   accessToken: 'at-portal',
   refreshToken: 'rt-portal',
+  // 批次 F：会话带过期时刻；测试里给远期值，避免 hostPortal 主动刷新介入
+  expiresAt: 4_102_444_800_000,
   user: { id: 1, username: 'admin', nickname: '联调管理员' },
   roles: ['common'],
   permissions: ['ai-image:task:create'],
@@ -59,7 +61,7 @@ const APP_IMAGE: PortalAppRecord = {
   id: 1,
   appId: 'ai-image',
   name: 'AI 图像工坊',
-  entry: '/subapp-probe/index.html',
+  entry: '/subapps/ai-image/index.html',
   backendApi: '',
   baseRoute: '/ai-image',
   icon: null,
@@ -121,6 +123,14 @@ function openPortal(path = '/') {
   return render(<App />);
 }
 
+/**
+ * 登录表单字段句柄：dtm Input 不透传 aria-*（属性白名单，getByLabelText
+ * 会命中无值 setter 的包裹元素），白名单内的 id 是唯一稳定句柄。
+ */
+function loginField(id: string): HTMLInputElement {
+  return document.getElementById(id) as HTMLInputElement;
+}
+
 /** 预置已登录会话（sessionStorage + 订阅层 store 同步）。 */
 function seedSession() {
   sessionStorage.setItem(SESSION_KEY, JSON.stringify(SESSION));
@@ -150,7 +160,7 @@ afterEach(() => {
   window.history.replaceState(null, '', '/');
   sessionStorage.clear();
   useSessionStore.setState({ session: null });
-  useAppRegistryStore.setState({ view: { status: 'loading', data: [] }, needsLogin: false, flight: undefined });
+  useAppRegistryStore.setState({ view: { status: 'loading', data: [] }, flight: undefined });
   vi.unstubAllGlobals();
 });
 
@@ -159,8 +169,8 @@ describe('登录与身份', () => {
     stubPortalFetch();
     openPortal('/login');
 
-    fireEvent.change(screen.getByPlaceholderText('请输入账号'), { target: { value: 'admin' } });
-    fireEvent.change(screen.getByPlaceholderText('请输入密码'), { target: { value: 'admin123' } });
+    fireEvent.change(loginField('portal-login-account'), { target: { value: 'admin' } });
+    fireEvent.change(loginField('portal-login-password'), { target: { value: 'admin123' } });
     fireEvent.click(screen.getByRole('button', { name: '登录' }));
 
     await screen.findByText('你好，联调管理员');
@@ -174,11 +184,11 @@ describe('登录与身份', () => {
     stubPortalFetch({ loginBody: { code: 400, msg: '账号或密码不正确', data: null } });
     openPortal('/login');
 
-    fireEvent.change(screen.getByPlaceholderText('请输入账号'), { target: { value: 'admin' } });
-    fireEvent.change(screen.getByPlaceholderText('请输入密码'), { target: { value: 'wrong' } });
+    fireEvent.change(loginField('portal-login-account'), { target: { value: 'admin' } });
+    fireEvent.change(loginField('portal-login-password'), { target: { value: 'wrong' } });
     fireEvent.click(screen.getByRole('button', { name: '登录' }));
 
-    // 组件库 NoticeBar 自身也占 role=alert（静态通告）：失败提示应存在于**某个** alert 里
+    // 失败提示占 role=alert（批次 F 登录页重构后 NoticeBar 已删除，这是唯一 alert）
     expect(await screen.findByText('账号或密码不正确')).toBeTruthy();
     expect(
       screen.getAllByRole('alert').some((el) => el.textContent?.includes('账号或密码不正确')),
@@ -189,16 +199,27 @@ describe('登录与身份', () => {
 });
 
 describe('应用清单（注册表接口）', () => {
-  it('未登录不发清单请求，给「先登录」引导', async () => {
+  it('未登录直开工作台：守卫拦截到登录页，不发清单请求', async () => {
     const { fetchMock } = stubPortalFetch();
     openPortal('/preview');
 
-    expect(screen.getByText('应用清单需要登录后获取。')).toBeTruthy();
-    expect(screen.getByRole('button', { name: '去登录' })).toBeTruthy();
-    await waitFor(() => expect(screen.queryByRole('status')).toBeNull());
+    expect(window.location.pathname).toBe('/login');
+    expect(await screen.findByRole('heading', { level: 1, name: '登录 AI 中台' })).toBeTruthy();
     expect(
       fetchMock.mock.calls.filter(([url]) => String(url).includes('/portal-app/enabled-list')),
     ).toHaveLength(0);
+  });
+
+  it('登录成功回跳守卫带来的原路径（市场深链）', async () => {
+    stubPortalFetch();
+    openPortal('/preview/market');
+
+    expect(window.location.pathname).toBe('/login');
+    fireEvent.change(loginField('portal-login-account'), { target: { value: 'admin' } });
+    fireEvent.change(loginField('portal-login-password'), { target: { value: 'admin123' } });
+    fireEvent.click(screen.getByRole('button', { name: '登录' }));
+
+    await waitFor(() => expect(window.location.pathname).toBe('/preview/market'));
   });
 
   it('登录后市场渲染清单：检索过滤与结果计数', async () => {
@@ -267,16 +288,13 @@ describe('应用清单（注册表接口）', () => {
 });
 
 describe('子应用工作区', () => {
-  it('未登录进工作区给登录引导，不挂子应用', async () => {
+  it('未登录进工作区：守卫拦截到登录页，不挂子应用', async () => {
     stubPortalFetch();
     openPortal('/apps/ai-image');
 
-    // 工作区的未登录文案与市场页不同：这里只说工作区需要会话
-    expect(await screen.findByText('登录后才能进入应用工作区')).toBeTruthy();
+    expect(window.location.pathname).toBe('/login');
     expect(document.querySelector('iframe')).toBeNull();
-
-    fireEvent.click(screen.getByRole('button', { name: '去登录' }));
-    await screen.findByRole('heading', { level: 1, name: '登录 AI 中台' });
+    expect(await screen.findByRole('heading', { level: 1, name: '登录 AI 中台' })).toBeTruthy();
   });
 
   it('登录后挂载同源 iframe：sandbox 白名单 + 宿主桥 + 身份快照', async () => {
@@ -347,6 +365,8 @@ describe('全站安全性质', () => {
 
   it('宽屏渲染横向文字导航，窄屏胶囊不并存在无障碍树', () => {
     stubPortalFetch();
+    // 批次 F 全守卫：/preview 需要会话，否则被重定向到登录页量不到导航
+    seedSession();
     const original = window.matchMedia;
     window.matchMedia = ((query: string) => ({
       matches: query === WIDE_QUERY,

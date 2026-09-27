@@ -8,15 +8,15 @@ import type { DataView, PortalApp } from './store/appRegistryStore';
 import { SESSION_KEY } from './api/yudao';
 
 /**
- * 应用市场的非成功态（批次 C 起）：事实源是注册表 store，这里直接写 store 状态
- * 覆盖 loading / error / needsLogin / 空清单四个分支（fetch 被替换成空操作，
- * 页面挂载时的拉取不会覆盖喂进去的形状）。
+ * 应用市场的非成功态（批次 C 起，批次 F 删 needsLogin 分支）：事实源是注册表
+ * store，这里直接写 store 状态覆盖 loading / error / 空清单分支（fetch 被替换成
+ * 空操作，页面挂载时的拉取不会覆盖喂进去的形状）。
  */
 
 const realFetch = useAppRegistryStore.getState().fetch;
 
-function feed(view: DataView<PortalApp>, needsLogin = false): void {
-  useAppRegistryStore.setState({ view, needsLogin, fetch: vi.fn() });
+function feed(view: DataView<PortalApp>): void {
+  useAppRegistryStore.setState({ view, fetch: vi.fn() });
 }
 
 const SAMPLE: PortalApp = {
@@ -27,7 +27,7 @@ const SAMPLE: PortalApp = {
   framework: 'react',
   sandbox: 'iframe',
   baseRoute: '/ai-image',
-  entry: '/subapp-probe/index.html',
+  entry: '/subapps/ai-image/index.html',
   backendApi: 'https://api.invalid/x',
   status: 0,
   permissions: [],
@@ -42,7 +42,6 @@ afterEach(() => {
   vi.unstubAllGlobals();
   useAppRegistryStore.setState({
     view: { status: 'loading', data: [] },
-    needsLogin: false,
     flight: undefined,
     fetch: realFetch,
   });
@@ -68,7 +67,6 @@ describe('应用市场非成功态', () => {
     const refetch = vi.fn();
     useAppRegistryStore.setState({
       view: { status: 'error', data: [], error: '网络暂时没有响应，稍后重试一般就能恢复。' },
-      needsLogin: false,
       fetch: refetch,
     });
     render(
@@ -85,19 +83,6 @@ describe('应用市场非成功态', () => {
     fireEvent.click(screen.getByRole('button', { name: '重试' }));
     // 市场页每次挂载都重新拉取（C1 语义：重进页面即见新配置）——挂载 1 次 + 重试 1 次
     expect(refetch).toHaveBeenCalledTimes(2);
-  });
-
-  it('未登录：给「先登录」引导而不是把 401 当故障', () => {
-    feed({ status: 'error', data: [], error: '登录后才能查看应用列表。' }, true);
-    render(
-      // 页面 2026-09-26 起用 useNavigate（未登录「去登录」直跳），裸渲染会缺 Router 上下文
-      <MemoryRouter>
-        <MarketPage />
-      </MemoryRouter>,
-    );
-
-    expect(screen.getByRole('region', { name: '需要登录' }).textContent).toContain('应用清单需要登录后获取');
-    expect(screen.getByRole('button', { name: '去登录' })).toBeTruthy();
   });
 
   it('空清单：说明「应用在管理端配置后出现」，不伪造应用', () => {
@@ -131,19 +116,20 @@ describe('应用市场非成功态', () => {
     expect(screen.getByRole('region', { name: '应用列表' }).textContent).toContain('AI 商品图生成');
   });
 
-  it('会话过期（接口 401）：清死会话并转「先登录」引导，不当故障透传', async () => {
-    // 本地有死会话（令牌 30 分钟过期后残留），请求照发但后端回 code 401
+  it('会话过期（接口 401）：静默刷新失败后清死会话转错误态，不当故障透传', async () => {
+    // 本地有死会话（令牌 30 分钟过期后残留），请求照发但后端与刷新接口都回 code 401
     sessionStorage.setItem(
       SESSION_KEY,
       JSON.stringify({
         accessToken: 'dead-token',
         refreshToken: 'rt',
+        expiresAt: Date.now() + 60_000,
         user: { id: 1, username: 'admin', nickname: '联调管理员' },
         roles: [],
         permissions: [],
       }),
     );
-    useAppRegistryStore.setState({ view: { status: 'loading', data: [] }, needsLogin: false, fetch: realFetch });
+    useAppRegistryStore.setState({ view: { status: 'loading', data: [] }, flight: undefined, fetch: realFetch });
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ code: 401, msg: '账号未登录', data: null }) })),
@@ -154,7 +140,9 @@ describe('应用市场非成功态', () => {
       </MemoryRouter>,
     );
 
-    expect(await screen.findByRole('region', { name: '需要登录' })).toBeTruthy();
+    // 刷新失败 → 清会话 → store 置 401 错误态（「去登录」引导已由路由守卫取代）
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toContain('登录状态已过期，请重新登录。');
     expect(sessionStorage.getItem(SESSION_KEY)).toBeNull();
     expect(screen.queryByText('账号未登录')).toBeNull();
   });

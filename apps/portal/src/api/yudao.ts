@@ -1,7 +1,8 @@
 import type { AppFramework, AppRegistry } from '@ai-portal/shared-types';
 
 /**
- * 门户真实接口客户端（批次 B 建立登录会话，批次 C 增加应用清单拉取）。
+ * 门户真实接口客户端（批次 B 建立登录会话，批次 C 增加应用清单拉取，
+ * 批次 F 增加单飞刷新与 401 自动重试）。
  *
  * 约定与后台侧一致（引导文档 §8.4 [锁定]）：
  * - 双令牌只落 sessionStorage（钉钉内页面关闭即释放，符合免登语义），
@@ -26,6 +27,11 @@ export interface PortalUser {
 export interface PortalSession {
   accessToken: string;
   refreshToken: string;
+  /**
+   * 访问令牌过期时刻（epoch 毫秒，登录/刷新响应的 expiresTime 原样）。
+   * 旧会话缺省 0=未知：getToken 不做主动刷新，仅靠 401 反应式刷新兜底。
+   */
+  expiresAt: number;
   user: PortalUser;
   /** 账号角色编码；宿主权限原语与子应用身份快照都要用（批次 C 起）。 */
   roles: string[];
@@ -53,6 +59,8 @@ function normalizeSession(parsed: Partial<PortalSession>): PortalSession {
   return {
     accessToken: parsed.accessToken ?? '',
     refreshToken: parsed.refreshToken ?? '',
+    // 批次 B/F 早期会话没有 expiresAt，读到旧格式补 0（未知）而不是报错。
+    expiresAt: typeof parsed.expiresAt === 'number' ? parsed.expiresAt : 0,
     user: parsed.user ?? { id: 0, username: '', nickname: '' },
     roles: Array.isArray(parsed.roles) ? parsed.roles : [],
     permissions: Array.isArray(parsed.permissions) ? parsed.permissions : [],
@@ -78,7 +86,60 @@ export function clearSession(): void {
   sessionStorage.removeItem(SESSION_KEY);
 }
 
-async function request<T>(path: string, init: RequestInit = {}, accessToken?: string): Promise<T> {
+/**
+ * 单飞刷新（批次 F）：全局共享一个 in-flight Promise，绝不各自刷新。
+ * 后端实证（2026-09-27）：刷新不轮换 refreshToken，但**立即作废旧 access token**——
+ * 并发两次刷新会互相作废对方刚发的新令牌，这是必须单飞的根因。
+ * 回写前重读会话：登出竞态下不得复活已清掉的会话。
+ * ponytail: 网络抖动也按失败清会话（重登成本低）；要「明确拒绝才清」时按
+ * ApiError.code===401 分支再收窄。
+ */
+let refreshFlight: Promise<boolean> | undefined;
+
+export function refreshSession(): Promise<boolean> {
+  if (refreshFlight) return refreshFlight;
+  const session = readSession();
+  if (!session?.refreshToken) return Promise.resolve(false);
+  const refreshToken = session.refreshToken;
+  refreshFlight = (async () => {
+    try {
+      const tokens = await request<LoginResult>(
+        `/admin-api/system/auth/refresh-token?refreshToken=${encodeURIComponent(refreshToken)}`,
+        { method: 'POST' },
+        undefined,
+        false,
+      );
+      const current = readSession(); // 登出竞态：会话已被清掉就不再回写。
+      if (!current) return false;
+      saveSession({
+        ...current,
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+        expiresAt: tokens.expiresTime,
+      });
+      return true;
+    } catch {
+      clearSession();
+      return false;
+    } finally {
+      refreshFlight = undefined;
+    }
+  })();
+  return refreshFlight;
+}
+
+/**
+ * 统一请求入口。401 判定收口（批次 F）：网关 /api 返回真 HTTP 401，
+ * Yudao /admin-api 业务 401 是 HTTP 200 + body code 401（信封惯例）——两种都算
+ * 登录态失效：先静默刷新，成功则以新令牌重试恰一次（allowRefresh=false 防循环），
+ * 失败（refresh token 也过期/被顶号）如实抛 401，由守卫与掉会话兜底接管。
+ */
+async function request<T>(
+  path: string,
+  init: RequestInit = {},
+  accessToken?: string,
+  allowRefresh = true,
+): Promise<T> {
   const token = accessToken ?? readSession()?.accessToken;
   const response = await fetch(path, {
     ...init,
@@ -89,6 +150,12 @@ async function request<T>(path: string, init: RequestInit = {}, accessToken?: st
       ...init.headers,
     },
   });
+  if (response.status === 401) {
+    if (allowRefresh && (await refreshSession())) {
+      return request<T>(path, init, undefined, false);
+    }
+    throw new ApiError(401, '登录状态已过期，请重新登录。');
+  }
   if (!response.ok) {
     throw new ApiError(
       response.status,
@@ -96,6 +163,12 @@ async function request<T>(path: string, init: RequestInit = {}, accessToken?: st
     );
   }
   const result = (await response.json()) as CommonResult<T>;
+  if (result.code === 401) {
+    if (allowRefresh && (await refreshSession())) {
+      return request<T>(path, init, undefined, false);
+    }
+    throw new ApiError(401, '登录状态已过期，请重新登录。');
+  }
   if (result.code !== 0) {
     throw new ApiError(result.code, result.msg || '请求没有成功，请稍后再试。');
   }
@@ -116,14 +189,10 @@ interface PermissionInfo {
 }
 
 /**
- * 账号密码登录：先拿双令牌，再凭新令牌取账号信息，最后一次性写入会话——
- * 中途失败不会留下半截会话。后续批次接入钉钉免登时会新增免登入口，这里不改。
+ * 凭双令牌取账号信息并一次性写入会话——中途失败不会留下半截会话。
+ * 账号密码登录与钉钉免登（P0-6 骨架）共用这条收尾。
  */
-export async function loginWithPassword(username: string, password: string): Promise<PortalSession> {
-  const tokens = await request<LoginResult>('/admin-api/system/auth/login', {
-    method: 'POST',
-    body: JSON.stringify({ username, password }),
-  });
+export async function establishSession(tokens: LoginResult): Promise<PortalSession> {
   const info = await request<PermissionInfo>(
     '/admin-api/system/auth/get-permission-info',
     {},
@@ -132,6 +201,7 @@ export async function loginWithPassword(username: string, password: string): Pro
   const session: PortalSession = {
     accessToken: tokens.accessToken,
     refreshToken: tokens.refreshToken,
+    expiresAt: tokens.expiresTime,
     user: {
       id: info.user.id,
       username: info.user.username,
@@ -143,6 +213,31 @@ export async function loginWithPassword(username: string, password: string): Pro
   };
   saveSession(session);
   return session;
+}
+
+/**
+ * 账号密码登录：先拿双令牌，再走统一收尾。后续批次接入钉钉免登时新增
+ * loginWithSocial 入口，这里不改。
+ */
+export async function loginWithPassword(username: string, password: string): Promise<PortalSession> {
+  const tokens = await request<LoginResult>('/admin-api/system/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ username, password }),
+  });
+  return establishSession(tokens);
+}
+
+/**
+ * 社交登录（钉钉免登骨架，批次 F 预埋）：type=20 DINGTALK（后端
+ * SocialTypeEnum），state 用一次性随机串（后端 @NotEmpty 校验要求非空）。
+ * 服务端 social_client 未配置或用户未绑定时后端如实报错。
+ */
+export async function loginWithSocial(type: number, code: string): Promise<PortalSession> {
+  const tokens = await request<LoginResult>('/admin-api/system/auth/social-login', {
+    method: 'POST',
+    body: JSON.stringify({ type, code, state: crypto.randomUUID() }),
+  });
+  return establishSession(tokens);
 }
 
 /** enabled-list 接口的原始记录（后端字段原样；status 口径 0=启用 1=停用）。 */

@@ -24,7 +24,6 @@ const canDelete = computed(() => sdk.permission.can(DELETE_CODE));
 // props 快照只在宿主形态存在（联合类型在模板里收窄不了，这里按 mode 收窄一次）
 const nickname = props.handle.mode === 'hosted' ? props.handle.props?.user.nickname : undefined;
 
-const token = ref<string | null>(null);
 const tokenNote = ref('获取中…');
 const tasks = ref<TaskItem[]>([]);
 const listNote = ref<string | null>('加载中…');
@@ -39,40 +38,59 @@ function describe(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-async function refreshTasks(): Promise<void> {
-  if (!token.value) {
-    listNote.value = '等令牌';
-    return;
+/**
+ * 每次操作现取令牌（契约：子应用不缓存 token），401 再取一次重试——
+ * 宿主/SDK 的 getToken 内部已做静默刷新（批次 F），这里只兜「在途令牌被
+ * 刷新作废」的场景。
+ * ponytail 天花板：token 未到期但被服务端吊销时，重试拿到的还是同一枚，
+ * 二次 401 如实上抛（SDK 无强制刷新原语）。
+ */
+async function authed<T>(fn: (token: string) => Promise<T>): Promise<T> {
+  let token = await sdk.auth.getToken();
+  try {
+    return await fn(token);
+  } catch (error) {
+    if (error instanceof ApiError && (error.status === 401 || error.code === 401)) {
+      token = await sdk.auth.getToken();
+      return await fn(token);
+    }
+    throw error;
   }
+}
+
+async function refreshTasks(): Promise<void> {
   listNote.value = '加载中…';
   try {
-    tasks.value = await listTasks(token.value);
+    tasks.value = await authed((token) => listTasks(token));
     listNote.value = null;
   } catch (error) {
     listNote.value = `加载失败：${describe(error)}`;
   }
 }
 
-async function refreshToken(): Promise<void> {
+/** 面板探针：验证身份原语可用并显示最近一次结果（不缓存返回值）。 */
+async function probeToken(): Promise<void> {
   tokenNote.value = '获取中…';
   try {
-    token.value = await sdk.auth.getToken();
-    tokenNote.value = `已取得（长度 ${token.value.length}）`;
+    const token = await sdk.auth.getToken();
+    tokenNote.value = `已取得（长度 ${token.length}）`;
   } catch (error) {
-    token.value = null;
     tokenNote.value = `未取得：${describe(error)}`;
     return;
   }
   await refreshTasks();
 }
 
-onMounted(refreshToken);
+onMounted(() => {
+  void probeToken();
+  void refreshTasks();
+});
 
 async function addTask(): Promise<void> {
   const title = newTitle.value.trim();
-  if (!token.value || !canCreate.value || !title) return;
+  if (!canCreate.value || !title) return;
   try {
-    const task = await createTask(token.value, title);
+    const task = await authed((token) => createTask(token, title));
     tasks.value = [task, ...tasks.value];
     newTitle.value = '';
     opNote.value = null;
@@ -84,9 +102,9 @@ async function addTask(): Promise<void> {
 }
 
 async function removeTask(id: number): Promise<void> {
-  if (!token.value || !canDelete.value) return;
+  if (!canDelete.value) return;
   try {
-    await deleteTask(token.value, id);
+    await authed((token) => deleteTask(token, id));
     tasks.value = tasks.value.filter((task) => task.id !== id);
     opNote.value = null;
   } catch (error) {
@@ -112,12 +130,8 @@ async function tryInvoke(): Promise<void> {
 }
 
 async function checkWhoami(): Promise<void> {
-  if (!token.value) {
-    whoamiNote.value = '等令牌';
-    return;
-  }
   try {
-    const identity = await whoami(token.value);
+    const identity = await authed((token) => whoami(token));
     whoamiNote.value =
       `网关注入身份：X-User-Id=${identity.userId}，X-App-Id=${identity.appId}` +
       `，权限 ${identity.permissions.join(' / ') || '无'}（requestId ${identity.requestId.slice(0, 8)}…）`;
@@ -139,7 +153,7 @@ async function checkWhoami(): Promise<void> {
       <li><b>窗口形态</b>{{ handle.mode === 'hosted' ? '被门户嵌入' : '顶层窗口' }}</li>
       <li>
         <b>身份令牌</b><span :class="tokenNote.startsWith('已取得') ? 'is-ok' : 'is-bad'">{{ tokenNote }}</span>
-        <button v-if="!tokenNote.startsWith('已取得')" type="button" @click="refreshToken">重试</button>
+        <button v-if="!tokenNote.startsWith('已取得')" type="button" @click="probeToken">重试</button>
       </li>
       <li>
         <b>新建权限</b>

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { Button, Empty, SearchBar, SegmentedControl } from 'dingtalk-design-mobile';
 import { AppletOutlined } from 'dd-icons';
 import { deriveChannel, deriveVisual, useAppRegistryStore } from '../../store/appRegistryStore';
@@ -31,12 +31,10 @@ const CHANNEL_OPTIONS: Array<{ value: ChannelFilter; label: string }> = [
  * 用链接语义会让读屏与「在新标签打开」把它当成地址。
  */
 export default function MarketPage() {
-  const navigate = useNavigate();
   const [keyword, setKeyword] = useState('');
   const [channel, setChannel] = useState<ChannelFilter>('all');
   const [searchParams, setSearchParams] = useSearchParams();
   const view = useAppRegistryStore((state) => state.view);
-  const needsLogin = useAppRegistryStore((state) => state.needsLogin);
 
   useEffect(() => {
     void useAppRegistryStore.getState().fetch();
@@ -101,17 +99,7 @@ export default function MarketPage() {
         ) : null}
       </div>
 
-      {needsLogin ? (
-        <section className="ui-section" aria-label="需要登录">
-          <div className="ui-card ui-card--center">
-            <Empty title="登录后查看应用" inline />
-            <p className="ui-note">应用清单需要登录后获取。</p>
-            <Button size="large" inline={false} onClick={() => navigate('/login')}>
-              去登录
-            </Button>
-          </div>
-        </section>
-      ) : view.status === 'loading' ? (
+      {view.status === 'loading' ? (
         <section className="ui-section" aria-label="应用列表加载中">
           {/* 骨架是装饰（彩虹规范允许的加载位），不进无障碍树 */}
           <ul className="portal-cards" aria-hidden="true">

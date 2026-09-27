@@ -1,8 +1,8 @@
 import { useEffect, useMemo } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Button, Empty } from 'dingtalk-design-mobile';
 import { RightArrowOutlined } from 'dd-icons';
-import { useAppRegistryStore, summarizeApps } from '../../store/appRegistryStore';
+import { summarizeApps, useAppRegistryStore } from '../../store/appRegistryStore';
 import { useSessionStore } from '../../store/sessionStore';
 import { PORTAL_ENV_LABEL } from '../../store/portalNotice';
 import { summarizeRoadmap } from '../../store/roadmap';
@@ -21,10 +21,8 @@ import { deriveVisual } from '../../store/appRegistryStore';
  * 两个统计数字由清单派生，不与列表分开维护。
  */
 export default function WorkbenchPage() {
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const view = useAppRegistryStore((state) => state.view);
-  const needsLogin = useAppRegistryStore((state) => state.needsLogin);
   const session = useSessionStore((state) => state.session);
   const roadmap = useMemo(() => summarizeRoadmap(), []);
 
@@ -69,15 +67,7 @@ export default function WorkbenchPage() {
             </span>
           </Link>
         </div>
-        {needsLogin ? (
-          <div className="ui-card ui-card--center">
-            <Empty title="登录后查看应用" inline />
-            <p className="ui-note">应用清单需要登录后获取。</p>
-            <Button size="large" inline={false} onClick={() => navigate('/login')}>
-              去登录
-            </Button>
-          </div>
-        ) : view.status === 'loading' ? (
+        {view.status === 'loading' ? (
           <ul className="portal-grid" aria-hidden="true">
             {[0, 1, 2, 3, 4, 5].map((index) => (
               <li key={index} className="portal-grid__skel">

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { Suspense, useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { Avatar } from 'dingtalk-design-mobile';
@@ -16,6 +16,7 @@ import { WIDE_QUERY, useMediaQuery } from './useMediaQuery';
 import { useRouteMeta } from './useRouteMeta';
 import type { RouteMeta } from './useRouteMeta';
 import EnvNotice from './EnvNotice';
+import PageFallback from '../router/PageFallback';
 
 /**
  * 门户外壳：紧凑顶栏 + 主导航 + 页面标题行 + 内容区。
@@ -197,8 +198,12 @@ export default function PortalShell() {
             <EnvNotice />
           </div>
 
+          {/* 批次 G：单点 Suspense 承担全部懒加载内页——标题行/导航/披露条在
+              边界外，chunk 加载期间页面标题与导航高亮即时正确，只有这里出骨架 */}
           <div className="portal-content ui-enter" key={location.pathname}>
-            <Outlet />
+            <Suspense fallback={<PageFallback />}>
+              <Outlet />
+            </Suspense>
           </div>
         </div>
       </main>

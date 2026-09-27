@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Alert, Avatar, Breadcrumb, Button, Input, Menu, Tag } from 'dingtalk-design-desktop';
@@ -14,15 +14,16 @@ import {
   UploadOutlined,
 } from 'dd-icons';
 import { DEMO_DISCLOSURE, DEMO_EXPLANATION, DEMO_OPERATOR } from '../store/demoDirectory';
-import { clearSession, readSession } from '../api/yudao';
+import { logoutRemote, readSession } from '../api/yudao';
 import { useRouteMeta } from '../shell/useRouteMeta';
 import type { RouteMeta } from '../shell/useRouteMeta';
+import PageFallback from '../router/PageFallback';
 
 /**
  * 后台外壳：左侧分组导航 + 顶部面包屑与身份区 + 披露提示条。
  *
  * 导航点击只切换后台内部路由，不产生任何外部跳转。身份区随会话切换（批次 B 起）：
- * 登录后显示账号信息并提供「退出登录」（清空会话回登录页）；未登录预览时是占位身份，
+ * 登录后显示账号信息并提供「退出登录」（批次 F 起吊销后端双令牌并清空会话回登录页）；未登录预览时是占位身份，
  * 退出按钮保持禁用——没有登录态就不存在退出动作，可用的退出按钮会让人误以为已经登录。
  *
  * 版式取舍：
@@ -251,7 +252,8 @@ export default function AdminShell() {
               className="admin-header__logout"
               disabled={!session}
               onClick={() => {
-                clearSession();
+                // 批次 F：logoutRemote 吞网络错、本地必清——登出不能被网络失败卡住。
+                void logoutRemote();
                 navigate('/login');
               }}
             >
@@ -291,9 +293,13 @@ export default function AdminShell() {
             </div>
 
             <main className="admin-content" id="admin-main" tabIndex={-1} ref={mainRef}>
-              {/* key 挂在路由出口上：切页时重放一次 ui-enter，与门户同一条入场曲线 */}
+              {/* key 挂在路由出口上：切页时重放一次 ui-enter，与门户同一条入场曲线。
+                  批次 G：单点 Suspense 承担全部懒加载内页——面包屑/h1/披露条都在
+                  边界外，chunk 加载期间标题导航即时正确，只有内容区出骨架 */}
               <div className="admin-content__inner ui-enter" key={pathname}>
-                <Outlet />
+                <Suspense fallback={<PageFallback />}>
+                  <Outlet />
+                </Suspense>
               </div>
             </main>
 

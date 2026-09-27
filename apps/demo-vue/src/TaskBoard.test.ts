@@ -1,7 +1,7 @@
 import { mount, flushPromises } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import TaskBoard from './components/TaskBoard.vue';
-import { createTask, deleteTask, listTasks, whoami } from './api/tasks';
+import { ApiError, createTask, deleteTask, listTasks, whoami } from './api/tasks';
 import type { PortalHandle } from '@ai-portal/shared-sdk';
 
 /**
@@ -101,5 +101,33 @@ describe('TaskBoard（批次 E：真实 API + 权限门控）', () => {
     expect(mocked.whoami).toHaveBeenCalledWith('x'.repeat(32));
     expect(wrapper.text()).toContain('X-User-Id=7');
     expect(wrapper.text()).toContain('demo-vue:task:create');
+  });
+
+  it('批次 F：在途令牌被作废（401）后重取令牌重试一次成功', async () => {
+    mocked.whoami
+      .mockRejectedValueOnce(new ApiError(401, 401, '登录状态已过期，请重新登录。'))
+      .mockResolvedValue({
+        userId: '7',
+        appId: 'demo-vue',
+        tenantId: '1',
+        orgId: '100',
+        roles: ['super_admin'],
+        permissions: ['demo-vue:task:create'],
+        requestId: 'req-abcdef123456',
+      });
+    const { handle } = makeHandle(true);
+    const getToken = handle.sdk.auth.getToken as ReturnType<typeof vi.fn>;
+    getToken.mockReset().mockImplementation(async () => `token-${getToken.mock.calls.length}`);
+    const wrapper = mount(TaskBoard, { props: { handle } });
+    await flushPromises();
+
+    await wrapper.findAll('button').find((b) => b.text() === '网关身份')!.trigger('click');
+    await flushPromises();
+
+    // 401 后重取了新令牌（两次 whoami 用的令牌不同），重试成功
+    const tokens = mocked.whoami.mock.calls.map(([token]) => token);
+    expect(tokens).toHaveLength(2);
+    expect(tokens[0]).not.toBe(tokens[1]);
+    expect(wrapper.text()).toContain('X-User-Id=7');
   });
 });

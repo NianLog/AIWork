@@ -30,6 +30,9 @@ Scope: apps/portal/src/**,packages/shared-sdk/**,packages/shared-types/**,apps/a
      15s 超时、BAD_ENTRY 立即失败、同源 load 后注入 `window.portal` +
      `__PORTAL_PROPS__` 并派发 `portal:ready`；跨源不注入（子应用侧超时自曝）；
      unmount 幂等、reload 同配置重挂。
+     【2026-09-27 增补】BAD_ENTRY 收口了同源入口命名空间校验：entry 必须位于
+     `/subapps/` 前缀（跨源不受限），防门户 SPA fallback 把门户自身喂给 iframe——
+     见 [2026-09-27-portal-self-embedding-defense](2026-09-27-portal-self-embedding-defense.md)。
    - `hostPortal`：宿主侧五原语的诚实边界——getToken 无会话抛「请先登录」（无假续期）；
      permission.can 精确匹配（无通配符豁免，应用权限码未播种前对子应用码返回 false 是真实状态）；
      event 模块级总线；navigate 借 `setHostNavigator`（工作区挂路由实例），否则整页跳转兜底；
@@ -103,6 +106,8 @@ Scope: apps/portal/src/**,packages/shared-sdk/**,packages/shared-types/**,apps/a
   `needsLogin`，页面转「去登录」引导；管理端 `ApplicationsPage` 同型漏洞同批修复
   （蟑螂原则）。两端各补 401 用例（`market-loading.test.tsx`、admin `App.test.tsx`）。
   静默续期（refreshToken）不在本批——§8.1 安排在宿主 getToken 原语内做。
+  【2026-09-27 批次 F 已兑现】单飞刷新 + 401 自动重试已落在两端 yudao.ts 与
+  hostPortal.getToken，见 [2026-09-27-batch-f-silent-refresh-and-guards](2026-09-27-batch-f-silent-refresh-and-guards.md)。
 
 ## 续记（2026-09-26 联调返修：工作区布局与 favicon）
 

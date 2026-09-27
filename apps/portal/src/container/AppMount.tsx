@@ -60,6 +60,8 @@ export default function AppMount({ app, onExit }: { app: PortalApp; onExit: () =
       void instance?.unmount();
     };
     // 依赖挂关键配置字段与会话：对象身份每次拉取都会变，不能整个 app 进依赖。
+    // 注意（批次 F）：令牌静默刷新只写 sessionStorage 不进本 store——订阅方消费
+    // 的都是身份字段，身份不变即不重挂子应用（「无感」的前提），勿改成订阅令牌。
   }, [app.appId, app.version, app.entry, app.sandbox, session, attempt]);
 
   return (

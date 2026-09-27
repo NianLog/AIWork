@@ -17,8 +17,10 @@ async function start(): Promise<void> {
     appId: manifest.appId,
     title: manifest.name,
     navigation: [{ label: '任务清单', path: '/' }],
-    // login 只在独立形态被用到；宿主形态的身份来自注入的 props 快照与原语。
+    // login/refresh 只在独立形态被用到（批次 F 接入 refresh：SDK 单飞静默刷新）；
+    // 宿主形态的身份来自注入的 props 快照与原语，宿主 getToken 自带续期。
     login: auth.login,
+    refresh: auth.refresh,
   });
   createApp({ render: () => h(TaskBoard, { handle }) }).mount(handle.container);
 }

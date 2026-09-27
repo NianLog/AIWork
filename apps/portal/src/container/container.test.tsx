@@ -8,6 +8,7 @@ import { mountIframeApp } from './iframe-adapter';
 import { buildRuntimeConfig, useAppRegistryStore } from '../store/appRegistryStore';
 import type { PortalApp } from '../store/appRegistryStore';
 import { useSessionStore } from '../store/sessionStore';
+import { SESSION_KEY } from '../api/yudao';
 import type { PortalSession } from '../api/yudao';
 import type { PortalSDK } from '@ai-portal/shared-types';
 
@@ -20,6 +21,8 @@ import type { PortalSDK } from '@ai-portal/shared-types';
 const SESSION: PortalSession = {
   accessToken: 'test-access-token',
   refreshToken: 'test-refresh-token',
+  // 远期值：getToken 的临期窗口是 60 秒，给「当前+60s」会恰好触发主动刷新
+  expiresAt: 4_102_444_800_000,
   user: { id: 7, username: 'admin', nickname: '联调管理员' },
   roles: ['common'],
   permissions: ['ai-image:task:create'],
@@ -54,7 +57,7 @@ function portalAppFixture(): PortalApp {
     framework: 'react',
     sandbox: 'iframe',
     baseRoute: '/ai-image',
-    entry: '/subapp-probe/index.html',
+    entry: '/subapps/ai-image/index.html',
     backendApi: 'https://api.invalid/ai-image',
     status: 0,
     permissions: [],
@@ -66,13 +69,17 @@ function portalAppFixture(): PortalApp {
 
 beforeEach(() => {
   useSessionStore.setState({ session: SESSION });
-  useAppRegistryStore.setState({ view: { status: 'loading', data: [] }, needsLogin: false, flight: undefined });
+  // 批次 F 起 hostPortal.getToken 读 sessionStorage（事实源），与 store 同步预置；
+  // expiresAt 给远期值，避免主动刷新在 jsdom 里发起 fetch。
+  sessionStorage.setItem(SESSION_KEY, JSON.stringify(SESSION));
+  useAppRegistryStore.setState({ view: { status: 'loading', data: [] }, flight: undefined });
 });
 
 afterEach(() => {
   cleanup();
   setHostNavigator(undefined);
   useSessionStore.setState({ session: null });
+  sessionStorage.clear();
   document.body.replaceChildren();
 });
 
@@ -140,6 +147,31 @@ describe('iframe 适配器', () => {
     const mount = document.createElement('div');
     document.body.append(mount);
     const app = { ...portalAppFixture(), entry: 'javascript:alert(1)' };
+    const cfg = buildRuntimeConfig(app, SESSION);
+    await expect(mountIframeApp(cfg, mount, hostFixture())).rejects.toMatchObject({
+      name: 'AppLoadError',
+      code: 'BAD_ENTRY',
+    });
+    expect(mount.querySelector('iframe')).toBeNull();
+  });
+
+  it('同源入口不在 /subapps/ 命名空间立即拒绝（2026-09-27 嵌套事故防御）', async () => {
+    const mount = document.createElement('div');
+    document.body.append(mount);
+    // 事故原值：/demo-vue/ 经门户 SPA fallback 把门户自身喂给 iframe，递归嵌套
+    const app = { ...portalAppFixture(), entry: '/demo-vue/' };
+    const cfg = buildRuntimeConfig(app, SESSION);
+    await expect(mountIframeApp(cfg, mount, hostFixture())).rejects.toMatchObject({
+      name: 'AppLoadError',
+      code: 'BAD_ENTRY',
+    });
+    expect(mount.querySelector('iframe')).toBeNull();
+  });
+
+  it('路径归一化挡住 /subapps/../ 形式的绕过写法', async () => {
+    const mount = document.createElement('div');
+    document.body.append(mount);
+    const app = { ...portalAppFixture(), entry: '/subapps/../demo-vue/' };
     const cfg = buildRuntimeConfig(app, SESSION);
     await expect(mountIframeApp(cfg, mount, hostFixture())).rejects.toMatchObject({
       name: 'AppLoadError',
@@ -271,8 +303,43 @@ describe('运行时配置与宿主桥', () => {
     await expect(portalHost.invoke('dd.scanCode', {})).rejects.toThrow(/JSAPI/);
 
     useSessionStore.setState({ session: null });
+    sessionStorage.removeItem(SESSION_KEY);
     await expect(portalHost.auth.getToken()).rejects.toThrow(/登录/);
     expect(portalHost.permission.can('ai-image:task:create')).toBe(false);
+  });
+
+  it('getToken 临期先静默刷新再发新令牌；刷新只写 storage 不进 store（批次 F）', async () => {
+    sessionStorage.setItem(
+      SESSION_KEY,
+      JSON.stringify({ ...SESSION, accessToken: 'at-old', expiresAt: Date.now() + 30_000 }),
+    );
+    const urls: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        urls.push(String(input));
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            code: 0,
+            msg: '',
+            data: {
+              userId: 7,
+              accessToken: 'at-new',
+              refreshToken: SESSION.refreshToken,
+              expiresTime: Date.now() + 1_800_000,
+            },
+          }),
+        } as Response;
+      }),
+    );
+
+    await expect(portalHost.auth.getToken()).resolves.toBe('at-new');
+    expect(urls.filter((url) => url.includes('/auth/refresh-token'))).toHaveLength(1);
+    expect(JSON.parse(sessionStorage.getItem(SESSION_KEY)!).accessToken).toBe('at-new');
+    // 刷新只写 storage 不进 store：订阅层身份不变 → AppMount 不重挂子应用
+    expect(useSessionStore.getState().session?.accessToken).toBe('test-access-token');
   });
 
   it('宿主桥事件总线可订阅/派发/退订，导航借工作区路由实例', () => {

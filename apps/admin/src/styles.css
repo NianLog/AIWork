@@ -424,6 +424,15 @@
   min-width: 0;
 }
 
+/* 批次 G：路由懒加载骨架容器（PageFallback）——两根 ui-skeleton 条的纵向排布，
+   页面 chunk 加载期间的内容区占位（portal 侧复用 workspace__loading-body，admin 无等价类） */
+.admin-page-fallback {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-3);
+  padding: var(--ui-space-4) 0;
+}
+
 .admin-content:focus,
 .admin-content:focus-visible {
   outline: none;
@@ -637,11 +646,22 @@
   background: var(--ui-surface-sunken);
 }
 
+/*
+ * 品牌侧（批次 F 起）：portal-hero 同款品牌渐变面板；四段产品文案压缩为
+ * logo + 一句价值主张 + 环境徽章（登录页只做登录）。admin 的 hero 恒显。
+ * 文字/图标一律 --ui-brand-ink 实色（不叠 opacity：信息不许弱）。
+ */
 .admin-login__hero {
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   gap: var(--ui-space-3);
-  max-width: 380px;
+  width: 380px;
+  flex: none;
+  padding: var(--ui-space-6);
+  border-radius: var(--ui-radius-l);
+  background: linear-gradient(110deg, var(--ui-brand) 0%, var(--ui-brand-lift) 100%);
+  color: var(--ui-brand-ink);
 }
 
 .admin-login__logo {
@@ -650,60 +670,39 @@
   justify-content: center;
   width: 40px;
   height: 40px;
-  border-radius: var(--ui-radius-l);
-  background: var(--ui-brand);
-  color: var(--ui-brand-ink);
+  border-radius: var(--ui-radius-m);
+  background: var(--ui-brand-ink);
+  color: var(--ui-brand);
   font-size: var(--ui-font-xl);
   line-height: var(--ui-leading-none);
 }
 
 .admin-login__brand {
-  margin: 0;
+  margin: var(--ui-space-2) 0 0;
   font-size: var(--ui-font-xl);
   font-weight: var(--ui-weight-semibold);
   line-height: var(--ui-leading-tight);
   letter-spacing: var(--ui-tracking-tight);
-  color: var(--ui-text-strong);
+  color: var(--ui-brand-ink);
 }
 
 .admin-login__slogan {
   margin: 0;
   font-size: var(--ui-font-sm);
   line-height: var(--ui-leading-base);
-  color: var(--ui-text-soft);
+  color: var(--ui-brand-ink);
 }
 
-.admin-login__points {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ui-space-3);
-  margin: var(--ui-space-2) 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.admin-login__points li {
-  display: flex;
-  flex-direction: column;
-  /* 每条里「小标题」与「说明」两行之间 4px */
-  gap: var(--ui-space-1);
-  font-size: var(--ui-font-sm);
-  line-height: var(--ui-leading-base);
-  color: var(--ui-text-soft);
-}
-
-.admin-login__points li strong {
-  font-size: var(--ui-font-sm);
-  font-weight: var(--ui-weight-medium);
-  line-height: var(--ui-leading-tight);
-  color: var(--ui-text-strong);
-}
-
+/* 环境徽章：portal-hero__badge 同款 ink 描边胶囊（边框是装饰允许弱，文字实色） */
 .admin-login__env {
   margin: var(--ui-space-2) 0 0;
-  font-size: var(--ui-font-xs);
+  padding: var(--ui-space-1) var(--ui-space-3);
+  border: 1px solid var(--ui-brand-ink);
+  border-radius: var(--ui-radius-pill);
+  font-size: var(--ui-font-2xs);
+  font-weight: var(--ui-weight-medium);
   line-height: var(--ui-leading-tight);
-  color: var(--ui-text-soft);
+  color: var(--ui-brand-ink);
 }
 
 .admin-login__panel {
@@ -744,10 +743,7 @@
   color: var(--ui-text-soft);
 }
 
-/*
- * 登录页的披露条：与后台顶栏那条不同，这里带图标、有底色，
- * 因为登录页没有别的披露渠道，它需要被看见。
- */
+/* 失败/过期提示（批次 F：info 型披露条删除，只剩这两种瞬时状态） */
 .admin-login__notice {
   margin: 0;
 }
@@ -759,67 +755,10 @@
   gap: var(--ui-space-4);
 }
 
-.admin-login__divider {
-  display: flex;
-  align-items: center;
-  gap: var(--ui-space-3);
+/* 卡底单一弱注脚（批次 F：info Alert 与卡底脚注收敛为一行；逃生卡已删） */
+.admin-login__foot {
   margin: 0;
-  font-size: var(--ui-font-xs);
-  line-height: var(--ui-leading-tight);
-  color: var(--ui-text-soft);
-}
-
-.admin-login__divider::before,
-.admin-login__divider::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: var(--ui-line);
-}
-
-.admin-login__skip {
-  display: flex;
-  align-items: center;
-  gap: var(--ui-space-3);
-  padding: var(--ui-space-4);
-  border: 1px solid var(--ui-brand-line);
-  border-radius: var(--ui-radius-l);
-  background: var(--ui-brand-soft);
-  color: var(--ui-brand-strong);
-  transition: var(--ui-transition-surface);
-}
-
-.admin-login__skip:hover {
-  background: var(--ui-brand-soft-weak);
-  color: var(--ui-brand-strong);
-  box-shadow: var(--ui-shadow-card);
-}
-
-/*
- * 跳过登录入口的两行文字。
- *
- * 这里必须是块级/弹性容器，不能让两个 <span> 留在行内格式化上下文里：
- * 行内元素换行时上下两行的盒子在几何上是相互重叠的（第一行折行后与第二行同 y），
- * 审计脚本把它报成 -19px 的真重叠。上一版没给这个类写样式，问题就一直藏着。
- */
-.admin-login__skip-text {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ui-space-1);
-  flex: 1;
-  min-width: 0;
-}
-
-.admin-login__skip-text strong {
-  font-size: var(--ui-font-base);
-  font-weight: var(--ui-weight-semibold);
-  line-height: var(--ui-leading-tight);
-}
-
-.admin-login__skip-text span {
-  font-size: var(--ui-font-xs);
-  line-height: var(--ui-leading-tight);
-  color: var(--ui-text-soft);
+  text-align: center;
 }
 
 /* ======================================================================
