@@ -589,7 +589,7 @@
   flex: none;
   padding: var(--ui-space-6);
   border-radius: var(--ui-radius-l);
-  background: linear-gradient(110deg, var(--ui-brand) 0%, var(--ui-brand-lift) 100%);
+  background: var(--ui-brand);
   color: var(--ui-brand-ink);
 }
 

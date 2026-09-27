@@ -14,7 +14,7 @@
  *   4. 禁用态：native disabled / aria-disabled 元素的实际观感（过灰读不出 = 负优化）。
  *   5. 全页色彩普查：每种不透明背景色占了多少像素面积——品牌橙是不是只出现在
  *      该出现的位置，卡片白与页面灰是否分得开。
- *   6. 品牌色违规：#ED7D33 出现在文字色、细边框、伪元素细条上 = 违反 tokens.css
+ *   6. 品牌色违规：#2563EB（brand）出现在文字色、细边框、伪元素细条上 = 违反 tokens.css
  *      写下的使用约束（该色只有 2.77:1，只许大面积色块）。
  *
  * 用法：node scripts/qc/state-audit.mjs [页面名片段]
@@ -177,7 +177,7 @@ const PROBE = String.raw`(() => {
   }
 
   /* ---------- 6. 品牌色违规（先于 hover，避免鼠标位置污染读取） ---------- */
-  const BRAND = '237, 125, 51';
+  const BRAND = '37, 99, 235'; // #2563EB（2026-09-28 品牌换蓝）
   const brandViolations = [];
   for (const el of document.querySelectorAll('body *')) {
     if (!visible(el)) continue;
@@ -187,7 +187,7 @@ const PROBE = String.raw`(() => {
       brandViolations.push({ where: label(el), kind: '文字色', text: ownText(el).slice(0, 18), fs: cs.fontSize });
     }
     const bw = Math.max(parseFloat(cs.borderTopWidth) || 0, parseFloat(cs.borderBottomWidth) || 0);
-    if (bw > 0 && bw <= 2 && (cs.borderTopColor === 'rgb(' + BRAND + ']' || cs.borderBottomColor === 'rgb(' + BRAND + ')') && r.width * r.height < 20000) {
+    if (bw > 0 && bw <= 2 && (cs.borderTopColor === 'rgb(' + BRAND + ')' || cs.borderBottomColor === 'rgb(' + BRAND + ')') && r.width * r.height < 20000) {
       brandViolations.push({ where: label(el), kind: '细边框 ' + bw + 'px', size: Math.round(r.width) + 'x' + Math.round(r.height) });
     }
     for (const pseudo of ['::before', '::after']) {
