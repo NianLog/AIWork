@@ -74,9 +74,10 @@ export default defineConfig({
         changeOrigin: true,
       },
       '/subapps': {
-        target: 'http://127.0.0.1:5175',
-        changeOrigin: false,
-        ws: true,
+        // 批次 I：注册表 entry 已版本化（/subapps/{appId}/{ver}/），本地 5175 dev
+        // server 没有版本路径——切到服务器 nginx 静态产物，上传链路即部署单元。
+        target: 'http://jbslab.bili',
+        changeOrigin: true,
       },
       // 子应用业务请求统一走线上网关（批次 E）：hosted iframe 与门户同源，
       // /api/{appId}/** 由这里代理到 nginx+Lua 网关，浏览器无跨源。
@@ -109,9 +110,10 @@ export default defineConfig({
         changeOrigin: true,
       },
       '/subapps': {
-        target: 'http://127.0.0.1:5175',
-        changeOrigin: false,
-        ws: true,
+        // 批次 I：注册表 entry 已版本化（/subapps/{appId}/{ver}/），本地 5175 dev
+        // server 没有版本路径——切到服务器 nginx 静态产物，上传链路即部署单元。
+        target: 'http://jbslab.bili',
+        changeOrigin: true,
       },
       // 子应用业务请求统一走线上网关（批次 E）：hosted iframe 与门户同源，
       // /api/{appId}/** 由这里代理到 nginx+Lua 网关，浏览器无跨源。
