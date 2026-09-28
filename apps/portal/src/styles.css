@@ -1756,3 +1756,53 @@
 .fb-done .ui-note {
   margin: 0;
 }
+
+/* ======================================================================
+   进度条与工期（批次 R）：宽屏时间轴与窄屏手风琴共用
+   ====================================================================== */
+.roadmap-bar {
+  height: 6px;
+  margin-top: 8px;
+  border-radius: 3px;
+  background: var(--ui-surface-deep, rgba(0, 0, 0, 0.06));
+  overflow: hidden;
+}
+
+.roadmap-bar__fill {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  transition: width var(--ui-dur-base) var(--ui-ease-standard);
+}
+
+.roadmap-bar__fill--emerald {
+  background: var(--ui-tone-emerald-fg);
+}
+
+.roadmap-bar__fill--cyan {
+  background: var(--ui-tone-cyan-fg);
+}
+
+.roadmap-bar__fill--slate {
+  background: var(--ui-tone-slate-fg);
+}
+
+.roadmap-bar__label {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 4px;
+  font-size: var(--ui-font-xs);
+  color: var(--ui-text-soft);
+}
+
+.roadmap-bar__schedule {
+  color: var(--ui-text-soft);
+}
+
+/* 状态页加载骨架：与看板同高的占位，避免加载完成时跳版 */
+.progress-skeleton {
+  display: grid;
+  gap: 12px;
+  padding: 16px 0;
+}

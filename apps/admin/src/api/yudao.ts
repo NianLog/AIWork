@@ -961,3 +961,83 @@ export async function updateFeedback(input: {
 export async function deleteFeedback(id: number): Promise<void> {
   await request<void>(`/admin-api/portal-feedback/delete?id=${id}`, { method: 'DELETE' });
 }
+
+/** ===== 门户进展看板（批次 R）===== */
+
+export type RoadmapStage = 0 | 1 | 2;
+
+export interface RoadmapRow {
+  id: number;
+  name: string;
+  description?: string;
+  stage: RoadmapStage;
+  progress: number;
+  startDate?: string;
+  dueDate?: string;
+  sort: number;
+}
+
+interface RoadmapItem {
+  id: number;
+  name: string;
+  description?: string | null;
+  stage: number;
+  progress: number;
+  startDate?: string | null;
+  dueDate?: string | null;
+  sort: number;
+}
+
+export const ROADMAP_STAGE_LABEL: Record<RoadmapStage, string> = {
+  0: '规划中',
+  1: '进行中',
+  2: '已完成',
+};
+
+function toRoadmapRow(item: RoadmapItem): RoadmapRow {
+  return {
+    id: item.id,
+    name: item.name,
+    description: item.description || undefined,
+    stage: ([0, 1, 2] as const).includes(item.stage as RoadmapStage) ? (item.stage as RoadmapStage) : 0,
+    progress: Math.min(100, Math.max(0, item.progress)),
+    startDate: item.startDate || undefined,
+    dueDate: item.dueDate || undefined,
+    sort: item.sort,
+  };
+}
+
+/** 全量条目（后端不分页），管理端维护与门户展示共用这一份。 */
+export async function fetchRoadmapItems(): Promise<RoadmapRow[]> {
+  const list = await request<RoadmapItem[]>('/admin-api/portal-roadmap/list');
+  return list.map(toRoadmapRow);
+}
+
+export interface RoadmapInput {
+  id?: number;
+  name: string;
+  description?: string;
+  stage: RoadmapStage;
+  progress: number;
+  startDate?: string;
+  dueDate?: string;
+  sort: number;
+}
+
+export async function createRoadmapItem(input: RoadmapInput): Promise<number> {
+  return request<number>('/admin-api/portal-roadmap/create', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateRoadmapItem(input: RoadmapInput): Promise<void> {
+  await request<void>('/admin-api/portal-roadmap/update', {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function deleteRoadmapItem(id: number): Promise<void> {
+  await request<void>(`/admin-api/portal-roadmap/delete?id=${id}`, { method: 'DELETE' });
+}

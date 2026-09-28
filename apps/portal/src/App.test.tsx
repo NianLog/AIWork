@@ -3,11 +3,12 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
-import { WIDE_QUERY } from './shell/useMediaQuery';
+import { PROGRESS_BOARD_QUERY, WIDE_QUERY } from './shell/useMediaQuery';
 import { SESSION_KEY } from './api/yudao';
 import type { PortalAppRecord } from './api/yudao';
 import { useSessionStore } from './store/sessionStore';
 import { useAppRegistryStore } from './store/appRegistryStore';
+import { useRoadmapStore } from './store/roadmap';
 
 /**
  * 门户测试（批次 C 起）：应用清单来自注册表接口，会话来自登录态。
@@ -97,15 +98,38 @@ const ANNOUNCEMENTS = [
   { id: 1, title: '新应用上线', content: 'AI 图像工坊已开放使用。', pinned: false, createTime: 1_727_100_000_000 },
 ];
 
+/** yyyy-MM-dd 的相对日期：工期断言不随时间漂移。 */
+function dayFromNow(offsetDays: number): string {
+  const d = new Date(Date.now() + offsetDays * 86_400_000);
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${mm}-${dd}`;
+}
+
+/** 进展看板条目（后端已按阶段+sort 排好，桩里原样给）。 */
+const ROADMAP_ITEMS = [
+  { id: 1, name: '统一登录', description: '账号密码登录与会话保持', stage: 2, progress: 100, sort: 1 },
+  {
+    id: 2, name: '使用统计', description: '访问与使用数据的采集', stage: 1, progress: 40,
+    startDate: dayFromNow(-5), dueDate: dayFromNow(9), sort: 2,
+  },
+  { id: 3, name: '消息提醒', description: '多通道提醒', stage: 0, progress: 0, sort: 3 },
+];
+
 /**
- * 接口桩：登录 / 权限信息 / 启用应用清单 / 公告 / 反馈提交五张路由表。
+ * 接口桩：登录 / 权限信息 / 启用应用清单 / 公告 / 进展 / 反馈提交六张路由表。
  * 清单内容可变（setApps），C1 用例靠它模拟「管理端新增配置」；
- * 公告默认空列表（卡片隐藏，存量用例不感知）；反馈提交记录请求体供断言。
+ * 公告与进展默认空列表（卡片隐藏，存量用例不感知）；反馈提交记录请求体供断言。
  */
-function stubPortalFetch(options: { loginBody?: unknown; announcements?: typeof ANNOUNCEMENTS } = {}) {
+function stubPortalFetch(options: {
+  loginBody?: unknown;
+  announcements?: typeof ANNOUNCEMENTS;
+  roadmap?: typeof ROADMAP_ITEMS;
+} = {}) {
   const state = {
     apps: [APP_IMAGE, APP_VIDEO] as PortalAppRecord[],
     announcements: options.announcements ?? [],
+    roadmap: options.roadmap ?? [],
     feedbackPosts: [] as string[],
   };
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -125,6 +149,9 @@ function stubPortalFetch(options: { loginBody?: unknown; announcements?: typeof 
     }
     if (url.includes('/portal-announcement/enabled-list')) {
       return jsonResponse({ code: 0, data: state.announcements, msg: '' });
+    }
+    if (url.includes('/portal-roadmap/list')) {
+      return jsonResponse({ code: 0, data: state.roadmap, msg: '' });
     }
     if (url.includes('/portal-feedback/submit')) {
       state.feedbackPosts.push(String(init?.body ?? ''));
@@ -183,6 +210,7 @@ afterEach(() => {
   sessionStorage.clear();
   useSessionStore.setState({ session: null });
   useAppRegistryStore.setState({ view: { status: 'loading', data: [] }, flight: undefined });
+  useRoadmapStore.setState({ view: { status: 'loading', data: [] }, flight: undefined });
   vi.unstubAllGlobals();
 });
 
@@ -407,6 +435,59 @@ describe('公告与反馈（批次 Q）', () => {
     expect(body.type).toBe('bug');
     expect(body.content).toBe('希望市场页支持按名称排序');
     expect(body.appId).toBeUndefined(); // 工作台入口 = 平台整体反馈
+  });
+});
+
+describe('功能进展（批次 R）', () => {
+  it('进展页渲染接口条目：进度、已进行天数与预计工期按查看日现算', async () => {
+    stubPortalFetch({ roadmap: ROADMAP_ITEMS });
+    seedSession();
+    // jsdom 不匹配任何媒体查询：手动对齐看板断点（否则渲染的是窄屏手风琴形态）
+    const original = window.matchMedia;
+    window.matchMedia = ((query: string) => ({
+      matches: query === PROGRESS_BOARD_QUERY,
+      media: query,
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    })) as unknown as typeof window.matchMedia;
+
+    let board: HTMLElement;
+    try {
+      openPortal('/preview/status');
+      board = await screen.findByRole('list', { name: '功能进展阶段' });
+    } finally {
+      window.matchMedia = original;
+    }
+    expect(board.textContent).toContain('统一登录');
+    expect(board.textContent).toContain('40%');
+    // 开始日期是 5 天前、预计完成在 9 天后 → 总工期 14 天
+    expect(board.textContent).toContain('已进行 5 天 · 预计工期 14 天');
+    expect(screen.getByText(/不展示使用人数、响应速度等运行数据/)).toBeTruthy();
+  });
+
+  it('工作台速览计数来自看板接口', async () => {
+    stubPortalFetch({ roadmap: ROADMAP_ITEMS });
+    seedSession();
+    openPortal('/preview');
+
+    const card = await screen.findByRole('region', { name: '功能进展速览' });
+    expect(within(card).getByText('已经可以体验')).toBeTruthy();
+    expect(within(card).getByText('正在建设')).toBeTruthy();
+    expect(within(card).getByText('规划中')).toBeTruthy();
+    expect(within(card).getByRole('link', { name: /去看进展/ })).toBeTruthy();
+  });
+
+  it('看板为空或失败：工作台不渲染速览卡，应用区不受影响', async () => {
+    stubPortalFetch(); // 默认空进展
+    seedSession();
+    openPortal('/preview');
+
+    await screen.findByRole('button', { name: 'AI 图像工坊' });
+    expect(screen.queryByRole('region', { name: '功能进展速览' })).toBeNull();
   });
 });
 

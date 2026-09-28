@@ -7,7 +7,7 @@ import type { PortalAnnouncement } from '../../api/yudao';
 import { summarizeApps, useAppRegistryStore, formatUpdateTime } from '../../store/appRegistryStore';
 import { useSessionStore } from '../../store/sessionStore';
 import { PORTAL_ENV_LABEL } from '../../store/portalNotice';
-import { summarizeRoadmap } from '../../store/roadmap';
+import { summarizeRoadmap, useRoadmapStore } from '../../store/roadmap';
 import AppDetailDrawer from '../parts/AppDetailDrawer';
 import FeedbackDrawer from '../parts/FeedbackDrawer';
 import { AppIconTile } from '../parts/AppVisuals';
@@ -76,14 +76,18 @@ export default function WorkbenchPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const view = useAppRegistryStore((state) => state.view);
   const session = useSessionStore((state) => state.session);
-  const roadmap = useMemo(() => summarizeRoadmap(), []);
+  // 功能进展速览（批次 R）：与管理端共看板的接口数据，不再是硬编码数组；
+  // 拉取失败或还没有条目时整卡隐藏（与公告卡同策略：速览是增益内容，不摆错误剧场）
+  const roadmapView = useRoadmapStore((state) => state.view);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
 
   useEffect(() => {
     void useAppRegistryStore.getState().fetch();
+    void useRoadmapStore.getState().fetch();
   }, []);
 
   const stats = useMemo(() => summarizeApps(view.data), [view.data]);
+  const roadmap = useMemo(() => summarizeRoadmap(roadmapView.data), [roadmapView.data]);
   /** 选中态即 URL：?app=xxx 打开抽屉（推历史），清除参数关闭（replace） */
   const activeAppId = searchParams.get('app');
   const activeApp = activeAppId
@@ -160,28 +164,30 @@ export default function WorkbenchPage() {
         <aside className="wb-rail" aria-label="平台公告、功能进展与应用统计">
           <AnnouncementCard />
 
-          <section className="wb-card">
-            <div className="ui-section__head">
-              <h2 className="ui-section__title">功能进展</h2>
-              <Link className="ui-section__link" to="/preview/status">
-                去看进展
-                <span aria-hidden="true">
-                  <RightArrowOutlined style={{ fontSize: 12 }} />
-                </span>
-              </Link>
-            </div>
-            <ul className="wb-progress">
-              {roadmap.map((stage) => (
-                <li key={stage.key} className="wb-progress__item">
-                  <span className="wb-progress__count ui-num" aria-hidden="true">{stage.count}</span>
-                  <span className="wb-progress__meta">
-                    <span className="wb-progress__title">{stage.title}</span>
-                    <span className="wb-progress__summary">{stage.summary}</span>
+          {roadmapView.status === 'success' && roadmapView.data.length > 0 ? (
+            <section className="wb-card" aria-label="功能进展速览">
+              <div className="ui-section__head">
+                <h2 className="ui-section__title">功能进展</h2>
+                <Link className="ui-section__link" to="/preview/status">
+                  去看进展
+                  <span aria-hidden="true">
+                    <RightArrowOutlined style={{ fontSize: 12 }} />
                   </span>
-                </li>
-              ))}
-            </ul>
-          </section>
+                </Link>
+              </div>
+              <ul className="wb-progress">
+                {roadmap.map((stage) => (
+                  <li key={stage.key} className="wb-progress__item">
+                    <span className="wb-progress__count ui-num" aria-hidden="true">{stage.count}</span>
+                    <span className="wb-progress__meta">
+                      <span className="wb-progress__title">{stage.title}</span>
+                      <span className="wb-progress__summary">{stage.summary}</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
 
           <section className="wb-card" aria-label="应用统计">
             <dl className="wb-statcard">

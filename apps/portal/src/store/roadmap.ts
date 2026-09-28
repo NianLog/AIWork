@@ -1,96 +1,150 @@
+import { create } from 'zustand';
+import { ApiError, fetchRoadmapItems } from '../api/yudao';
+import type { PortalRoadmapItem, RoadmapStageValue } from '../api/yudao';
+import { useSessionStore } from './sessionStore';
+
+export type { PortalRoadmapItem, RoadmapStageValue } from '../api/yudao';
+
 /**
- * 功能进展路线：三个阶段（已经可以体验 / 正在建设 / 规划中）。
+ * 功能进展 store（批次 R）：进展条目的唯一数据源，替代硬编码 TS 数组——
+ * 管理端「功能进展」页编辑后，门户进展页与工作台速览显示的就是同一份。
  *
- * 从 StatusPage 抽出来做共享数据源（2026-09-25 批次四）：工作台的
- * 「功能进展速览」与功能进展页读同一份数据，两处的阶段数与计数永远一致——
- * 各自维护一份必然漂移。
+ * - 每次挂载页面都重新拉取（in-flight 去重），语义与应用注册表 store 一致：
+ *   管理端改了条目，用户进页面就能看到，不用等门户发版；
+ * - 401（会话过期）交给路由守卫，与 appRegistryStore 同策略。
  *
- * 纪律：只记录能力层面的进展，不编造任何运行数据（使用人数、可用率、
- * 响应时间）——数字没有真实来源时只会被误读成统计结论，
- * 功能进展页的测试断言了这句承诺。
+ * 纪律继承自静态版：只记录能力层面的进展，不编造任何运行数据（使用人数、
+ * 可用率、响应时间）——数字没有真实来源时只会被误读成统计结论。
  */
 
-export type StageKey = 'ready' | 'building' | 'planned';
-
-export interface StageItem {
-  name: string;
-  desc: string;
+/** 四态数据视图契约：与应用注册表共用同一个形状（各 store 独立持有状态）。 */
+export interface DataView<T> {
+  status: 'loading' | 'error' | 'success';
+  data: T[];
+  error?: string;
 }
 
-export interface Stage {
-  key: StageKey;
+interface RoadmapState {
+  view: DataView<PortalRoadmapItem>;
+  fetch(): Promise<void>;
+  flight: Promise<void> | undefined;
+}
+
+export const useRoadmapStore = create<RoadmapState>((set, get) => ({
+  view: { status: 'loading', data: [] },
+  flight: undefined,
+  async fetch() {
+    const existing = get().flight;
+    if (existing) return existing;
+    const flight = (async () => {
+      set({ view: { status: 'loading', data: [] } });
+      try {
+        const data = await fetchRoadmapItems();
+        set({ view: { status: 'success', data } });
+      } catch (error) {
+        if (error instanceof ApiError && error.code === 401) {
+          useSessionStore.getState().dropSession();
+          set({ view: { status: 'error', data: [], error: '登录状态已过期，请重新登录。' } });
+          return;
+        }
+        set({
+          view: {
+            status: 'error',
+            data: [],
+            error: error instanceof Error ? error.message : '进展条目暂时没有取到，稍后重试一般就能恢复。',
+          },
+        });
+      } finally {
+        set({ flight: undefined });
+      }
+    })();
+    set({ flight });
+    return flight;
+  },
+}));
+
+/* ------------------------------------------------------------------ */
+/* 展示层派生：阶段标题/图标/说明是展示层常量（不入库），条目本身来自接口。 */
+/* ------------------------------------------------------------------ */
+
+/** 阶段展示定义：按「已完成 → 进行中 → 规划中」排列（路线图的读法）。 */
+export const ROADMAP_STAGE_DEFS: Array<{
+  stage: RoadmapStageValue;
   title: string;
-  /** 阶段的通俗说明，帮助判断这一阶段意味着什么 */
   summary: string;
   icon: 'check' | 'process' | 'clock';
-  items: StageItem[];
-}
-
-export const ROADMAP_STAGES: Stage[] = [
+  tone: 'emerald' | 'cyan' | 'slate';
+}> = [
   {
-    key: 'ready',
+    stage: 2,
     title: '已经可以体验',
-    summary: '现在打开门户就能用，不需要登录',
+    summary: '现在打开门户就能用',
     icon: 'check',
-    items: [
-      {
-        name: '浏览应用与查看介绍',
-        desc: '在工作台和应用市场查看每个应用能做什么、由哪个团队负责。',
-      },
-      {
-        name: '查找与筛选应用',
-        desc: '按名称、分类或团队搜索，也可在正式版、试运行、已停用之间切换查看。',
-      },
-    ],
+    tone: 'emerald',
   },
   {
-    key: 'building',
+    stage: 1,
     title: '正在建设',
     summary: '已经开工，还没有到可以试用的程度',
     icon: 'process',
-    items: [
-      {
-        name: '统一登录',
-        desc: '登录开通后，每个人看到的应用会跟随自己的岗位与所在组织。',
-      },
-      {
-        name: '权限管理',
-        desc: '每位成员能用哪些功能由管理员统一配置，互不越界。',
-      },
-    ],
+    tone: 'cyan',
   },
   {
-    key: 'planned',
+    stage: 0,
     title: '规划中',
     summary: '已经排进计划，尚未开工',
     icon: 'clock',
-    items: [
-      {
-        name: '应用上架',
-        desc: '业务团队可以自助提交新应用，审核通过后出现在应用市场。',
-      },
-      {
-        name: '使用统计',
-        desc: '按应用查看使用次数与活跃情况，帮助团队评估效果。',
-      },
-      {
-        name: '消息提醒',
-        desc: '任务完成、风险提醒等消息会通过工作台与钉钉送达。',
-      },
-      {
-        name: '安全守护',
-        desc: '所有操作留痕可查，异常使用及时提醒，保护数据安全。',
-      },
-    ],
+    tone: 'slate',
   },
 ];
 
-/** 工作台速览卡用的摘要：阶段 + 条目数。 */ 
-export function summarizeRoadmap() {
-  return ROADMAP_STAGES.map((stage) => ({
-    key: stage.key,
-    title: stage.title,
-    summary: stage.summary,
-    count: stage.items.length,
+export interface RoadmapStageGroup {
+  stage: RoadmapStageValue;
+  title: string;
+  summary: string;
+  icon: 'check' | 'process' | 'clock';
+  tone: 'emerald' | 'cyan' | 'slate';
+  items: PortalRoadmapItem[];
+}
+
+/** 按阶段分组（阶段定义顺序恒定，组内保持接口排序：阶段内 sort 小者在前）。 */
+export function groupRoadmapByStage(items: PortalRoadmapItem[]): RoadmapStageGroup[] {
+  return ROADMAP_STAGE_DEFS.map((def) => ({
+    ...def,
+    items: items.filter((item) => item.stage === def.stage),
   }));
+}
+
+/** 工作台速览卡用的摘要：阶段 + 条目数。 */
+export function summarizeRoadmap(items: PortalRoadmapItem[]) {
+  return groupRoadmapByStage(items).map((group) => ({
+    key: group.stage,
+    title: group.title,
+    summary: group.summary,
+    count: group.items.length,
+  }));
+}
+
+const DAY_MS = 86_400_000;
+
+function parseDay(value: string): number {
+  // 本地零点解析（带 T00:00:00，避免裸日期被当 UTC 造成时区偏移）
+  return new Date(`${value}T00:00:00`).getTime();
+}
+
+/**
+ * 已进行天数：查看日 − 开始日期；未开工（日期在未来）或没填开始日期则不算。
+ * 工期按查看日现算——库里只存事实，不存随时会过期的差值。
+ */
+export function elapsedDays(item: PortalRoadmapItem, now = Date.now()): number | undefined {
+  if (!item.startDate) return undefined;
+  const diff = Math.floor((now - parseDay(item.startDate)) / DAY_MS);
+  return diff >= 0 ? diff : undefined;
+}
+
+/** 预计总工期天数：预计完成 − 开始；两个日期都填了才算得出。 */
+export function plannedDurationDays(item: PortalRoadmapItem): number | undefined {
+  if (!item.startDate || !item.dueDate) return undefined;
+  const diff = Math.round((parseDay(item.dueDate) - parseDay(item.startDate)) / DAY_MS);
+  return diff > 0 ? diff : undefined;
 }
