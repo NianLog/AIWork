@@ -1561,3 +1561,198 @@
   flex: 1;
   height: 14px;
 }
+
+/* ======================================================================
+   批次 Q：工作台公告卡 + 反馈入口 + 反馈表单
+   ====================================================================== */
+
+/* 公告卡：右栏第一张。图标与标题同行，条目以标题/正文/时间三行排布 */
+.wb-announce__icon {
+  display: inline-flex;
+  margin-right: var(--ui-space-1);
+  color: var(--ui-brand-strong);
+  font-size: 15px;
+  vertical-align: -2px;
+}
+
+.wb-announce {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--ui-space-3);
+}
+
+.wb-announce__item + .wb-announce__item {
+  padding-top: var(--ui-space-3);
+  border-top: 1px solid var(--ui-line);
+}
+
+.wb-announce__title {
+  margin: 0;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.wb-announce__pin {
+  display: inline-block;
+  margin-right: var(--ui-space-2);
+  padding: 0 6px;
+  border-radius: var(--ui-radius-s);
+  background: var(--ui-tone-brand-bg);
+  color: var(--ui-tone-brand-fg);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 20px;
+  vertical-align: 1px;
+}
+
+.wb-announce__content {
+  margin: var(--ui-space-1) 0 0;
+  color: var(--ui-text-soft);
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-line;
+}
+
+.wb-announce__time {
+  margin: var(--ui-space-1) 0 0;
+  color: var(--ui-text-soft);
+  font-size: 12px;
+}
+
+/* 反馈入口：工作台底部一行安静的长条按钮，不抢内容区的视觉 */
+.wb-feedback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ui-space-2);
+  width: 100%;
+  margin-top: var(--ui-page-gap);
+  padding: 12px;
+  border: 1px dashed var(--ui-line);
+  border-radius: var(--ui-radius-l);
+  background: transparent;
+  color: var(--ui-text-soft);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: var(--ui-transition-colors);
+}
+
+.wb-feedback:hover {
+  color: var(--ui-brand-strong);
+  border-color: var(--ui-brand-strong);
+}
+
+/* 反馈表单：原生控件 + 显式 label（dtm 控件不透传 aria-*） */
+.fb-form {
+  display: grid;
+  gap: var(--ui-space-4);
+}
+
+.fb-form__group {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.fb-form__label {
+  display: block;
+  margin-bottom: var(--ui-space-2);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.fb-form__optional {
+  font-weight: 400;
+  color: var(--ui-text-soft);
+}
+
+.fb-form__types {
+  display: flex;
+  gap: var(--ui-space-2);
+}
+
+.fb-form__type {
+  flex: 1;
+}
+
+.fb-form__type input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.fb-form__type span {
+  display: block;
+  padding: 8px 0;
+  border: 1px solid var(--ui-line);
+  border-radius: var(--ui-radius-m);
+  text-align: center;
+  font-size: 13px;
+  cursor: pointer;
+  transition: var(--ui-transition-colors);
+}
+
+.fb-form__type input:checked + span {
+  border-color: var(--ui-brand-strong);
+  background: var(--ui-tone-brand-bg);
+  color: var(--ui-tone-brand-fg);
+  font-weight: 600;
+}
+
+/* 叠加的视觉隐藏 radio 组（无障碍）：聚焦时给卡片描边，键盘可达可见 */
+.fb-form__type input:focus-visible + span {
+  outline: 2px solid var(--ui-brand-strong);
+  outline-offset: 2px;
+}
+
+.fb-form__field input,
+.fb-form__field textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--ui-line);
+  border-radius: var(--ui-radius-m);
+  font: inherit;
+  font-size: 14px;
+  color: var(--ui-text-strong);
+  background: var(--ui-surface, #fff);
+  transition: var(--ui-transition-colors);
+}
+
+.fb-form__field textarea {
+  resize: vertical;
+  min-height: 96px;
+}
+
+.fb-form__field input:focus,
+.fb-form__field textarea:focus {
+  outline: none;
+  border-color: var(--ui-brand-strong);
+}
+
+.fb-form__error {
+  margin: 0;
+  color: var(--ui-tone-danger-fg);
+  font-size: 13px;
+}
+
+/* 提交成功态：一句话 + 一颗按钮，不搞庆祝动画 */
+.fb-done {
+  display: grid;
+  gap: var(--ui-space-4);
+  text-align: center;
+}
+
+.fb-done__title {
+  margin: var(--ui-space-2) 0 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.fb-done .ui-note {
+  margin: 0;
+}

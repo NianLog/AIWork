@@ -4,22 +4,29 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   SESSION_KEY,
   assignRoleMenus,
+  createAnnouncement,
   createApplication,
+  deleteAnnouncement,
+  deleteFeedback,
+  fetchAnnouncements,
   fetchApplications,
   fetchAppPermissions,
+  fetchAppVersions,
   fetchDepts,
+  fetchFeedbacks,
   fetchMenus,
   fetchUserRoles,
   fetchUsers,
   logoutRemote,
   readSession,
+  updateAnnouncement,
   updateUser,
   updateApplication,
   updateDept,
+  updateFeedback,
   updateRole,
   updateUserStatus,
   uploadPackage,
-  fetchAppVersions,
 } from './yudao';
 import type { ApiError } from './yudao';
 import type { ApplicationRow, DeptRow, RoleRow, UserRow } from './yudao';
@@ -492,5 +499,130 @@ describe('产物包上传通道（批次 I）', () => {
     const versions = await fetchAppVersions('demo-vue');
     expect(urls[0]).toBe('/admin-api/portal-app/versions?appId=demo-vue');
     expect(versions[0]).toMatchObject({ version: '2.0.0', isLatest: true });
+  });
+});
+
+describe('公告与反馈（批次 Q）', () => {
+  it('fetchAnnouncements 走 page 端点：pinned 缺省 false、status 归一、时间格式化', async () => {
+    const urls: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        urls.push(`${init?.method ?? 'GET'} ${String(input)}`);
+        return jsonResponse({
+          code: 0,
+          msg: '',
+          data: {
+            list: [
+              { id: 1, title: '维护通知', content: '周六维护', pinned: true, status: 0, createTime: 1_727_136_000_000 },
+              { id: 2, title: '上线公告', content: '已上线', status: 1, createTime: undefined },
+            ],
+            total: 2,
+          },
+        });
+      }),
+    );
+
+    const rows = await fetchAnnouncements();
+    expect(urls[0]).toBe('GET /admin-api/portal-announcement/page?pageNo=1&pageSize=100');
+    expect(rows[0]).toMatchObject({ id: 1, pinned: true, status: 0 });
+    // pinned 缺省 false、停用照上管理端列表、未知时间占位不伪造
+    expect(rows[1]).toMatchObject({ id: 2, pinned: false, status: 1 });
+  });
+
+  it('createAnnouncement POST 全量载荷；updateAnnouncement 走 PUT 带 id', async () => {
+    const calls: Array<{ url: string; method?: string; body: Record<string, unknown> }> = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        calls.push({
+          url: String(input),
+          method: init?.method,
+          body: JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>,
+        });
+        return jsonResponse({ code: 0, msg: '', data: 7 });
+      }),
+    );
+
+    const created = await createAnnouncement({
+      title: '维护通知', content: '周六维护', pinned: true, status: 0,
+    });
+    expect(created).toBe(7);
+    expect(calls[0]).toMatchObject({
+      url: '/admin-api/portal-announcement/create',
+      method: 'POST',
+      body: { title: '维护通知', content: '周六维护', pinned: true, status: 0 },
+    });
+
+    await updateAnnouncement({ id: 7, title: '改', content: '改', pinned: false, status: 1 });
+    expect(calls[1]).toMatchObject({
+      url: '/admin-api/portal-announcement/update',
+      method: 'PUT',
+      body: { id: 7, status: 1 },
+    });
+  });
+
+  it('deleteAnnouncement 与 deleteFeedback 都是 DELETE ?id=', async () => {
+    const urls: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        urls.push(`${init?.method ?? 'GET'} ${String(input)}`);
+        return jsonResponse({ code: 0, msg: '', data: null });
+      }),
+    );
+
+    await deleteAnnouncement(3);
+    await deleteFeedback(9);
+    expect(urls).toEqual([
+      'DELETE /admin-api/portal-announcement/delete?id=3',
+      'DELETE /admin-api/portal-feedback/delete?id=9',
+    ]);
+  });
+
+  it('fetchFeedbacks 行映射：未知类型归一 other、空 appId 归 undefined', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        jsonResponse({
+          code: 0,
+          msg: '',
+          data: {
+            list: [
+              { id: 1, appId: '', type: 'suggestion', content: '希望支持排序', status: 0, creator: '1', createTime: 1_727_136_000_000 },
+              { id: 2, appId: 'ai-image', type: 'poison', content: '怪类型', status: 1, remark: '看过', creator: '2', createTime: 1_727_136_000_000 },
+            ],
+            total: 2,
+          },
+        }),
+      ),
+    );
+
+    const rows = await fetchFeedbacks();
+    expect(rows[0]).toMatchObject({ appId: undefined, type: 'suggestion', status: 0 });
+    // 白名单外的类型不裸奔上屏，兜底 other
+    expect(rows[1]).toMatchObject({ appId: 'ai-image', type: 'other', remark: '看过' });
+  });
+
+  it('updateFeedback PUT 只带处理字段：不携带用户内容', async () => {
+    const calls: Array<{ url: string; method?: string; body: Record<string, unknown> }> = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        calls.push({
+          url: String(input),
+          method: init?.method,
+          body: JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>,
+        });
+        return jsonResponse({ code: 0, msg: '', data: null });
+      }),
+    );
+
+    await updateFeedback({ id: 5, status: 1, remark: '已排进下个迭代' });
+    expect(calls[0]).toEqual({
+      url: '/admin-api/portal-feedback/update',
+      method: 'PUT',
+      body: { id: 5, status: 1, remark: '已排进下个迭代' },
+    });
   });
 });
