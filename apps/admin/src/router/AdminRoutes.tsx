@@ -22,6 +22,7 @@ const RolesPage = lazy(() => import('./pages/RolesPage'));
 const OrganizationsPage = lazy(() => import('./pages/OrganizationsPage'));
 const AnnouncementsPage = lazy(() => import('./pages/AnnouncementsPage'));
 const FeedbackPage = lazy(() => import('./pages/FeedbackPage'));
+const RoadmapPage = lazy(() => import('./pages/RoadmapPage'));
 
 /**
  * 会话守卫（批次 F）：/preview 要求登录。沿后台既有惯例「登录/退出必经路由跳转」
@@ -92,6 +93,11 @@ export default function AdminRoutes() {
           path="feedback"
           element={<FeedbackPage />}
           handle={{ title: '用户反馈', subtitle: '' }}
+        />
+        <Route
+          path="roadmap"
+          element={<RoadmapPage />}
+          handle={{ title: '功能进展', subtitle: '' }}
         />
       </Route>
       <Route path="*" element={<NotFoundPage />} />

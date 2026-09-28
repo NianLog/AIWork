@@ -351,3 +351,48 @@ export async function submitFeedback(input: FeedbackInput): Promise<void> {
     body: JSON.stringify(input),
   });
 }
+
+// ======================================================================
+// 功能进展（批次 R）：进展看板条目，管理端维护、门户进展页与工作台速览消费
+// ======================================================================
+
+/** 展示层阶段值：0 规划中 / 1 进行中 / 2 已完成（与后端 RoadmapStageEnum 对齐）。 */
+export type RoadmapStageValue = 0 | 1 | 2;
+
+export interface PortalRoadmapItem {
+  id: number;
+  name: string;
+  description?: string;
+  stage: RoadmapStageValue;
+  /** 进度百分比 0-100（api 层钳制，脏数据不穿透到界面）。 */
+  progress: number;
+  /** yyyy-MM-dd；未排期为 undefined。 */
+  startDate?: string;
+  dueDate?: string;
+  sort: number;
+}
+
+export async function fetchRoadmapItems(): Promise<PortalRoadmapItem[]> {
+  const list = await request<
+    Array<{
+      id: number;
+      name: string;
+      description?: string | null;
+      stage?: number;
+      progress?: number;
+      startDate?: string | null;
+      dueDate?: string | null;
+      sort?: number;
+    }>
+  >('/admin-api/portal-roadmap/list');
+  return list.map((item) => ({
+    id: item.id,
+    name: item.name,
+    description: item.description || undefined,
+    stage: item.stage === 1 || item.stage === 2 ? item.stage : 0,
+    progress: Math.min(100, Math.max(0, Math.round(item.progress ?? 0))),
+    startDate: item.startDate || undefined,
+    dueDate: item.dueDate || undefined,
+    sort: item.sort ?? 0,
+  }));
+}

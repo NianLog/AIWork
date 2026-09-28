@@ -1,7 +1,7 @@
 {
   "version": 1,
   "schema": "dde-agent-index/1",
-  "generatedAt": "2026-09-28T01:28:20.185Z",
+  "generatedAt": "2026-09-28T02:01:05.558Z",
   "generator": "npx tsx scripts/notes.ts index",
   "disclaimer": "本索引是笔记库的派生快照，用于快速导航与关系检索，不是事实源。\n凡涉及代码修改、实现细节核对、或笔记 freshness.state 为 stale/undated 时，\n必须回读 source.path/lines 指向的源文件与相关代码，避免被过期记录误导。",
   "usage": {
@@ -12,13 +12,13 @@
     "markRechecked": "npx tsx scripts/notes.ts touch <笔记路径>   # 刷新 Last-verified 元数据"
   },
   "stats": {
-    "activeNotes": 33,
+    "activeNotes": 34,
     "archivedNotes": 0,
     "modules": 0,
-    "relations": 59,
+    "relations": 60,
     "byLifecycle": {
       "proposed": 1,
-      "implemented": 32
+      "implemented": 33
     },
     "staleNotes": []
   },
@@ -39,7 +39,8 @@
       "supersedes": null,
       "supersededBy": [],
       "cites": [
-        "implemented/architecture/2026-09-28-batch-q-announcements-feedback.md"
+        "implemented/architecture/2026-09-28-batch-q-announcements-feedback.md",
+        "implemented/architecture/2026-09-28-batch-r-roadmap-board.md"
       ],
       "citedBy": [
         "implemented/architecture/2026-09-28-batch-q-announcements-feedback.md"
@@ -52,7 +53,7 @@
         "rule": "最近复核 2026-09-27"
       },
       "summary": "| 批次 | 内容 | 关键产物 | 依赖 | |---|---|---|---| | Q 公告与反馈 | 两张新表 + CRUD API + admin 管理页 + 工作台公告卡/反馈入口 | sys_portal_announcement、sys_portal_feedback | 无 |",
-      "bodySha256": "ea567e9de251f325",
+      "bodySha256": "d4b15758c20fa6ea",
       "lines": {
         "title": 1,
         "status": 3,
@@ -73,15 +74,15 @@
           },
           {
             "title": "Alternatives considered",
-            "line": 39
+            "line": 41
           },
           {
             "title": "Acceptance criteria",
-            "line": 52
+            "line": 54
           },
           {
             "title": "Risks",
-            "line": 65
+            "line": 67
           }
         ]
       },
@@ -1254,6 +1255,68 @@
       "updateHint": "编辑 .agents/notes/implemented/architecture/2026-09-28-batch-q-announcements-feedback.md 后运行：npx tsx scripts/notes.ts verify && npx tsx scripts/notes.ts index"
     },
     {
+      "id": "implemented/architecture/2026-09-28-batch-r-roadmap-board.md",
+      "path": ".agents/notes/implemented/architecture/2026-09-28-batch-r-roadmap-board.md",
+      "anchor": "// Note: .agents/notes/implemented/architecture/2026-09-28-batch-r-roadmap-board.md",
+      "title": "批次 R：功能进展看板后台化",
+      "lifecycle": "implemented",
+      "class": "architecture",
+      "date": "2026-09-28",
+      "scope": [
+        "apps/portal/src/store/roadmap.ts",
+        "apps/portal/src/router/pages/StatusPage.tsx",
+        "apps/admin/src/router/pages/RoadmapPage.tsx"
+      ],
+      "supersedes": null,
+      "supersededBy": [],
+      "cites": [],
+      "citedBy": [
+        "proposed/architecture/2026-09-27-capability-batches-q-to-w.md"
+      ],
+      "lastVerified": "2026-09-28",
+      "archivedDate": null,
+      "freshness": {
+        "state": "fresh",
+        "monthsSinceVerify": 0,
+        "rule": "最近复核 2026-09-28"
+      },
+      "summary": "进展条目入库存 sys_portal_roadmap_item（yudao-portal@3e9e6e0，批次 R）， 管理端 /preview/roadmap 维护、门户进展页与工作台速览消费同一份 GET /portal-roadmap/list：",
+      "bodySha256": "4c2442afdce59947",
+      "lines": {
+        "title": 1,
+        "status": 3,
+        "scope": [
+          4
+        ],
+        "supersedes": null,
+        "lastVerified": 5,
+        "archived": null,
+        "sections": [
+          {
+            "title": "Problem",
+            "line": 7
+          },
+          {
+            "title": "Decision",
+            "line": 15
+          },
+          {
+            "title": "Alternatives considered",
+            "line": 47
+          },
+          {
+            "title": "Consequences",
+            "line": 63
+          },
+          {
+            "title": "Testing",
+            "line": 79
+          }
+        ]
+      },
+      "updateHint": "编辑 .agents/notes/implemented/architecture/2026-09-28-batch-r-roadmap-board.md 后运行：npx tsx scripts/notes.ts verify && npx tsx scripts/notes.ts index"
+    },
+    {
       "id": "implemented/feature/2026-09-25-business-language-ui-copy.md",
       "path": ".agents/notes/implemented/feature/2026-09-25-business-language-ui-copy.md",
       "anchor": "// Note: .agents/notes/implemented/feature/2026-09-25-business-language-ui-copy.md",
@@ -2143,6 +2206,11 @@
       "type": "cite",
       "from": "proposed/architecture/2026-09-27-capability-batches-q-to-w.md",
       "to": "implemented/architecture/2026-09-28-batch-q-announcements-feedback.md"
+    },
+    {
+      "type": "cite",
+      "from": "proposed/architecture/2026-09-27-capability-batches-q-to-w.md",
+      "to": "implemented/architecture/2026-09-28-batch-r-roadmap-board.md"
     },
     {
       "type": "cite",

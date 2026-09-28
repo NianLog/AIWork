@@ -22,6 +22,8 @@ publio OA 完整版）、功能进展是硬编码 TS 数组（改一行要发版
 
 批次 Q 已于 2026-09-28 落地（yudao-portal@271b321 + 本仓同批 PR），实施事实与偏差见 [批次 Q 笔记](../../implemented/architecture/2026-09-28-batch-q-announcements-feedback.md)；本篇仍是 R→U 的活规划。
 | **R 进展看板后台化** | roadmap 从硬编码 TS 改后端表（阶段/条目/状态/进度/起止日期），admin 可编辑，门户渲染进度条 | sys_portal_roadmap_stage/item | 无 |
+
+批次 R 已于 2026-09-28 落地（yudao-portal@3e9e6e0 + 本仓同批 PR）：实际用单表 `sys_portal_roadmap_item`（未建 stage 表，规划表中的两表方案收敛），实施事实与偏差见 [批次 R 笔记](../../implemented/architecture/2026-09-28-batch-r-roadmap-board.md)。
 | **S 灰度规则角色化** | canaryRatio 比例哈希 → 规则表（role/dept/user_group 三维），ChannelResolver 重写，admin 编辑 UI | sys_portal_app_canary_rule | 无 |
 | **T 使用统计链路** | 访问日志表 + 门户上报端点 + 聚合 API + admin 图表页 + 工作台统计卡（真实数据） | sys_portal_app_access_log | 无 |
 | **W 后端代理收口** | /api/{appId}/** 代理端到端验证 + admin 表单 backendApi 说明强化 + 文档 | 验证记录 | 无（地基已有） |

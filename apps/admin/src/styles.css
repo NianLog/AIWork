@@ -820,3 +820,24 @@
     --ui-container: 1320px;
   }
 }
+/*
+ * 功能进展页（批次 R）：原生日期控件与两列日期网格。
+ * dtd 没有「能直接拿 yyyy-MM-dd 字符串」的轻量日期框，用原生
+ * input[type=date] 与后端契约零转换；样式对齐 dtd Input 的边框高度。
+ */
+.ui-field__native {
+  width: 100%;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--ui-line);
+  border-radius: 6px;
+  background: var(--ui-surface);
+  color: var(--ui-text-strong);
+  font: inherit;
+}
+
+.admin-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 12px;
+}
