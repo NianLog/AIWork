@@ -25,6 +25,7 @@ const FeedbackPage = lazy(() => import('./pages/FeedbackPage'));
 const RoadmapPage = lazy(() => import('./pages/RoadmapPage'));
 const StatsPage = lazy(() => import('./pages/StatsPage'));
 const AuditPage = lazy(() => import('./pages/AuditPage'));
+const DingtalkBindingPage = lazy(() => import('./pages/DingtalkBindingPage'));
 
 /**
  * 会话守卫（批次 F）：/preview 要求登录。沿后台既有惯例「登录/退出必经路由跳转」
@@ -110,6 +111,11 @@ export default function AdminRoutes() {
           path="audit"
           element={<AuditPage />}
           handle={{ title: '操作日志', subtitle: '' }}
+        />
+        <Route
+          path="dingtalk"
+          element={<DingtalkBindingPage />}
+          handle={{ title: '钉钉绑定', subtitle: '' }}
         />
       </Route>
       <Route path="*" element={<NotFoundPage />} />

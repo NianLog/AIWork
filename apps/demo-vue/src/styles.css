@@ -217,3 +217,38 @@ button[disabled] {
   color: #86909c;
   white-space: nowrap;
 }
+/* 平台通知示例（批次 X）：借平台统一端点发通知 */
+.board__notify {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid #e5e6eb;
+}
+
+.board__notifydesc {
+  margin: 4px 0 12px;
+  font-size: 12px;
+  color: #86909c;
+  line-height: 1.6;
+}
+
+.board__notifyform {
+  display: grid;
+  gap: 8px;
+  max-width: 460px;
+}
+
+.board__notifyform input,
+.board__notifyform textarea {
+  padding: 8px 10px;
+  border: 1px solid #e5e6eb;
+  border-radius: 6px;
+  font: inherit;
+}
+
+.board__notify .is-ok {
+  color: #00b42a;
+}
+
+.board__notify .is-bad {
+  color: #f53f3f;
+}
