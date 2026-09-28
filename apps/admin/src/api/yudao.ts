@@ -243,7 +243,6 @@ interface AppPageItem {
   sandbox: string | null;
   latestVersion: string | null;
   canaryVersion: string | null;
-  canaryRatio: number | null;
   status: number;
   audit: number;
   createTime: number;
@@ -268,10 +267,10 @@ export interface ApplicationRow {
   sandbox: string;
   latestVersion: string | undefined;
   canaryVersion: string | undefined;
-  canaryRatio: number | undefined;
   status: CommonStatus;
   audit: number;
-  /** 派生展示字段：停用优先；启用且配置试运行版本与比例视为试运行，否则正式版。 */
+  /** 派生展示字段：停用优先；启用了 canary 指针视为试运行（可见人群由灰度规则表决定，
+   * 行内不拉取规则——「已发布但没配规则」展示为试运行不算造假：版本确实发布了）。 */
   channel: AppChannel;
   /** 派生展示字段：'YYYY-MM-DD HH:mm'，字典序即时间序（最近更新列排序用）。 */
   publishedAt: string;
@@ -310,13 +309,12 @@ function toApplicationRow(app: AppPageItem): ApplicationRow {
     sandbox: app.sandbox ?? '',
     latestVersion: app.latestVersion ?? undefined,
     canaryVersion: app.canaryVersion ?? undefined,
-    canaryRatio: app.canaryRatio ?? undefined,
     status: (app.status === 1 ? 1 : 0) as CommonStatus,
     audit: app.audit ?? 0,
     channel:
       app.status !== 0
         ? 'paused'
-        : app.canaryVersion && (app.canaryRatio ?? 0) > 0
+        : app.canaryVersion
           ? 'canary'
           : 'stable',
     publishedAt: formatDateTime(app.createTime ?? 0),
@@ -335,7 +333,6 @@ export interface ApplicationInput {
   framework: string;
   sandbox: string;
   canaryVersion?: string;
-  canaryRatio?: number;
   status: CommonStatus;
   /** update 全量语义透传字段（create 可省略，后端自定默认）。 */
   latestVersion?: string;
@@ -373,7 +370,6 @@ function applicationPayload(row: ApplicationRow): ApplicationInput {
     sandbox: row.sandbox,
     latestVersion: row.latestVersion,
     canaryVersion: row.canaryVersion,
-    canaryRatio: row.canaryRatio,
     status: row.status,
     audit: row.audit,
   };
@@ -405,21 +401,18 @@ export interface AppVersionRow {
 
 /**
  * zip 产物包上传（multipart）：版本号只来自包内 micro-app.config.json，
- * 表单不传 version。canary 缺省比例由后端补 10。
+ * 表单不传 version。canary 通道只落指针——谁可见由灰度规则决定（批次 S 起
+ * 无比例语义），规则为空 = 无人可见，发布后须到应用列表配置灰度规则。
  */
 export async function uploadPackage(input: {
   appId: string;
   channel: 'stable' | 'canary';
-  canaryRatio?: number;
   file: File;
 }): Promise<AppPackageUploadResult> {
   const form = new FormData();
   form.append('file', input.file);
   form.append('appId', input.appId);
   form.append('channel', input.channel);
-  if (input.channel === 'canary' && input.canaryRatio != null) {
-    form.append('canaryRatio', String(input.canaryRatio));
-  }
   return request<AppPackageUploadResult>('/admin-api/portal-app/upload-package', {
     method: 'POST',
     body: form,
@@ -431,6 +424,58 @@ export async function fetchAppVersions(appId: string): Promise<AppVersionRow[]> 
   return request<AppVersionRow[]>(
     `/admin-api/portal-app/versions?appId=${encodeURIComponent(appId)}`,
   );
+}
+
+/* ────────────────────── 应用灰度规则（portal-app-canary-rule，批次 S） ────────────────────── */
+
+/** 规则维度：1 按角色 2 按部门 3 指定用户（与后端 CanaryRuleTypeEnum 对齐）。 */
+export type CanaryRuleType = 1 | 2 | 3;
+
+export const CANARY_RULE_TYPE_LABEL: Record<CanaryRuleType, string> = {
+  1: '按角色',
+  2: '按部门',
+  3: '指定用户',
+};
+
+/** 灰度规则行（后端只回编号；对象名称由页面用已加载的选项列表解析）。 */
+export interface CanaryRuleRow {
+  id: number;
+  appId: string;
+  type: CanaryRuleType;
+  value: number;
+}
+
+function toCanaryRuleRow(raw: { id: number; appId: string; type: number; value: number }): CanaryRuleRow {
+  return {
+    id: raw.id,
+    appId: raw.appId,
+    type: (raw.type === 1 || raw.type === 2 || raw.type === 3 ? raw.type : 1) as CanaryRuleType,
+    value: raw.value,
+  };
+}
+
+export async function fetchCanaryRules(appId: string): Promise<CanaryRuleRow[]> {
+  const list = await request<Array<{ id: number; appId: string; type: number; value: number }>>(
+    `/admin-api/portal-app-canary-rule/list?appId=${encodeURIComponent(appId)}`,
+  );
+  return list.map(toCanaryRuleRow);
+}
+
+export async function createCanaryRule(input: {
+  appId: string;
+  type: CanaryRuleType;
+  value: number;
+}): Promise<number> {
+  return request<number>('/admin-api/portal-app-canary-rule/create', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function deleteCanaryRule(id: number): Promise<void> {
+  await request<void>(`/admin-api/portal-app-canary-rule/delete?id=${id}`, {
+    method: 'DELETE',
+  });
 }
 
 /* ────────────────────────── 用户（system/user） ────────────────────────── */

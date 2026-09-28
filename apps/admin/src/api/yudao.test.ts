@@ -6,11 +6,14 @@ import {
   assignRoleMenus,
   createAnnouncement,
   createApplication,
+  createCanaryRule,
   deleteAnnouncement,
+  deleteCanaryRule,
   deleteFeedback,
   fetchAnnouncements,
   fetchApplications,
   fetchAppPermissions,
+  fetchCanaryRules,
   fetchAppVersions,
   fetchDepts,
   fetchFeedbacks,
@@ -381,7 +384,7 @@ describe('写通道封装（批次 H）', () => {
               {
                 id: 1, appId: 'demo-vue', name: '演示应用', entry: '/subapps/demo-vue/', backendApi: 'http://127.0.0.1:48080/admin-api',
                 baseRoute: '/demo-vue', icon: null, version: '0.1.0', framework: 'vue3', sandbox: 'iframe',
-                latestVersion: null, canaryVersion: '0.2.0-rc1', canaryRatio: 20, status: 0, audit: 0, createTime: 1790445024000,
+                latestVersion: null, canaryVersion: '0.2.0-rc1', status: 0, audit: 0, createTime: 1790445024000,
               },
             ],
           },
@@ -392,7 +395,7 @@ describe('写通道封装（批次 H）', () => {
     const rows = await fetchApplications();
 
     expect(rows[0]).toMatchObject({
-      framework: 'vue3', sandbox: 'iframe', channel: 'canary', canaryRatio: 20, status: 0,
+      framework: 'vue3', sandbox: 'iframe', channel: 'canary', status: 0,
     } satisfies Partial<ApplicationRow>);
   });
 
@@ -409,12 +412,12 @@ describe('写通道封装（批次 H）', () => {
     const row: ApplicationRow = {
       id: 1, appId: 'demo-vue', name: '演示应用', entry: '/subapps/demo-vue/', backendApi: 'http://x/admin-api',
       baseRoute: '/demo-vue', icon: undefined, version: '0.1.0', framework: 'vue3', sandbox: 'iframe',
-      latestVersion: undefined, canaryVersion: undefined, canaryRatio: undefined, status: 0, audit: 0,
+      latestVersion: undefined, canaryVersion: undefined, status: 0, audit: 0,
       channel: 'stable', publishedAt: '2026-09-27 10:00',
     };
-    await updateApplication(row, { canaryVersion: '0.2.0-rc1', canaryRatio: 20 });
+    await updateApplication(row, { canaryVersion: '0.2.0-rc1'});
 
-    expect(bodies[0]).toMatchObject({ id: 1, appId: 'demo-vue', name: '演示应用', framework: 'vue3', status: 0, canaryVersion: '0.2.0-rc1', canaryRatio: 20 });
+    expect(bodies[0]).toMatchObject({ id: 1, appId: 'demo-vue', name: '演示应用', framework: 'vue3', status: 0, canaryVersion: '0.2.0-rc1'});
     // 派生展示字段不上行
     expect(bodies[0]).not.toHaveProperty('channel');
     expect(bodies[0]).not.toHaveProperty('publishedAt');
@@ -463,7 +466,7 @@ describe('产物包上传通道（批次 I）', () => {
     );
 
     const file = new File([new Uint8Array([80, 75, 3, 4])], 'pkg.zip', { type: 'application/zip' });
-    const result = await uploadPackage({ appId: 'demo-vue', channel: 'canary', canaryRatio: 30, file });
+    const result = await uploadPackage({ appId: 'demo-vue', channel: 'canary', file });
 
     const init = calls[0];
     expect(init?.body).toBeInstanceOf(FormData);
@@ -473,7 +476,6 @@ describe('产物包上传通道（批次 I）', () => {
     const body = init?.body as FormData;
     expect(body.get('appId')).toBe('demo-vue');
     expect(body.get('channel')).toBe('canary');
-    expect(body.get('canaryRatio')).toBe('30');
     expect(body.get('file')).toBe(file);
     expect(result.entry).toBe('/subapps/demo-vue/1.0.0/');
   });
@@ -624,5 +626,74 @@ describe('公告与反馈（批次 Q）', () => {
       method: 'PUT',
       body: { id: 5, status: 1, remark: '已排进下个迭代' },
     });
+  });
+});
+
+describe('应用灰度规则（批次 S）', () => {
+  it('createCanaryRule 发 JSON 载荷到 create 端点', async () => {
+    seedSession();
+    const calls: Array<{ url: string; method: string; body: string }> = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        calls.push({
+          url: String(input),
+          method: String(init?.method),
+          body: String(init?.body ?? ''),
+        });
+        return jsonResponse({ code: 0, msg: '', data: 11 });
+      }),
+    );
+
+    const id = await createCanaryRule({ appId: 'demo-vue', type: 3, value: 249 });
+
+    expect(id).toBe(11);
+    expect(calls[0].url).toContain('/portal-app-canary-rule/create');
+    expect(calls[0].method).toBe('POST');
+    expect(JSON.parse(calls[0].body)).toEqual({ appId: 'demo-vue', type: 3, value: 249 });
+  });
+
+  it('fetchCanaryRules 走 list 端点并透传 appId；非法 type 归 1 不猜', async () => {
+    seedSession();
+    const calls: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        calls.push(String(input));
+        return jsonResponse({
+          code: 0,
+          msg: '',
+          data: [
+            { id: 10, appId: 'demo-vue', type: 1, value: 5 },
+            { id: 11, appId: 'demo-vue', type: 99, value: 249 },
+          ],
+        });
+      }),
+    );
+
+    const rows = await fetchCanaryRules('demo-vue');
+
+    expect(calls[0]).toContain('/portal-app-canary-rule/list?appId=demo-vue');
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toEqual({ id: 10, appId: 'demo-vue', type: 1, value: 5 });
+    // 未知维度（库里的脏数据或后端新枚举）归 1 展示，不静默丢行
+    expect(rows[1].type).toBe(1);
+  });
+
+  it('deleteCanaryRule 发 DELETE 并带 id 查询参数', async () => {
+    seedSession();
+    const calls: Array<{ url: string; method: string }> = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        calls.push({ url: String(input), method: String(init?.method) });
+        return jsonResponse({ code: 0, msg: '', data: true });
+      }),
+    );
+
+    await deleteCanaryRule(10);
+
+    expect(calls[0].url).toContain('/portal-app-canary-rule/delete?id=10');
+    expect(calls[0].method).toBe('DELETE');
   });
 });

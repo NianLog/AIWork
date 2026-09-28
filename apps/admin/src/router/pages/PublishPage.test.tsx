@@ -31,7 +31,7 @@ const EDIT_ROW = {
   id: 2, appId: 'video-studio', name: '视频工坊', entry: '/subapps/video-studio/',
   backendApi: 'http://x/admin-api', baseRoute: '/video', icon: undefined, version: '1.2.0',
   framework: 'vue3', sandbox: 'iframe', latestVersion: undefined, canaryVersion: '1.3.0-rc.1',
-  canaryRatio: 20, status: 0 as const, audit: 0, channel: 'canary' as const,
+  status: 0 as const, audit: 0, channel: 'canary' as const,
   publishedAt: '2026-09-27 10:00',
 };
 
@@ -120,7 +120,6 @@ describe('发布页真实表单（批次 H）', () => {
     await waitFor(() => expect(screen.getByText('apps-page')).toBeTruthy());
     expect(createApplication.mock.calls[0][0]).toMatchObject({
       canaryVersion: '0.2.0-rc.1',
-      canaryRatio: 10,
     });
   });
 
@@ -138,7 +137,7 @@ describe('发布页真实表单（批次 H）', () => {
     expect(updateApplication).toHaveBeenCalledTimes(1);
     const [row, patch] = updateApplication.mock.calls[0];
     expect(row).toMatchObject({ id: 2, appId: 'video-studio' });
-    expect(patch).toMatchObject({ name: '视频工坊-改名', framework: 'vue3', canaryVersion: '1.3.0-rc.1', canaryRatio: 20 });
+    expect(patch).toMatchObject({ name: '视频工坊-改名', framework: 'vue3', canaryVersion: '1.3.0-rc.1'});
     expect(createApplication).not.toHaveBeenCalled();
   });
 });

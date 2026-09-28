@@ -25,6 +25,8 @@ publio OA 完整版）、功能进展是硬编码 TS 数组（改一行要发版
 
 批次 R 已于 2026-09-28 落地（yudao-portal@3e9e6e0 + 本仓同批 PR）：实际用单表 `sys_portal_roadmap_item`（未建 stage 表，规划表中的两表方案收敛），实施事实与偏差见 [批次 R 笔记](../../implemented/architecture/2026-09-28-batch-r-roadmap-board.md)。
 | **S 灰度规则角色化** | canaryRatio 比例哈希 → 规则表（role/dept/user_group 三维），ChannelResolver 重写，admin 编辑 UI | sys_portal_app_canary_rule | 无 |
+
+批次 S 已于 2026-09-28 落地（yudao-portal@dc1747e + 本仓同批 PR）：实际用角色/部门/指定用户三维（user_group 未做——BPM 未启用，用户白名单承接内测语义），比例灰度全链退役，实施事实与偏差见 [批次 S 笔记](../../implemented/architecture/2026-09-28-batch-s-canary-rules.md)。
 | **T 使用统计链路** | 访问日志表 + 门户上报端点 + 聚合 API + admin 图表页 + 工作台统计卡（真实数据） | sys_portal_app_access_log | 无 |
 | **W 后端代理收口** | /api/{appId}/** 代理端到端验证 + admin 表单 backendApi 说明强化 + 文档 | 验证记录 | 无（地基已有） |
 | **U 安全审计** | portal controller 接 yudao 操作日志 + admin 审计查看页 + 工作台「最近动态」 | 依赖 yudao operatelog | V（异常提醒走消息通道） |

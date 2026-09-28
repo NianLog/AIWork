@@ -32,7 +32,6 @@ const SAMPLE: PortalApp = {
   status: 0,
   permissions: [],
   canaryVersion: null,
-  canaryRatio: null,
   updateTime: 0,
 };
 

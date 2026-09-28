@@ -254,7 +254,6 @@ export interface PortalAppRecord {
   sandbox: string;
   latestVersion: string | null;
   canaryVersion: string | null;
-  canaryRatio: number | null;
   status: number;
   createTime: number | null;
 }
@@ -270,7 +269,6 @@ export type PortalApp = AppRegistry & {
   id: number;
   latestVersion?: string;
   canaryVersion: string | null;
-  canaryRatio: number | null;
   /** epoch 毫秒（后端 LocalDateTime 序列化口径）；界面统一用 formatUpdateTime 格式化。 */
   updateTime: number;
 };
@@ -301,7 +299,6 @@ export async function fetchEnabledApps(): Promise<PortalApp[]> {
     permissions: [],
     latestVersion: app.latestVersion ?? undefined,
     canaryVersion: app.canaryVersion ?? null,
-    canaryRatio: app.canaryRatio ?? null,
     updateTime: typeof app.createTime === 'number' ? app.createTime : 0,
   }));
 }

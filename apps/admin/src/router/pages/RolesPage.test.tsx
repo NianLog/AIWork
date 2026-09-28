@@ -52,7 +52,7 @@ const APPS = [
   {
     id: 5, appId: 'demo-vue', name: '示例应用', version: '1.0.0', framework: 'vue3',
     sandbox: 'iframe', baseRoute: '/demo', entry: 'https://apps.invalid/demo/index.html',
-    backendApi: '', icon: '', latestVersion: '1.0.0', canaryVersion: '', canaryRatio: 0,
+    backendApi: '', icon: '', latestVersion: '1.0.0', canaryVersion: '',
     status: 0 as const, createTime: 0,
   },
 ];

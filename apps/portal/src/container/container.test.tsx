@@ -62,7 +62,6 @@ function portalAppFixture(): PortalApp {
     status: 0,
     permissions: [],
     canaryVersion: null,
-    canaryRatio: null,
     updateTime: Date.UTC(2026, 8, 24, 6, 0),
   };
 }
