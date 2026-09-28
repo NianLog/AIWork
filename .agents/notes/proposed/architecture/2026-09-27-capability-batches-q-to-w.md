@@ -36,6 +36,10 @@ publio OA 完整版）、功能进展是硬编码 TS 数组（改一行要发版
 | **U 安全审计** | portal controller 接 yudao 操作日志 + admin 审计查看页 + 工作台「最近动态」 | 依赖 yudao operatelog | V（异常提醒走消息通道） |
 | **V 消息提醒** | 站内信打底 + 钉钉通道（调研结论定形态），组件化 ChannelAdapter | sys_portal_notification | 无 |
 
+批次 V 已于 2026-09-28 落地（yudao-portal@efb70d3 + 本仓同批 PR）：站内信为事实源，
+钉钉通道收敛为群机器人 webhook（工作通知等免登上线后补 SPI 实现），凭证配置化默认
+关闭，公告发布联动广播，实施事实与偏差见 [批次 V 笔记](../../implemented/architecture/2026-09-28-batch-v-notifications.md)。
+
 落地顺序：Q → R → S → W → T → V → U（U 的异常提醒复用 V 的通道，故 V 先行）。
 每批一分支一 PR 一笔记（随代码同批转 implemented），后端改动在 yudao-portal
 仓库同批提交。

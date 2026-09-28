@@ -422,3 +422,40 @@ export interface PortalAccessStats {
 export async function fetchAccessStats(days: number): Promise<PortalAccessStats> {
   return request<PortalAccessStats>(`/admin-api/portal-app-access-log/stats?days=${days}`);
 }
+
+// ======================================================================
+// 站内信（批次 V）：收件箱 / 未读数 / 标记已读
+// ======================================================================
+
+/** 站内信条目（后端 LocalDateTime 序列化为 epoch 毫秒；string 兼容防御） */
+export interface PortalNotification {
+  id: number;
+  title: string;
+  content: string;
+  bizType: string;
+  bizId?: number;
+  readFlag: boolean;
+  createTime: number | string;
+}
+
+/** 本人收件箱（最近 50 条，时间倒序） */
+export async function fetchNotifications(): Promise<PortalNotification[]> {
+  const list = await request<PortalNotification[]>('/admin-api/portal-notification/my-list');
+  return Array.isArray(list) ? list : [];
+}
+
+/** 本人未读数（徽标轮询用；失败由调用方隐藏徽标，不报错打扰） */
+export async function fetchUnreadCount(): Promise<number> {
+  const count = await request<number>('/admin-api/portal-notification/unread-count');
+  return typeof count === 'number' ? count : 0;
+}
+
+/** 标记单条已读（别人的消息后端静默忽略，前端无感知） */
+export async function markNotificationRead(id: number): Promise<void> {
+  await request<boolean>(`/admin-api/portal-notification/read?id=${id}`, { method: 'PUT' });
+}
+
+/** 全部标记已读 */
+export async function markAllNotificationsRead(): Promise<void> {
+  await request<boolean>('/admin-api/portal-notification/read-all', { method: 'PUT' });
+}

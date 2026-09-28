@@ -18,6 +18,7 @@ import NotFoundPage from './pages/NotFoundPage';
 const WorkbenchPage = lazy(() => import('./pages/WorkbenchPage'));
 const MarketPage = lazy(() => import('./pages/MarketPage'));
 const StatusPage = lazy(() => import('./pages/StatusPage'));
+const NotificationsPage = lazy(() => import('./pages/NotificationsPage'));
 const SubAppWorkspace = lazy(() => import('./pages/SubAppWorkspace'));
 
 /**
@@ -83,6 +84,11 @@ export default function PortalRoutes() {
           path="status"
           element={<StatusPage />}
           handle={{ title: '功能进展', subtitle: '已上线与正在建设的能力' }}
+        />
+        <Route
+          path="notifications"
+          element={<NotificationsPage />}
+          handle={{ title: '消息', subtitle: '平台公告与提醒' }}
         />
       </Route>
       {/* 子应用工作区：全屏接管，不套 PortalShell（批次 F 起同样要求登录）。
