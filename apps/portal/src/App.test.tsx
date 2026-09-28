@@ -9,6 +9,7 @@ import type { PortalAppRecord } from './api/yudao';
 import { useSessionStore } from './store/sessionStore';
 import { useAppRegistryStore } from './store/appRegistryStore';
 import { useRoadmapStore } from './store/roadmap';
+import { useNotificationsStore } from './store/notifications';
 
 /**
  * 门户测试（批次 C 起）：应用清单来自注册表接口，会话来自登录态。
@@ -124,6 +125,7 @@ function stubPortalFetch(options: {
   loginBody?: unknown;
   announcements?: typeof ANNOUNCEMENTS;
   roadmap?: typeof ROADMAP_ITEMS;
+  notifications?: Array<{ id: number; title: string; content: string; bizType: string; readFlag: boolean; createTime: number }>;
 } = {}) {
   const state = {
     apps: [APP_IMAGE, APP_VIDEO] as PortalAppRecord[],
@@ -131,6 +133,8 @@ function stubPortalFetch(options: {
     roadmap: options.roadmap ?? [],
     feedbackPosts: [] as string[],
     accessReports: [] as string[],
+    notifications: structuredClone(options.notifications ?? []),
+    readCalls: [] as string[], // read/read-all 调用记录（含 id）
   };
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
@@ -168,6 +172,30 @@ function stubPortalFetch(options: {
         msg: '',
       });
     }
+    if (url.includes('/portal-notification/my-list')) {
+      return jsonResponse({ code: 0, data: state.notifications, msg: '' });
+    }
+    if (url.includes('/portal-notification/unread-count')) {
+      return jsonResponse({
+        code: 0,
+        data: state.notifications.filter((n) => !n.readFlag).length,
+        msg: '',
+      });
+    }
+    if (url.includes('/portal-notification/read-all')) {
+      state.readCalls.push('all');
+      state.notifications.forEach((n) => {
+        n.readFlag = true;
+      });
+      return jsonResponse({ code: 0, data: true, msg: '' });
+    }
+    if (url.includes('/portal-notification/read')) {
+      const id = Number(url.slice(url.indexOf('id=') + 3));
+      state.readCalls.push(String(id));
+      const row = state.notifications.find((n) => n.id === id);
+      if (row) row.readFlag = true;
+      return jsonResponse({ code: 0, data: true, msg: '' });
+    }
     return jsonResponse({ code: 404, msg: '接口不存在', data: null }, 404);
   });
   vi.stubGlobal('fetch', fetchMock);
@@ -176,6 +204,8 @@ function stubPortalFetch(options: {
     setApps: (apps: PortalAppRecord[]) => { state.apps = apps; },
     feedbackPosts: () => state.feedbackPosts,
     accessReports: () => state.accessReports,
+    readCalls: () => state.readCalls,
+    notifications: () => state.notifications,
   };
 }
 
@@ -223,6 +253,7 @@ afterEach(() => {
   useSessionStore.setState({ session: null });
   useAppRegistryStore.setState({ view: { status: 'loading', data: [] }, flight: undefined });
   useRoadmapStore.setState({ view: { status: 'loading', data: [] }, flight: undefined });
+  useNotificationsStore.setState({ unreadCount: null, list: [], listStatus: 'loading' });
   vi.unstubAllGlobals();
 });
 
@@ -561,6 +592,75 @@ describe('使用统计（批次 T）', () => {
       fetchMock.mock.calls.filter(([url]) => String(url).includes('/portal-app-access-log'))
         .length,
     ).toBe(0);
+  });
+});
+
+describe('消息中心（批次 V）', () => {
+  const NOTIFICATIONS = [
+    { id: 1, title: '新公告：中台使用统计上线', content: '工作台可查看近 7 天访问。', bizType: 'announcement', readFlag: false, createTime: Date.now() },
+    { id: 2, title: '旧公告：灰度规则升级', content: '灰度改按角色点名。', bizType: 'announcement', readFlag: false, createTime: Date.now() },
+    { id: 3, title: '更早的公告', content: '已读过。', bizType: 'announcement', readFlag: true, createTime: Date.now() },
+  ];
+
+  it('工作台：两封未读显导航徽标「2」，挂载拉未读数', async () => {
+    const { fetchMock } = stubPortalFetch({ notifications: NOTIFICATIONS });
+    seedSession();
+    openPortal('/preview');
+
+    await screen.findByRole('button', { name: 'AI 图像工坊' });
+    expect(document.querySelector('.portal-navbadge')?.textContent).toBe('2');
+    expect(
+      fetchMock.mock.calls.filter(([url]) => String(url).includes('/portal-notification/unread-count')).length,
+    ).toBe(1);
+  });
+
+  it('未读数拉不到（后端未部署）：徽标静默隐藏', async () => {
+    stubPortalFetch();
+    seedSession();
+    openPortal('/preview');
+    // stub 对未声明的 notification 端点返回空表（未读数=0）——这里验证
+    // 拉取动作发生且徽标不渲染（0 未读同样隐藏）
+    await screen.findByRole('button', { name: 'AI 图像工坊' });
+    expect(document.querySelector('.portal-navbadge')).toBeNull();
+  });
+
+  it('消息页：列表渲染、单条标已读后徽标归零', async () => {
+    const { fetchMock, readCalls, notifications } = stubPortalFetch({ notifications: NOTIFICATIONS });
+    seedSession();
+    openPortal('/preview/notifications');
+
+    expect(await screen.findByText('新公告：中台使用统计上线')).toBeTruthy();
+    expect(await screen.findByText('旧公告：灰度规则升级')).toBeTruthy();
+    // 已读条目没有「标为已读」按钮
+    expect(screen.queryAllByRole('button', { name: '标为已读' })).toHaveLength(2);
+
+    fireEvent.click(screen.getAllByRole('button', { name: '标为已读' })[0]);
+    await waitFor(() => expect(document.querySelector('.portal-navbadge')?.textContent).toBe('1'));
+    expect(readCalls()).toEqual(['1']);
+    expect(notifications().find((n) => n.id === 1)?.readFlag).toBe(true);
+    expect(
+      fetchMock.mock.calls.filter(([url]) => String(url).includes('/portal-notification')).length,
+    ).toBeGreaterThan(2); // my-list/unread-count + 标读后的重拉
+  });
+
+  it('消息页：全部已读一键清零', async () => {
+    const { readCalls } = stubPortalFetch({ notifications: NOTIFICATIONS });
+    seedSession();
+    openPortal('/preview/notifications');
+
+    fireEvent.click(await screen.findByRole('button', { name: '全部已读（2）' }));
+    await waitFor(() => expect(document.querySelector('.portal-navbadge')).toBeNull());
+    expect(readCalls()).toEqual(['all']);
+    expect(screen.queryByRole('button', { name: '标为已读' })).toBeNull();
+  });
+
+  it('消息页：没有消息显空态', async () => {
+    stubPortalFetch();
+    seedSession();
+    openPortal('/preview/notifications');
+
+    expect(await screen.findByText('还没有消息')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: '标为已读' })).toBeNull();
   });
 });
 

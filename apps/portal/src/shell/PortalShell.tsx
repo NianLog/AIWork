@@ -7,10 +7,13 @@ import {
   HomeFilled,
   HomeOutlined,
   InProcessOutlined,
+  MailFilled,
+  MailOutlined,
   OrganizationOutlined,
   ShopOutlined,
 } from 'dd-icons';
 import { PORTAL_ENV_LABEL } from '../store/portalNotice';
+import { useNotificationsStore } from '../store/notifications';
 import { useSessionStore } from '../store/sessionStore';
 import { WIDE_QUERY, useMediaQuery } from './useMediaQuery';
 import { useRouteMeta } from './useRouteMeta';
@@ -80,6 +83,12 @@ const NAV_ITEMS: NavItem[] = [
     label: '功能进展',
     icon: () => <InProcessOutlined />,
   },
+  {
+    key: 'notifications',
+    path: '/preview/notifications',
+    label: '消息',
+    icon: (active) => (active ? <MailFilled /> : <MailOutlined />),
+  },
 ];
 
 /**
@@ -91,6 +100,7 @@ const PAGE_METAS: RouteMeta[] = [
   { path: '/preview', title: '工作台', subtitle: '常用工具与推荐应用' },
   { path: '/preview/market', title: '应用市场', subtitle: '按名称或状态查找应用' },
   { path: '/preview/status', title: '功能进展', subtitle: '已上线与正在建设的能力' },
+  { path: '/preview/notifications', title: '消息', subtitle: '平台公告与提醒' },
 ];
 
 const FALLBACK_META: RouteMeta = PAGE_METAS[0];
@@ -102,6 +112,17 @@ function resolveActiveKey(pathname: string) {
   );
 }
 
+/** 未读徽标数字：99 封顶（更大的数字挤爆导航行，99+ 足以传达「去看消息」） */
+function badgeText(count: number): string {
+  return count > 99 ? '99+' : String(count);
+}
+
+/** 未读徽标：只挂「消息」项；文字侧行内渲染（不放 aria-hidden 的图标槽，读屏可达） */
+function NavBadge({ show, count }: { show: boolean; count: number | null }) {
+  if (!show || count === null) return null;
+  return <span className="portal-navbadge">{badgeText(count)}</span>;
+}
+
 export default function PortalShell() {
   const location = useLocation();
   const isWide = useMediaQuery(WIDE_QUERY);
@@ -111,6 +132,18 @@ export default function PortalShell() {
   // 会话事实源在 sessionStorage，store 只做订阅层——登录/退出不需要整页刷新。
   const session = useSessionStore((state) => state.session);
   const activeKey = resolveActiveKey(location.pathname);
+  // 未读徽标（批次 V）：挂载拉一次 + 60s 轮询。拉取失败徽标静默隐藏
+  // （unreadCount=null），后端未部署/网络抖动都不报错打扰——徽标是增益信息。
+  const unreadCount = useNotificationsStore((state) => state.unreadCount);
+  const refreshUnread = useNotificationsStore((state) => state.refreshUnread);
+  useEffect(() => {
+    void refreshUnread();
+    const timer = window.setInterval(() => {
+      void refreshUnread();
+    }, 60_000);
+    return () => window.clearInterval(timer);
+  }, [refreshUnread]);
+  const showBadge = unreadCount !== null && unreadCount > 0;
 
   // 路由落点：切页后焦点主动落在内容区（main 已有 tabIndex={-1}），
   // 页面标题行的变化也随之被读屏播报。没有这一步，焦点会掉回 body。
@@ -148,6 +181,7 @@ export default function PortalShell() {
                       aria-current={item.key === activeKey ? 'page' : undefined}
                     >
                       {item.label}
+                      <NavBadge show={item.key === 'notifications' && showBadge} count={unreadCount} />
                     </Link>
                   </li>
                 ))}
@@ -164,7 +198,10 @@ export default function PortalShell() {
                       <span className="portal-tab__icon" aria-hidden="true">
                         {item.icon(item.key === activeKey)}
                       </span>
-                      <span className="portal-tab__label">{item.label}</span>
+                      <span className="portal-tab__label">
+                        {item.label}
+                        <NavBadge show={item.key === 'notifications' && showBadge} count={unreadCount} />
+                      </span>
                     </Link>
                   </li>
                 ))}

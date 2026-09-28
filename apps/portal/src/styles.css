@@ -1806,3 +1806,56 @@
   gap: 12px;
   padding: 16px 0;
 }
+
+/* 消息中心（批次 V）：导航未读徽标 + 收件箱条目 */
+.portal-navbadge {
+  display: inline-block;
+  margin-left: var(--ui-space-1);
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--ui-brand);
+  color: var(--ui-brand-ink);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 17px;
+  vertical-align: 1px;
+}
+
+.ntf-item--unread > .wb-announce__title {
+  color: var(--ui-text-strong, inherit);
+}
+
+.ntf-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: var(--ui-space-2);
+  border-radius: 50%;
+  background: var(--ui-brand);
+  vertical-align: 2px;
+}
+
+.ntf-readbtn {
+  margin-left: var(--ui-space-2);
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--ui-tone-brand-fg);
+  font-size: 12px;
+  font-weight: 400;
+  cursor: pointer;
+}
+
+.ntf-readbtn:hover {
+  text-decoration: underline;
+}
+
+.ntf-time {
+  display: block;
+}
+
+.ntf-state {
+  display: grid;
+  gap: var(--ui-space-2);
+  justify-items: start;
+}
