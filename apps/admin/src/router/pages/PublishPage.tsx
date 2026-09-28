@@ -270,6 +270,10 @@ export default function PublishPage() {
                       placeholder="应用调用的服务地址，例如：http://jbslab.bili:48080/admin-api"
                     />
                   </label>
+                  <p className="ui-note">
+                    成员端不直接访问这个地址：门户把 /api/应用标识/… 自动转发到这里，内网地址无需暴露公网。
+                    要填完整前缀（含 /admin-api 这类上下文），转发时把后面的路径原样拼在它后面。
+                  </p>
                 </>
               )}
 
