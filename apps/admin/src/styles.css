@@ -841,3 +841,53 @@
   grid-template-columns: 1fr 1fr;
   gap: 0 12px;
 }
+/*
+ * 使用统计页（批次 T）：14 天趋势用 CSS 条形（dtd 无图表组件，不为此引库）。
+ * 细 mark、数值直接标注（内部工具低量级场景，数字即数据）、track 是固定
+ * 高度的槽，bar 高度按窗口峰值归一。
+ */
+.stats-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 8px 4px 0;
+  margin: 0;
+  list-style: none;
+}
+
+.stats-bars__col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.stats-bars__value {
+  font-size: var(--ui-font-xs);
+  color: var(--ui-text-strong);
+  min-height: 18px;
+  line-height: 18px;
+}
+
+.stats-bars__track {
+  width: 100%;
+  max-width: 32px;
+  height: 120px;
+  display: flex;
+  align-items: flex-end;
+}
+
+.stats-bars__bar {
+  width: 100%;
+  min-height: 2px;
+  border-radius: var(--ui-radius-m) var(--ui-radius-m) 0 0;
+  background: var(--ui-brand);
+}
+
+.stats-bars__date {
+  font-size: var(--ui-font-xs);
+  color: var(--ui-text-soft);
+  white-space: nowrap;
+}

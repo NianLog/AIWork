@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Button, Empty } from 'dingtalk-design-mobile';
 import { AnnouncementOutlined, MessageOutlined, RightArrowOutlined } from 'dd-icons';
-import { fetchAnnouncements } from '../../api/yudao';
+import { fetchAccessStats, fetchAnnouncements } from '../../api/yudao';
 import type { PortalAnnouncement } from '../../api/yudao';
 import { summarizeApps, useAppRegistryStore, formatUpdateTime } from '../../store/appRegistryStore';
 import { useSessionStore } from '../../store/sessionStore';
@@ -69,6 +69,41 @@ function AnnouncementCard() {
         ))}
       </ul>
     </section>
+  );
+}
+
+
+/**
+ * 近 7 天访问（批次 T）：平台使用热度的一格。统计端点权限复用 portal:app:query，
+ * 只对有该权限码的账号拉取（普通成员不白发注定 403 的请求）；拉取失败或会话
+ * 未就绪时整格隐藏——增益内容不摆错误剧场，与公告卡同策略。
+ */
+function RecentAccessStat() {
+  const session = useSessionStore((state) => state.session);
+  const allowed = Boolean(session?.permissions.includes('portal:app:query'));
+  const [total, setTotal] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!allowed) return;
+    let cancelled = false;
+    fetchAccessStats(7)
+      .then((stats) => {
+        if (!cancelled) setTotal(stats.daily.reduce((sum, item) => sum + item.count, 0));
+      })
+      .catch(() => {
+        // 静默：统计缺席好过在工作台摆错误
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [allowed]);
+
+  if (total === null) return null;
+  return (
+    <div className="wb-statcard__stat">
+      <dt>近 7 天访问</dt>
+      <dd className="ui-num">{total}</dd>
+    </div>
   );
 }
 
@@ -199,6 +234,7 @@ export default function WorkbenchPage() {
                 <dt>小范围试运行</dt>
                 <dd className="ui-num">{stats.canary}</dd>
               </div>
+              <RecentAccessStat />
             </dl>
           </section>
         </aside>

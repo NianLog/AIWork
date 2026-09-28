@@ -393,3 +393,32 @@ export async function fetchRoadmapItems(): Promise<PortalRoadmapItem[]> {
     sort: item.sort ?? 0,
   }));
 }
+
+// ======================================================================
+// 使用统计（批次 T）：子应用访问上报 + 工作台近 7 天访问
+// ======================================================================
+
+/**
+ * 上报一次子应用访问（尽力而为）：统计是增益数据，调用方吞掉一切错误——
+ * 上报失败不影响子应用使用，也不打扰用户（不重试，下次访问再记就是）。
+ */
+export async function reportAppAccess(appId: string): Promise<void> {
+  try {
+    await request<number>(
+      `/admin-api/portal-app-access-log/create?appId=${encodeURIComponent(appId)}`,
+      { method: 'POST' },
+    );
+  } catch {
+    // 后端未部署/网络抖动/会话过期都静默：统计缺席好过加载被拖累
+  }
+}
+
+/** 使用统计聚合（工作台「近 7 天访问」只消费 daily；后台另有完整副本）。 */
+export interface PortalAccessStats {
+  /** 每日访问次数（date 为 yyyy-MM-dd，后端已按窗口补零，恒连续） */
+  daily: Array<{ date: string; count: number }>;
+}
+
+export async function fetchAccessStats(days: number): Promise<PortalAccessStats> {
+  return request<PortalAccessStats>(`/admin-api/portal-app-access-log/stats?days=${days}`);
+}

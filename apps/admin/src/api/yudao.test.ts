@@ -15,6 +15,7 @@ import {
   fetchAppPermissions,
   fetchCanaryRules,
   fetchAppVersions,
+  fetchAccessStats,
   fetchDepts,
   fetchFeedbacks,
   fetchMenus,
@@ -695,5 +696,44 @@ describe('应用灰度规则（批次 S）', () => {
 
     expect(calls[0].url).toContain('/portal-app-canary-rule/delete?id=10');
     expect(calls[0].method).toBe('DELETE');
+  });
+});
+
+
+describe('使用统计（批次 T）', () => {
+  it('fetchAccessStats：GET stats 带 days 窗口，响应形状归一', async () => {
+    seedSession();
+    const calls: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        calls.push(String(input));
+        return jsonResponse({
+          code: 0,
+          data: {
+            daily: [{ date: '2026-09-28', count: 2 }],
+            byApp: [{ appId: 'demo-vue', name: '演示应用', count: 2 }],
+          },
+          msg: '',
+        });
+      }),
+    );
+
+    const stats = await fetchAccessStats(14);
+    expect(calls[0]).toContain('/admin-api/portal-app-access-log/stats?days=14');
+    expect(stats.daily).toEqual([{ date: '2026-09-28', count: 2 }]);
+    expect(stats.byApp[0]?.name).toBe('演示应用');
+  });
+
+  it('fetchAccessStats：后端未部署给异形响应时归一为空，页面不炸', async () => {
+    seedSession();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => jsonResponse({ code: 0, data: { list: [] }, msg: '' })),
+    );
+
+    const stats = await fetchAccessStats(14);
+    expect(stats.daily).toEqual([]);
+    expect(stats.byApp).toEqual([]);
   });
 });
