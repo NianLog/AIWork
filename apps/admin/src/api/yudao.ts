@@ -1156,3 +1156,34 @@ export async function fetchOperateLogs(type?: string): Promise<OperateLogItem[]>
   );
   return Array.isArray(raw?.list) ? raw.list : [];
 }
+/* ────────────────────────── 钉钉绑定（批次 X） ────────────────────────── */
+
+/** 钉钉绑定行：平台用户 → 钉钉 userid 映射，工作通知的投递前置 */
+export interface DingtalkBindingItem {
+  id: number;
+  userId: number;
+  dingtalkUserid: string;
+  /** epoch 毫秒 */
+  updateTime: number | string;
+}
+
+/** 绑定列表（后端全量返回；绑定量级 = 平台用户量级，不分页） */
+export async function fetchDingtalkBindings(): Promise<DingtalkBindingItem[]> {
+  const raw = await request<DingtalkBindingItem[]>('/admin-api/portal-dingtalk/list');
+  return Array.isArray(raw) ? raw : [];
+}
+
+/** 绑定/换绑（user_id 唯一，重复绑定即覆盖钉钉 userid） */
+export async function bindDingtalk(userId: number, dingtalkUserid: string): Promise<void> {
+  await request<boolean>('/admin-api/portal-dingtalk/bind', {
+    method: 'POST',
+    body: JSON.stringify({ userId, dingtalkUserid }),
+  });
+}
+
+/** 解绑（未绑定时后端报「该用户没有钉钉绑定」） */
+export async function unbindDingtalk(userId: number): Promise<void> {
+  await request<boolean>(`/admin-api/portal-dingtalk/unbind?userId=${userId}`, {
+    method: 'DELETE',
+  });
+}

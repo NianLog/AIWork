@@ -41,10 +41,16 @@ admin 审计页直连 system 操作日志分页，工作台最近动态走薄视
 水位扫描复用批次 V 通道广播（依赖项就此闭环），实施事实与偏差见
 [批次 U 笔记](../../implemented/architecture/2026-09-28-batch-u-audit.md)。
 | **V 消息提醒** | 站内信打底 + 钉钉通道（调研结论定形态），组件化 ChannelAdapter | sys_portal_notification | 无 |
+| **X 钉钉工作通知** | 企业内部应用凭据通道（默认关）+ 用户绑定管理 + 子应用通知开放端点 + 接入规范文档 | sys_portal_dingtalk_binding、docs/子应用接入规范.md | V |
 
 批次 V 已于 2026-09-28 落地（yudao-portal@efb70d3 + 本仓同批 PR）：站内信为事实源，
 钉钉通道收敛为群机器人 webhook（工作通知等免登上线后补 SPI 实现），凭证配置化默认
 关闭，公告发布联动广播，实施事实与偏差见 [批次 V 笔记](../../implemented/architecture/2026-09-28-batch-v-notifications.md)。
+
+批次 X 已于 2026-09-28 落地（yudao-portal + 本仓同批提交）：钉钉工作通知通道
+（桩测试、默认关闭，凭据后补真实送达验证）+ 绑定管理 + app-send 开放端点与
+接入规范文档，实施事实与偏差见
+[批次 X 笔记](../../implemented/architecture/2026-09-28-batch-x-dingtalk-work-notice.md)。
 
 落地顺序：Q → R → S → W → T → V → U（U 的异常提醒复用 V 的通道，故 V 先行）。
 每批一分支一 PR 一笔记（随代码同批转 implemented），后端改动在 yudao-portal

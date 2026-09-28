@@ -1,7 +1,7 @@
 {
   "version": 1,
   "schema": "dde-agent-index/1",
-  "generatedAt": "2026-09-28T04:29:22.896Z",
+  "generatedAt": "2026-09-28T10:14:26.659Z",
   "generator": "npx tsx scripts/notes.ts index",
   "disclaimer": "本索引是笔记库的派生快照，用于快速导航与关系检索，不是事实源。\n凡涉及代码修改、实现细节核对、或笔记 freshness.state 为 stale/undated 时，\n必须回读 source.path/lines 指向的源文件与相关代码，避免被过期记录误导。",
   "usage": {
@@ -12,13 +12,13 @@
     "markRechecked": "npx tsx scripts/notes.ts touch <笔记路径>   # 刷新 Last-verified 元数据"
   },
   "stats": {
-    "activeNotes": 39,
+    "activeNotes": 40,
     "archivedNotes": 0,
     "modules": 0,
-    "relations": 65,
+    "relations": 67,
     "byLifecycle": {
       "proposed": 1,
-      "implemented": 38
+      "implemented": 39
     },
     "staleNotes": []
   },
@@ -45,7 +45,8 @@
         "implemented/feature/2026-09-28-batch-t-usage-stats.md",
         "implemented/process/2026-09-28-batch-w-proxy-verification.md",
         "implemented/architecture/2026-09-28-batch-u-audit.md",
-        "implemented/architecture/2026-09-28-batch-v-notifications.md"
+        "implemented/architecture/2026-09-28-batch-v-notifications.md",
+        "implemented/architecture/2026-09-28-batch-x-dingtalk-work-notice.md"
       ],
       "citedBy": [
         "implemented/architecture/2026-09-28-batch-q-announcements-feedback.md"
@@ -58,7 +59,7 @@
         "rule": "最近复核 2026-09-27"
       },
       "summary": "| 批次 | 内容 | 关键产物 | 依赖 | |---|---|---|---| | Q 公告与反馈 | 两张新表 + CRUD API + admin 管理页 + 工作台公告卡/反馈入口 | sys_portal_announcement、sys_portal_feedback | 无 |",
-      "bodySha256": "6ca7ffc0dd0b0c29",
+      "bodySha256": "9cdf9b44e0347ce3",
       "lines": {
         "title": 1,
         "status": 3,
@@ -79,15 +80,15 @@
           },
           {
             "title": "Alternatives considered",
-            "line": 57
+            "line": 63
           },
           {
             "title": "Acceptance criteria",
-            "line": 70
+            "line": 76
           },
           {
             "title": "Risks",
-            "line": 83
+            "line": 89
           }
         ]
       },
@@ -1454,7 +1455,8 @@
       "supersededBy": [],
       "cites": [],
       "citedBy": [
-        "proposed/architecture/2026-09-27-capability-batches-q-to-w.md"
+        "proposed/architecture/2026-09-27-capability-batches-q-to-w.md",
+        "implemented/architecture/2026-09-28-batch-x-dingtalk-work-notice.md"
       ],
       "lastVerified": null,
       "archivedDate": null,
@@ -1496,6 +1498,68 @@
         ]
       },
       "updateHint": "编辑 .agents/notes/implemented/architecture/2026-09-28-batch-v-notifications.md 后运行：npx tsx scripts/notes.ts verify && npx tsx scripts/notes.ts index"
+    },
+    {
+      "id": "implemented/architecture/2026-09-28-batch-x-dingtalk-work-notice.md",
+      "path": ".agents/notes/implemented/architecture/2026-09-28-batch-x-dingtalk-work-notice.md",
+      "anchor": "// Note: .agents/notes/implemented/architecture/2026-09-28-batch-x-dingtalk-work-notice.md",
+      "title": "批次 X 钉钉工作通知——平台唯一凭据 + 用户绑定 + 子应用通知能力开放",
+      "lifecycle": "implemented",
+      "class": "architecture",
+      "date": "2026-09-28",
+      "scope": [],
+      "supersedes": null,
+      "supersededBy": [],
+      "cites": [
+        "implemented/architecture/2026-09-28-batch-v-notifications.md"
+      ],
+      "citedBy": [
+        "proposed/architecture/2026-09-27-capability-batches-q-to-w.md"
+      ],
+      "lastVerified": null,
+      "archivedDate": null,
+      "freshness": {
+        "state": "fresh",
+        "monthsSinceVerify": 0,
+        "rule": "最近复核 2026-09-28"
+      },
+      "summary": "三层递进，绑定是三者共同前置：",
+      "bodySha256": "758b1845b67bffea",
+      "lines": {
+        "title": 1,
+        "status": 3,
+        "scope": [],
+        "supersedes": null,
+        "lastVerified": null,
+        "archived": null,
+        "sections": [
+          {
+            "title": "Problem",
+            "line": 7
+          },
+          {
+            "title": "Decision",
+            "line": 13
+          },
+          {
+            "title": "实施（落地形态与提案的偏差）",
+            "line": 37
+          },
+          {
+            "title": "Alternatives considered",
+            "line": 44
+          },
+          {
+            "title": "Testing",
+            "line": 52
+          },
+          {
+            "title": "Consequences",
+            "line": 59
+          }
+        ]
+      },
+      "updateHint": "编辑 .agents/notes/implemented/architecture/2026-09-28-batch-x-dingtalk-work-notice.md 后运行：npx tsx scripts/notes.ts verify && npx tsx scripts/notes.ts index"
     },
     {
       "id": "implemented/feature/2026-09-25-business-language-ui-copy.md",
@@ -2549,6 +2613,11 @@
     },
     {
       "type": "cite",
+      "from": "proposed/architecture/2026-09-27-capability-batches-q-to-w.md",
+      "to": "implemented/architecture/2026-09-28-batch-x-dingtalk-work-notice.md"
+    },
+    {
+      "type": "cite",
       "from": "implemented/architecture/2026-09-25-auth-injection-contract.md",
       "to": "implemented/architecture/2026-09-25-p0-second-half-plan-and-four-decisions.md"
     },
@@ -2751,6 +2820,11 @@
       "type": "cite",
       "from": "implemented/architecture/2026-09-28-batch-q-announcements-feedback.md",
       "to": "proposed/architecture/2026-09-27-capability-batches-q-to-w.md"
+    },
+    {
+      "type": "cite",
+      "from": "implemented/architecture/2026-09-28-batch-x-dingtalk-work-notice.md",
+      "to": "implemented/architecture/2026-09-28-batch-v-notifications.md"
     },
     {
       "type": "cite",

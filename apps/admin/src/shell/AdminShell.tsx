@@ -6,6 +6,7 @@ import {
   AiDiagonalStarsFilled,
   DotChartOutlined,
   FilehistoryOutlined,
+  MessageOutlined,
   LineChartOutlined,
   AnnouncementOutlined,
   AppletOutlined,
@@ -56,6 +57,7 @@ const NAV_GROUPS: Array<{ title: string; items: NavItem[] }> = [
       { key: '/preview/roadmap', label: '功能进展', icon: <DotChartOutlined /> },
       { key: '/preview/stats', label: '使用统计', icon: <LineChartOutlined /> },
       { key: '/preview/audit', label: '操作日志', icon: <FilehistoryOutlined /> },
+      { key: '/preview/dingtalk', label: '钉钉绑定', icon: <MessageOutlined /> },
     ],
   },
   {
@@ -88,6 +90,7 @@ const PAGE_METAS: Array<RouteMeta & { group: string }> = [
   { path: '/preview/roadmap', group: '平台管理', title: '功能进展', subtitle: '' },
   { path: '/preview/stats', group: '平台管理', title: '使用统计', subtitle: '' },
   { path: '/preview/audit', group: '平台管理', title: '操作日志', subtitle: '' },
+  { path: '/preview/dingtalk', group: '平台管理', title: '钉钉绑定', subtitle: '' },
   { path: '/preview/users', group: '身份与权限', title: '用户', subtitle: '' },
   { path: '/preview/roles', group: '身份与权限', title: '角色', subtitle: '' },
   { path: '/preview/organizations', group: '身份与权限', title: '组织', subtitle: '' },

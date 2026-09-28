@@ -4,6 +4,7 @@ import type { PortalHandle } from '@ai-portal/shared-sdk';
 import { ApiError, createTask, deleteTask, listTasks, whoami } from '../api/tasks';
 import type { TaskItem } from '../api/tasks';
 import manifest from '../../micro-app.config.json';
+import PlatformNotifyDemo from './PlatformNotifyDemo.vue';
 
 /**
  * 任务清单主体（批次 E：后端真实化）：
@@ -192,5 +193,7 @@ async function checkWhoami(): Promise<void> {
         </li>
       </ul>
     </section>
+
+    <PlatformNotifyDemo :handle="handle" />
   </div>
 </template>
