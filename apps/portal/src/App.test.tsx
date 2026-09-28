@@ -71,7 +71,6 @@ const APP_IMAGE: PortalAppRecord = {
   sandbox: 'iframe',
   latestVersion: null,
   canaryVersion: null,
-  canaryRatio: null,
   status: 0,
   createTime: 1_727_136_000_000,
 };
@@ -85,7 +84,7 @@ const APP_VIDEO: PortalAppRecord = {
   framework: 'vue3',
   baseRoute: '/ai-video',
   canaryVersion: '0.9.1-canary',
-  canaryRatio: 30,
+  entry: '/subapps/ai-video/0.9.1-canary/',
 };
 
 function jsonResponse(body: unknown, status = 200) {

@@ -4,18 +4,36 @@ import {
   Button,
   Card,
   Input,
-  InputNumber,
   Modal,
   Radio,
+  Select,
   Table,
   Tag,
   message,
 } from 'dingtalk-design-desktop';
 import type { TableColumnsType } from 'dingtalk-design-desktop';
-import { fetchApplications, fetchAppVersions, updateApplication } from '../../api/yudao';
-import type { ApplicationRow, AppVersionRow } from '../../api/yudao';
+import {
+  CANARY_RULE_TYPE_LABEL,
+  createCanaryRule,
+  deleteCanaryRule,
+  fetchApplications,
+  fetchAppVersions,
+  fetchCanaryRules,
+  fetchDepts,
+  fetchRoles,
+  fetchUsers,
+  updateApplication,
+} from '../../api/yudao';
+import type { AppVersionRow, ApplicationRow, CanaryRuleRow, CanaryRuleType } from '../../api/yudao';
 import { CHANNEL_META } from '../../store/domain';
 import type { AppChannel, CommonStatus } from '../../store/domain';
+
+/** 灰度规则三维度（批次 S）：与后端 CanaryRuleTypeEnum 对齐。 */
+const RULE_TYPE_OPTIONS: Array<{ value: CanaryRuleType; label: string }> = [
+  { value: 1, label: CANARY_RULE_TYPE_LABEL[1] },
+  { value: 2, label: CANARY_RULE_TYPE_LABEL[2] },
+  { value: 3, label: CANARY_RULE_TYPE_LABEL[3] },
+];
 import RowActions from '../parts/RowActions';
 import SegmentedField from '../parts/SegmentedField';
 import { useAdminData } from '../parts/useAdminData';
@@ -68,13 +86,23 @@ export default function ApplicationsPage() {
   const [channelTarget, setChannelTarget] = useState<ApplicationRow | null>(null);
   const [channelMode, setChannelMode] = useState<'stable' | 'canary'>('stable');
   const [canaryVersion, setCanaryVersion] = useState('');
-  const [canaryRatio, setCanaryRatio] = useState(10);
 
   /** 版本与回滚弹窗（批次 I）：目标行 + 磁盘版本目录 + 回滚二次确认。 */
   const [versionsTarget, setVersionsTarget] = useState<ApplicationRow | null>(null);
   const [versions, setVersions] = useState<AppVersionRow[]>([]);
   const [versionsLoading, setVersionsLoading] = useState(false);
   const [rollbackTarget, setRollbackTarget] = useState<AppVersionRow | null>(null);
+
+  /** 灰度规则弹窗（批次 S）：canary 可见人群 = 角色 / 部门 / 指定用户；规则为空 = 无人可见。 */
+  const [rulesTarget, setRulesTarget] = useState<ApplicationRow | null>(null);
+  const [rules, setRules] = useState<CanaryRuleRow[]>([]);
+  const [rulesLoading, setRulesLoading] = useState(false);
+  const [ruleType, setRuleType] = useState<CanaryRuleType>(1);
+  const [ruleValue, setRuleValue] = useState<number | undefined>(undefined);
+  /** 三维度选项缓存：同维度只拉一次，跨弹窗复用（角色/部门/用户量级几十~几百）。 */
+  const [ruleOptions, setRuleOptions] = useState<
+    Partial<Record<CanaryRuleType, Array<{ id: number; name: string }>>>
+  >({});
 
   /** 写操作统一动线：busy 锁按钮 → 成功 message+reload → 失败透出人话错误。 */
   async function runWrite(successText: string, action: () => Promise<void>): Promise<void> {
@@ -94,9 +122,6 @@ export default function ApplicationsPage() {
     setChannelTarget(row);
     setChannelMode(row.channel === 'canary' ? 'canary' : 'stable');
     setCanaryVersion(row.canaryVersion ?? '');
-    // `|| 10` 而非 `?? 10`：ApplicationRow 把无试运行配置归一成 0（null 不会出现），
-    // 正式版应用首次切试运行要给 10% 起步值，否则预填 0% 违反 InputNumber min=1
-    setCanaryRatio(row.canaryRatio || 10);
   }
 
   async function confirmChannel() {
@@ -109,8 +134,8 @@ export default function ApplicationsPage() {
       await updateApplication(
         channelTarget,
         channelMode === 'canary'
-          ? { canaryVersion: canaryVersion.trim(), canaryRatio }
-          : { canaryVersion: '', canaryRatio: 0 },
+          ? { canaryVersion: canaryVersion.trim() }
+          : { canaryVersion: '' },
       );
       setChannelTarget(null);
     });
@@ -245,6 +270,11 @@ export default function ApplicationsPage() {
               onClick: () => openVersions(record),
             },
             {
+              key: 'rules',
+              label: '灰度规则',
+              onClick: () => openRules(record),
+            },
+            {
               key: record.status === 0 ? 'unpublish' : 'republish',
               label: record.status === 0 ? '下架应用' : '重新上架',
               onClick: () => setPendingStatus({ row: record, next: record.status === 0 ? 1 : 0 }),
@@ -255,6 +285,63 @@ export default function ApplicationsPage() {
     },
   ];
 
+
+  /** 打开灰度规则弹窗：拉规则列表 + 预载「按角色」选项。 */
+  async function openRules(row: ApplicationRow) {
+    setRulesTarget(row);
+    setRules([]);
+    setRuleType(1);
+    setRuleValue(undefined);
+    setRulesLoading(true);
+    void ensureRuleOptions(1);
+    try {
+      setRules(await fetchCanaryRules(row.appId));
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : '灰度规则没有加载出来，请稍后再试。');
+    } finally {
+      setRulesLoading(false);
+    }
+  }
+
+  /** 维度选项懒加载：复用角色/部门/用户的既有拉取，同一维度本页只拉一次。 */
+  async function ensureRuleOptions(type: CanaryRuleType) {
+    if (ruleOptions[type]) return;
+    try {
+      const rows =
+        type === 1
+          ? (await fetchRoles()).map((role) => ({ id: role.id, name: role.name }))
+          : type === 2
+            ? (await fetchDepts()).map((dept) => ({ id: dept.id, name: dept.name }))
+            : (await fetchUsers()).map((user) => ({ id: user.id, name: user.nickname }));
+      setRuleOptions((prev) => ({ ...prev, [type]: rows }));
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : '选项没有加载出来，请稍后再试。');
+    }
+  }
+
+  /** 规则值 → 人话：选项里找名字；找不到（如已删角色）退回 #id，不静默吞。 */
+  function resolveRuleTarget(rule: CanaryRuleRow): string {
+    const hit = (ruleOptions[rule.type] ?? []).find((option) => option.id === rule.value);
+    return hit ? hit.name : `#${rule.value}`;
+  }
+
+  async function addRule() {
+    if (!rulesTarget || ruleValue == null) return;
+    await runWrite('灰度规则已添加，立即生效。', async () => {
+      await createCanaryRule({ appId: rulesTarget.appId, type: ruleType, value: ruleValue });
+      setRules(await fetchCanaryRules(rulesTarget.appId));
+      setRuleValue(undefined);
+    });
+  }
+
+  async function removeRule(rule: CanaryRuleRow) {
+    if (!rulesTarget) return;
+    // 移除不二次确认：规则重加无损，误删代价是重新选一次对象。
+    await runWrite('灰度规则已移除。', async () => {
+      await deleteCanaryRule(rule.id);
+      setRules(await fetchCanaryRules(rulesTarget.appId));
+    });
+  }
 
   return (
     <div className="ui-page">
@@ -350,7 +437,7 @@ export default function ApplicationsPage() {
         </p>
       </Modal>
 
-      {/* 调整发布通道：正式发布会把试运行版本与比例清零 */}
+      {/* 调整发布通道：正式发布清掉试运行指针；谁可见由灰度规则表决定（批次 S） */}
       <Modal
         open={channelTarget !== null}
         title="调整发布通道"
@@ -368,29 +455,24 @@ export default function ApplicationsPage() {
           onChange={(event) => setChannelMode(event.target.value)}
         >
           <Radio value="stable">正式发布（全部成员使用当前版本）</Radio>
-          <Radio value="canary">试运行（一部分成员先试用新版本）</Radio>
+          <Radio value="canary">试运行（指定成员先试用新版本）</Radio>
         </Radio.Group>
         {channelMode === 'canary' ? (
-          <div className="ui-form-grid" style={{ marginTop: 12 }}>
-            <label className="ui-field">
-              <span className="ui-field__label">试运行版本</span>
-              <Input
-                value={canaryVersion}
-                onChange={(event) => setCanaryVersion(event.target.value)}
-                placeholder="例如：1.5.0-rc.1"
-              />
-            </label>
-            <label className="ui-field">
-              <span className="ui-field__label">试运行比例</span>
-              <InputNumber
-                value={canaryRatio}
-                min={1}
-                max={100}
-                addonAfter="%"
-                onChange={(value) => setCanaryRatio(value ?? 10)}
-              />
-            </label>
-          </div>
+          <>
+            <div className="ui-form-grid" style={{ marginTop: 12 }}>
+              <label className="ui-field">
+                <span className="ui-field__label">试运行版本</span>
+                <Input
+                  value={canaryVersion}
+                  onChange={(event) => setCanaryVersion(event.target.value)}
+                  placeholder="例如：1.5.0-rc.1"
+                />
+              </label>
+            </div>
+            <p className="ui-cell-sub">
+              试运行版不再按比例放量：在应用列表「灰度规则」里按角色、部门或指定成员配置可见人群；没配规则时试运行版对所有人不可见。
+            </p>
+          </>
         ) : null}
       </Modal>
 
@@ -452,6 +534,68 @@ export default function ApplicationsPage() {
             },
           ]}
         />
+      </Modal>
+
+      {/* 灰度规则（批次 S）：canary 可见人群，增删立即生效（enabled-list 每次现解析） */}
+      <Modal
+        open={rulesTarget !== null}
+        title={`灰度规则 · ${rulesTarget?.name ?? ''}`}
+        footer={null}
+        onCancel={() => setRulesTarget(null)}
+      >
+        <p className="ui-cell-sub" style={{ marginBottom: 8 }}>
+          试运行版只对下面点名的成员可见；规则为空时所有人都看不到试运行版。
+        </p>
+        {rulesLoading ? (
+          <p className="ui-cell-sub">规则加载中…</p>
+        ) : rules.length === 0 ? (
+          <p className="ui-cell-sub">还没有规则——试运行版当前对所有人不可见。</p>
+        ) : (
+          <ul style={{ margin: '0 0 12px', paddingLeft: 18 }}>
+            {rules.map((rule) => (
+              <li
+                key={rule.id}
+                style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}
+              >
+                <span>
+                  {CANARY_RULE_TYPE_LABEL[rule.type]} · {resolveRuleTarget(rule)}
+                </span>
+                <Button size="small" disabled={busy} onClick={() => removeRule(rule)}>
+                  移除
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className="ui-form-grid">
+          <label className="ui-field">
+            <span className="ui-field__label">添加维度</span>
+            <Select
+              value={ruleType}
+              options={RULE_TYPE_OPTIONS}
+              onChange={(value) => {
+                setRuleType(value);
+                setRuleValue(undefined);
+                void ensureRuleOptions(value);
+              }}
+            />
+          </label>
+          <label className="ui-field">
+            <span className="ui-field__label">对象</span>
+            <Select
+              value={ruleValue}
+              placeholder="选择要放行的对象"
+              options={(ruleOptions[ruleType] ?? []).map((option) => ({
+                value: option.id,
+                label: option.name,
+              }))}
+              onChange={(value) => setRuleValue(value)}
+            />
+          </label>
+        </div>
+        <Button type="primary" size="small" disabled={busy || ruleValue == null} onClick={() => addRule()}>
+          添加规则
+        </Button>
       </Modal>
 
       {/* 回滚二次确认 */}

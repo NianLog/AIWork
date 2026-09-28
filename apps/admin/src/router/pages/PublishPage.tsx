@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Button, Card, Input, InputNumber, Radio, Select, Steps, message } from 'dingtalk-design-desktop';
+import { Button, Card, Input, Radio, Select, Steps, message } from 'dingtalk-design-desktop';
 import { createApplication, updateApplication, uploadPackage } from '../../api/yudao';
 import type { ApplicationRow } from '../../api/yudao';
 
@@ -50,7 +50,6 @@ interface PublishForm {
   baseRoute: string;
   mode: 'stable' | 'canary';
   canaryVersion: string;
-  canaryRatio: number;
 }
 
 /** 必填项：键与提示名，缺哪个就点名哪个。 */
@@ -75,7 +74,6 @@ function initialForm(row?: ApplicationRow): PublishForm {
       baseRoute: row.baseRoute,
       mode: row.channel === 'canary' ? 'canary' : 'stable',
       canaryVersion: row.canaryVersion ?? '',
-      canaryRatio: row.canaryRatio ?? 10,
     };
   }
   return {
@@ -88,7 +86,6 @@ function initialForm(row?: ApplicationRow): PublishForm {
     baseRoute: '',
     mode: 'stable',
     canaryVersion: '',
-    canaryRatio: 10,
   };
 }
 
@@ -127,7 +124,6 @@ export default function PublishPage() {
         const result = await uploadPackage({
           appId: form.appId.trim(),
           channel: form.mode,
-          ...(form.mode === 'canary' ? { canaryRatio: form.canaryRatio } : {}),
           file: zipFile,
         });
         message.success(
@@ -144,8 +140,8 @@ export default function PublishPage() {
           backendApi: form.backendApi.trim(),
           baseRoute: form.baseRoute.trim(),
           ...(form.mode === 'canary'
-            ? { canaryVersion: form.canaryVersion.trim(), canaryRatio: form.canaryRatio }
-            : { canaryVersion: '', canaryRatio: 0 }),
+            ? { canaryVersion: form.canaryVersion.trim() }
+            : { canaryVersion: '' }),
         });
         message.success('应用信息已保存。');
       } else {
@@ -158,9 +154,7 @@ export default function PublishPage() {
           backendApi: form.backendApi.trim(),
           baseRoute: form.baseRoute.trim(),
           sandbox: 'iframe',
-          ...(form.mode === 'canary'
-            ? { canaryVersion: form.canaryVersion.trim(), canaryRatio: form.canaryRatio }
-            : {}),
+          ...(form.mode === 'canary' ? { canaryVersion: form.canaryVersion.trim() } : {}),
           status: 0,
         });
         message.success('应用已提交，随后出现在应用市场。');
@@ -286,7 +280,7 @@ export default function PublishPage() {
                   onChange={(event) => setField('mode', event.target.value)}
                 >
                   <Radio value="stable">正式发布（全部成员立即可用）</Radio>
-                  <Radio value="canary">试运行（先给一小部分成员使用）</Radio>
+                  <Radio value="canary">试运行（先给指定的成员使用）</Radio>
                 </Radio.Group>
               </div>
 
@@ -302,16 +296,10 @@ export default function PublishPage() {
                       />
                     </label>
                   )}
-                  <label className="ui-field">
-                    <span className="ui-field__label">试运行比例</span>
-                    <InputNumber
-                      value={form.canaryRatio}
-                      min={1}
-                      max={100}
-                      addonAfter="%"
-                      onChange={(value) => setField('canaryRatio', value ?? 10)}
-                    />
-                  </label>
+                  <p className="ui-note">
+                    谁可以先看到试运行版，在应用列表的「灰度规则」里按角色、部门或指定成员配置；
+                    没配规则时试运行版对所有人不可见。
+                  </p>
                 </>
               ) : null}
             </div>

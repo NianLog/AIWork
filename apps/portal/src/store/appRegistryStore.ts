@@ -74,9 +74,13 @@ export const useAppRegistryStore = create<RegistryState>((set, get) => ({
 
 export type AppChannel = 'stable' | 'canary';
 
-/** 发布通道：灰度指针存在且比例大于 0 视为试运行；停用应用不会出现在 enabled-list。 */
+/** 发布通道（批次 S 起比例灰度退役）：谁可见 canary 由后端灰度规则表在 enabled-list
+ * 现解析——当前 entry 正指向试运行版本才算「你在用试运行版」；有指针但你不在名单上时
+ * 显示正式版，徽标与实际加载的版本一致。停用应用不会出现在 enabled-list。 */
 export function deriveChannel(app: PortalApp): AppChannel {
-  return Boolean(app.canaryVersion) && (app.canaryRatio ?? 0) > 0 ? 'canary' : 'stable';
+  return Boolean(app.canaryVersion) && app.entry === `/subapps/${app.appId}/${app.canaryVersion}/`
+    ? 'canary'
+    : 'stable';
 }
 
 const ICON_KEYS = ['image', 'video', 'radar', 'sparkles', 'layers', 'zap'] as const;
