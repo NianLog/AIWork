@@ -20,6 +20,8 @@ const PublishPage = lazy(() => import('./pages/PublishPage'));
 const UsersPage = lazy(() => import('./pages/UsersPage'));
 const RolesPage = lazy(() => import('./pages/RolesPage'));
 const OrganizationsPage = lazy(() => import('./pages/OrganizationsPage'));
+const AnnouncementsPage = lazy(() => import('./pages/AnnouncementsPage'));
+const FeedbackPage = lazy(() => import('./pages/FeedbackPage'));
 
 /**
  * 会话守卫（批次 F）：/preview 要求登录。沿后台既有惯例「登录/退出必经路由跳转」
@@ -80,6 +82,16 @@ export default function AdminRoutes() {
           path="organizations"
           element={<OrganizationsPage />}
           handle={{ title: '组织', subtitle: '' }}
+        />
+        <Route
+          path="announcements"
+          element={<AnnouncementsPage />}
+          handle={{ title: '公告管理', subtitle: '' }}
+        />
+        <Route
+          path="feedback"
+          element={<FeedbackPage />}
+          handle={{ title: '用户反馈', subtitle: '' }}
         />
       </Route>
       <Route path="*" element={<NotFoundPage />} />

@@ -305,3 +305,49 @@ export async function fetchEnabledApps(): Promise<PortalApp[]> {
     updateTime: typeof app.createTime === 'number' ? app.createTime : 0,
   }));
 }
+
+// ======================================================================
+// 门户公告与用户反馈（批次 Q）：工作台右栏公告卡 + 反馈入口
+// ======================================================================
+
+/** 启用公告（enabled-list：仅启用项，置顶恒在前，后端已排序）。 */
+export interface PortalAnnouncement {
+  id: number;
+  title: string;
+  content: string;
+  pinned: boolean;
+  /** epoch 毫秒（后端 LocalDateTime 序列化口径）；未知为 null。 */
+  createTime: number | null;
+}
+
+export async function fetchAnnouncements(): Promise<PortalAnnouncement[]> {
+  const list = await request<
+    Array<{ id: number; title: string; content: string; pinned?: boolean; createTime?: number }>
+  >('/admin-api/portal-announcement/enabled-list');
+  return list.map((item) => ({
+    id: item.id,
+    title: item.title,
+    content: item.content,
+    pinned: item.pinned ?? false,
+    createTime: typeof item.createTime === 'number' ? item.createTime : null,
+  }));
+}
+
+export type FeedbackType = 'suggestion' | 'bug' | 'other';
+
+/** 反馈提交载荷（后端 FeedbackSubmitReqVO；提交人由登录态审计字段记录）。 */
+export interface FeedbackInput {
+  /** 关联应用；不传即平台整体反馈。 */
+  appId?: string;
+  type: FeedbackType;
+  content: string;
+  /** 可选联系方式（钉钉号/邮箱），便于回访。 */
+  contact?: string;
+}
+
+export async function submitFeedback(input: FeedbackInput): Promise<void> {
+  await request<number>('/admin-api/portal-feedback/submit', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}

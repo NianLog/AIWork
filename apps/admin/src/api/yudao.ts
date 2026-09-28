@@ -817,3 +817,147 @@ export async function assignRoleMenus(roleId: number, menuIds: number[]): Promis
     body: JSON.stringify({ roleId, menuIds }),
   });
 }
+
+// ======================================================================
+// 门户公告（批次 Q）：后台编辑、门户工作台展示
+// ======================================================================
+
+/** 公告行（page 列表与表单同构）。 */
+export interface AnnouncementRow {
+  id: number;
+  title: string;
+  content: string;
+  pinned: boolean;
+  status: CommonStatus;
+  createTime: string;
+}
+
+interface AnnouncementItem {
+  id: number;
+  title: string;
+  content: string;
+  pinned?: boolean;
+  status: number;
+  createTime?: number;
+}
+
+function toAnnouncementRow(item: AnnouncementItem): AnnouncementRow {
+  return {
+    id: item.id,
+    title: item.title,
+    content: item.content,
+    pinned: item.pinned ?? false,
+    status: (item.status === 1 ? 1 : 0) as CommonStatus,
+    createTime: formatDateTime(item.createTime ?? 0),
+  };
+}
+
+export async function fetchAnnouncements(): Promise<AnnouncementRow[]> {
+  const page = await request<{ list: AnnouncementItem[]; total: number }>(
+    '/admin-api/portal-announcement/page?pageNo=1&pageSize=100',
+  );
+  return page.list.map(toAnnouncementRow);
+}
+
+/** 公告表单载荷（create/update 共用；update 时必带 id）。 */
+export interface AnnouncementInput {
+  id?: number;
+  title: string;
+  content: string;
+  pinned: boolean;
+  status: CommonStatus;
+}
+
+export async function createAnnouncement(input: AnnouncementInput): Promise<number> {
+  return request<number>('/admin-api/portal-announcement/create', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateAnnouncement(input: AnnouncementInput): Promise<void> {
+  await request<void>('/admin-api/portal-announcement/update', {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function deleteAnnouncement(id: number): Promise<void> {
+  await request<void>(`/admin-api/portal-announcement/delete?id=${id}`, { method: 'DELETE' });
+}
+
+// ======================================================================
+// 门户用户反馈（批次 Q）：门户提交、后台查看与标记处理
+// ======================================================================
+
+export type FeedbackType = 'suggestion' | 'bug' | 'other';
+
+/** 反馈行（page 列表）。 */
+export interface FeedbackRow {
+  id: number;
+  appId?: string;
+  type: FeedbackType;
+  content: string;
+  contact?: string;
+  status: 0 | 1;
+  remark?: string;
+  creator: string;
+  createTime: string;
+}
+
+interface FeedbackItem {
+  id: number;
+  appId?: string;
+  type: string;
+  content: string;
+  contact?: string;
+  status: number;
+  remark?: string;
+  creator?: string;
+  createTime?: number;
+}
+
+export const FEEDBACK_TYPE_LABEL: Record<FeedbackType, string> = {
+  suggestion: '建议',
+  bug: '问题',
+  other: '其他',
+};
+
+function toFeedbackRow(item: FeedbackItem): FeedbackRow {
+  return {
+    id: item.id,
+    appId: item.appId || undefined,
+    type: (['suggestion', 'bug', 'other'] as const).includes(item.type as FeedbackType)
+      ? (item.type as FeedbackType)
+      : 'other',
+    content: item.content,
+    contact: item.contact || undefined,
+    status: item.status === 1 ? 1 : 0,
+    remark: item.remark || undefined,
+    creator: item.creator ?? '',
+    createTime: formatDateTime(item.createTime ?? 0),
+  };
+}
+
+export async function fetchFeedbacks(): Promise<FeedbackRow[]> {
+  const page = await request<{ list: FeedbackItem[]; total: number }>(
+    '/admin-api/portal-feedback/page?pageNo=1&pageSize=100',
+  );
+  return page.list.map(toFeedbackRow);
+}
+
+/** 标记处理：只改处理状态与备注，用户提交的内容不可改写。 */
+export async function updateFeedback(input: {
+  id: number;
+  status: 0 | 1;
+  remark?: string;
+}): Promise<void> {
+  await request<void>('/admin-api/portal-feedback/update', {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function deleteFeedback(id: number): Promise<void> {
+  await request<void>(`/admin-api/portal-feedback/delete?id=${id}`, { method: 'DELETE' });
+}

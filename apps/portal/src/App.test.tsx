@@ -91,13 +91,24 @@ function jsonResponse(body: unknown, status = 200) {
   return { ok: status >= 200 && status < 300, status, json: async () => body } as Response;
 }
 
+/** enabled-list 返回的启用公告行（后端已按置顶在前排序，桩里原样给）。 */
+const ANNOUNCEMENTS = [
+  { id: 2, title: '平台周六凌晨例行维护', content: '影响约 30 分钟。', pinned: true, createTime: 1_727_136_000_000 },
+  { id: 1, title: '新应用上线', content: 'AI 图像工坊已开放使用。', pinned: false, createTime: 1_727_100_000_000 },
+];
+
 /**
- * 接口桩：登录 / 权限信息 / 启用应用清单三张路由表。清单内容可变
- * （setApps），C1 用例靠它模拟「管理端新增配置」。
+ * 接口桩：登录 / 权限信息 / 启用应用清单 / 公告 / 反馈提交五张路由表。
+ * 清单内容可变（setApps），C1 用例靠它模拟「管理端新增配置」；
+ * 公告默认空列表（卡片隐藏，存量用例不感知）；反馈提交记录请求体供断言。
  */
-function stubPortalFetch(options: { loginBody?: unknown } = {}) {
-  const state = { apps: [APP_IMAGE, APP_VIDEO] as PortalAppRecord[] };
-  const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+function stubPortalFetch(options: { loginBody?: unknown; announcements?: typeof ANNOUNCEMENTS } = {}) {
+  const state = {
+    apps: [APP_IMAGE, APP_VIDEO] as PortalAppRecord[],
+    announcements: options.announcements ?? [],
+    feedbackPosts: [] as string[],
+  };
+  const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     if (url.includes('/system/auth/login')) {
       return jsonResponse(options.loginBody ?? { code: 0, data: { userId: 1, accessToken: 'at-portal', refreshToken: 'rt-portal', expiresTime: 0 }, msg: '' });
@@ -112,10 +123,21 @@ function stubPortalFetch(options: { loginBody?: unknown } = {}) {
     if (url.includes('/portal-app/enabled-list')) {
       return jsonResponse({ code: 0, data: state.apps, msg: '' });
     }
+    if (url.includes('/portal-announcement/enabled-list')) {
+      return jsonResponse({ code: 0, data: state.announcements, msg: '' });
+    }
+    if (url.includes('/portal-feedback/submit')) {
+      state.feedbackPosts.push(String(init?.body ?? ''));
+      return jsonResponse({ code: 0, data: 1, msg: '' });
+    }
     return jsonResponse({ code: 404, msg: '接口不存在', data: null }, 404);
   });
   vi.stubGlobal('fetch', fetchMock);
-  return { fetchMock, setApps: (apps: PortalAppRecord[]) => { state.apps = apps; } };
+  return {
+    fetchMock,
+    setApps: (apps: PortalAppRecord[]) => { state.apps = apps; },
+    feedbackPosts: () => state.feedbackPosts,
+  };
 }
 
 function openPortal(path = '/') {
@@ -336,6 +358,55 @@ describe('子应用工作区', () => {
     expect(await screen.findByRole('heading', { level: 1, name: '这个应用不存在' })).toBeTruthy();
     expect(screen.getByText(/返回工作台/)).toBeTruthy();
     expect(screen.queryByRole('button', { name: '去登录' })).toBeNull();
+  });
+});
+
+describe('公告与反馈（批次 Q）', () => {
+  it('工作台渲染启用公告：置顶标在前，标题正文时间可读', async () => {
+    stubPortalFetch({ announcements: ANNOUNCEMENTS });
+    seedSession();
+    openPortal('/preview');
+
+    const board = await screen.findByRole('region', { name: '平台公告' });
+    // 桩数据里置顶行在前——界面按接口顺序渲染，不自行重排
+    expect(board.textContent).toContain('平台周六凌晨例行维护');
+    expect(board.textContent).toContain('影响约 30 分钟。');
+    expect(within(board).getAllByText('置顶').length).toBe(1);
+  });
+
+  it('公告拉取失败或为空：工作台不渲染公告卡，应用区不受影响', async () => {
+    stubPortalFetch(); // 默认空公告列表
+    seedSession();
+    openPortal('/preview');
+
+    await screen.findByRole('button', { name: 'AI 图像工坊' });
+    expect(screen.queryByRole('region', { name: '平台公告' })).toBeNull();
+  });
+
+  it('反馈提交：填写类型与内容后请求体完整，成功态如实反馈', async () => {
+    const { feedbackPosts } = stubPortalFetch();
+    seedSession();
+    openPortal('/preview');
+
+    fireEvent.click(await screen.findByRole('button', { name: /用着不顺手/ }));
+    const dialog = await screen.findByRole('dialog', { name: '产品反馈' });
+
+    // 空内容被表单 required 拦下，不发请求
+    fireEvent.click(within(dialog).getByRole('button', { name: '提交反馈' }));
+    expect(feedbackPosts()).toHaveLength(0);
+
+    fireEvent.change(within(dialog).getByLabelText('反馈内容'), {
+      target: { value: '希望市场页支持按名称排序' },
+    });
+    fireEvent.click(within(dialog).getByText('问题反馈'));
+    fireEvent.click(within(dialog).getByRole('button', { name: '提交反馈' }));
+
+    await within(dialog).findByText('已收到，谢谢！');
+    expect(feedbackPosts()).toHaveLength(1);
+    const body = JSON.parse(feedbackPosts()[0]) as Record<string, unknown>;
+    expect(body.type).toBe('bug');
+    expect(body.content).toBe('希望市场页支持按名称排序');
+    expect(body.appId).toBeUndefined(); // 工作台入口 = 平台整体反馈
   });
 });
 

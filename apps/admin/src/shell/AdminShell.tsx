@@ -4,11 +4,13 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Avatar, Breadcrumb, Button, Input, Menu, Tag } from 'dingtalk-design-desktop';
 import {
   AiDiagonalStarsFilled,
+  AnnouncementOutlined,
   AppletOutlined,
   CloseOutlined,
   LinkmanOutlined,
   MenuOutlined,
   OrganizationOutlined,
+  WriteNoteOutlined,
   SafeOutlined,
   SearchOutlined,
   UploadOutlined,
@@ -47,6 +49,7 @@ const NAV_GROUPS: Array<{ title: string; items: NavItem[] }> = [
     items: [
       { key: '/preview/apps', label: '应用列表', icon: <AppletOutlined /> },
       { key: '/preview/publish', label: '应用发布', icon: <UploadOutlined /> },
+      { key: '/preview/announcements', label: '公告管理', icon: <AnnouncementOutlined /> },
     ],
   },
   {
@@ -55,6 +58,12 @@ const NAV_GROUPS: Array<{ title: string; items: NavItem[] }> = [
       { key: '/preview/users', label: '用户', icon: <LinkmanOutlined /> },
       { key: '/preview/roles', label: '角色', icon: <SafeOutlined /> },
       { key: '/preview/organizations', label: '组织', icon: <OrganizationOutlined /> },
+    ],
+  },
+  {
+    title: '运营',
+    items: [
+      { key: '/preview/feedback', label: '用户反馈', icon: <WriteNoteOutlined /> },
     ],
   },
 ];
@@ -69,9 +78,11 @@ const FLAT_NAV_ITEMS = NAV_GROUPS.flatMap((group) => group.items);
 const PAGE_METAS: Array<RouteMeta & { group: string }> = [
   { path: '/preview/apps', group: '平台管理', title: '应用列表', subtitle: '' },
   { path: '/preview/publish', group: '平台管理', title: '应用发布', subtitle: '' },
+  { path: '/preview/announcements', group: '平台管理', title: '公告管理', subtitle: '' },
   { path: '/preview/users', group: '身份与权限', title: '用户', subtitle: '' },
   { path: '/preview/roles', group: '身份与权限', title: '角色', subtitle: '' },
   { path: '/preview/organizations', group: '身份与权限', title: '组织', subtitle: '' },
+  { path: '/preview/feedback', group: '运营', title: '用户反馈', subtitle: '' },
 ];
 
 const FALLBACK_META = PAGE_METAS[0];
