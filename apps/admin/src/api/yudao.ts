@@ -1122,3 +1122,37 @@ export async function fetchAccessStats(days: number): Promise<AccessStats> {
     byApp: Array.isArray(raw.byApp) ? raw.byApp : [],
   };
 }
+
+// ======================================================================
+// 操作日志（批次 U）：admin 审计页直连 yudao system 模块的 operate-log
+// ======================================================================
+
+/** 操作日志条目（/admin-api/system/operate-log/page 响应行） */
+export interface OperateLogItem {
+  id: number;
+  /** 操作模块（门户写操作统一「门户」前缀） */
+  type: string;
+  /** 操作名（创建/更新/删除…） */
+  subType: string;
+  /** 操作描述（渲染后的一句话） */
+  action: string;
+  /** 操作人昵称（后端已映射） */
+  userName?: string;
+  userIp?: string;
+  /** epoch 毫秒 */
+  createTime: number | string;
+}
+
+/**
+ * 操作日志分页（type 传模块名做模拟匹配，不传查全部）。
+ * # ponytail: 审计页一次拉 100 条客户端分页——门户写操作低频，量级远够；
+ * 逼近上限时改服务端分页（后端 pageNo/pageSize 本来就支持）。
+ */
+export async function fetchOperateLogs(type?: string): Promise<OperateLogItem[]> {
+  const query = new URLSearchParams({ pageNo: '1', pageSize: '100' });
+  if (type) query.set('type', type);
+  const raw = await request<{ list?: OperateLogItem[]; total?: number }>(
+    `/admin-api/system/operate-log/page?${query.toString()}`,
+  );
+  return Array.isArray(raw?.list) ? raw.list : [];
+}

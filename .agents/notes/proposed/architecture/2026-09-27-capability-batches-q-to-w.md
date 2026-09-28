@@ -34,6 +34,12 @@ publio OA 完整版）、功能进展是硬编码 TS 数组（改一行要发版
 
 批次 W 已于 2026-09-28 落地（本仓单批，无后端改动）：六场景端到端验证全通，实证暴露并修正了 demo-vue 的裸主机 backendApi（前缀约定同步表单 ui-note 与引导文档 §8.1），验证记录见 [批次 W 笔记](../../implemented/process/2026-09-28-batch-w-proxy-verification.md)。
 | **U 安全审计** | portal controller 接 yudao 操作日志 + admin 审计查看页 + 工作台「最近动态」 | 依赖 yudao operatelog | V（异常提醒走消息通道） |
+
+批次 U 已于 2026-09-28 落地（yudao-portal@f0e98ef + 本仓同批 PR）：实证 yudao
+操作日志是 @LogRecord 注解驱动（非自动记录），七个 service 16 处写方法铺注解；
+admin 审计页直连 system 操作日志分页，工作台最近动态走薄视图登录即可，异常登录
+水位扫描复用批次 V 通道广播（依赖项就此闭环），实施事实与偏差见
+[批次 U 笔记](../../implemented/architecture/2026-09-28-batch-u-audit.md)。
 | **V 消息提醒** | 站内信打底 + 钉钉通道（调研结论定形态），组件化 ChannelAdapter | sys_portal_notification | 无 |
 
 批次 V 已于 2026-09-28 落地（yudao-portal@efb70d3 + 本仓同批 PR）：站内信为事实源，
