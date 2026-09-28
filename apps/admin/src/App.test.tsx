@@ -316,7 +316,7 @@ describe('后台业务界面', () => {
     expectBusinessLanguage();
   });
 
-  it('侧边导航覆盖九个管理页，逐页切换后标题跟随', () => {
+  it('侧边导航覆盖十个管理页，逐页切换后标题跟随', () => {
     openAdmin('/preview/apps');
     const menu = screen.getByRole('menu', { name: '后台导航' });
 
@@ -324,13 +324,14 @@ describe('后台业务界面', () => {
       within(menu)
         .getAllByRole('menuitem')
         .map((item) => (item.textContent ?? '').trim()),
-    ).toEqual(['应用列表', '应用发布', '公告管理', '功能进展', '使用统计', '用户', '角色', '组织', '用户反馈']);
+    ).toEqual(['应用列表', '应用发布', '公告管理', '功能进展', '使用统计', '操作日志', '用户', '角色', '组织', '用户反馈']);
 
     const pages: Array<[string, string, string]> = [
       ['应用发布', '/preview/publish', '应用发布'],
       ['公告管理', '/preview/announcements', '公告管理'],
       ['功能进展', '/preview/roadmap', '功能进展'],
       ['使用统计', '/preview/stats', '使用统计'],
+      ['操作日志', '/preview/audit', '操作日志'],
       ['用户', '/preview/users', '用户'],
       ['角色', '/preview/roles', '角色'],
       ['组织', '/preview/organizations', '组织'],

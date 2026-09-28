@@ -5,6 +5,7 @@ import { Avatar, Breadcrumb, Button, Input, Menu, Tag } from 'dingtalk-design-de
 import {
   AiDiagonalStarsFilled,
   DotChartOutlined,
+  FilehistoryOutlined,
   LineChartOutlined,
   AnnouncementOutlined,
   AppletOutlined,
@@ -54,6 +55,7 @@ const NAV_GROUPS: Array<{ title: string; items: NavItem[] }> = [
       { key: '/preview/announcements', label: '公告管理', icon: <AnnouncementOutlined /> },
       { key: '/preview/roadmap', label: '功能进展', icon: <DotChartOutlined /> },
       { key: '/preview/stats', label: '使用统计', icon: <LineChartOutlined /> },
+      { key: '/preview/audit', label: '操作日志', icon: <FilehistoryOutlined /> },
     ],
   },
   {
@@ -85,6 +87,7 @@ const PAGE_METAS: Array<RouteMeta & { group: string }> = [
   { path: '/preview/announcements', group: '平台管理', title: '公告管理', subtitle: '' },
   { path: '/preview/roadmap', group: '平台管理', title: '功能进展', subtitle: '' },
   { path: '/preview/stats', group: '平台管理', title: '使用统计', subtitle: '' },
+  { path: '/preview/audit', group: '平台管理', title: '操作日志', subtitle: '' },
   { path: '/preview/users', group: '身份与权限', title: '用户', subtitle: '' },
   { path: '/preview/roles', group: '身份与权限', title: '角色', subtitle: '' },
   { path: '/preview/organizations', group: '身份与权限', title: '组织', subtitle: '' },

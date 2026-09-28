@@ -459,3 +459,21 @@ export async function markNotificationRead(id: number): Promise<void> {
 export async function markAllNotificationsRead(): Promise<void> {
   await request<boolean>('/admin-api/portal-notification/read-all', { method: 'PUT' });
 }
+
+// ======================================================================
+// 最近动态（批次 U）：门户写操作薄视图（/portal-audit/recent，登录即可）
+// ======================================================================
+
+/** 最近动态条目（操作人昵称后端已映射，查不到兜底「平台管理员」） */
+export interface PortalRecentActivity {
+  id: number;
+  action: string;
+  operatorNickname: string;
+  createTime: number | string;
+}
+
+/** 门户侧管理写操作最近 10 条（增益内容：失败由调用方隐藏卡片，不报错） */
+export async function fetchRecentActivities(): Promise<PortalRecentActivity[]> {
+  const list = await request<PortalRecentActivity[]>('/admin-api/portal-audit/recent');
+  return Array.isArray(list) ? list : [];
+}

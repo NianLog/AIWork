@@ -1,9 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Button, Empty } from 'dingtalk-design-mobile';
-import { AnnouncementOutlined, MessageOutlined, RightArrowOutlined } from 'dd-icons';
-import { fetchAccessStats, fetchAnnouncements } from '../../api/yudao';
-import type { PortalAnnouncement } from '../../api/yudao';
+import {
+  AnnouncementOutlined,
+  FilehistoryOutlined,
+  MessageOutlined,
+  RightArrowOutlined,
+} from 'dd-icons';
+import { fetchAccessStats, fetchAnnouncements, fetchRecentActivities } from '../../api/yudao';
+import type { PortalAnnouncement, PortalRecentActivity } from '../../api/yudao';
 import { summarizeApps, useAppRegistryStore, formatUpdateTime } from '../../store/appRegistryStore';
 import { useSessionStore } from '../../store/sessionStore';
 import { PORTAL_ENV_LABEL } from '../../store/portalNotice';
@@ -22,6 +27,7 @@ import { deriveVisual } from '../../store/appRegistryStore';
  * 应用没有描述字段，条目只放名称，不造假文案。
  *
  * 公告（批次 Q）来自后台公告管理：右栏置顶第一张卡，是运营向用户喊话的通道。
+ * 最近动态（批次 U）随后：门户管理写操作的公共事实流。
  * 反馈入口在页面最底部一行——PortalShell 刻意无页脚（见其注释），反馈放工作台
  * 页内既不违背那个决策，也是用户最有意见的页面上顺手能找到的位置。
  */
@@ -65,6 +71,55 @@ function AnnouncementCard() {
             </p>
             <p className="wb-announce__content">{item.content}</p>
             <p className="wb-announce__time ui-num">{formatUpdateTime(item.createTime ?? 0)}</p>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+
+/**
+ * 最近动态（批次 U）：门户侧管理写操作的薄视图——谁发布了公告、更新了哪个
+ * 应用。动态内容是平台公共事实，登录即可见（/portal-audit/recent）；增益内容
+ * 策略与公告卡一致：失败或暂无记录整卡隐藏，不摆错误剧场。
+ */
+function RecentActivityCard() {
+  const [activities, setActivities] = useState<PortalRecentActivity[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchRecentActivities()
+      .then((list) => {
+        if (!cancelled) setActivities(list);
+      })
+      .catch(() => {
+        if (!cancelled) setActivities([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (!activities || activities.length === 0) return null;
+
+  return (
+    <section className="wb-card" aria-label="最近动态">
+      <div className="ui-section__head">
+        <h2 className="ui-section__title">
+          <span className="wb-announce__icon" aria-hidden="true">
+            <FilehistoryOutlined />
+          </span>
+          最近动态
+        </h2>
+      </div>
+      <ul className="wb-announce">
+        {activities.map((item) => (
+          <li key={item.id} className="wb-announce__item">
+            <p className="wb-announce__title">{item.action}</p>
+            <p className="wb-announce__time ui-num">
+              {item.operatorNickname} · {formatUpdateTime(Number(item.createTime))}
+            </p>
           </li>
         ))}
       </ul>
@@ -196,8 +251,9 @@ export default function WorkbenchPage() {
           )}
         </section>
 
-        <aside className="wb-rail" aria-label="平台公告、功能进展与应用统计">
+        <aside className="wb-rail" aria-label="平台公告、最近动态、功能进展与应用统计">
           <AnnouncementCard />
+          <RecentActivityCard />
 
           {roadmapView.status === 'success' && roadmapView.data.length > 0 ? (
             <section className="wb-card" aria-label="功能进展速览">

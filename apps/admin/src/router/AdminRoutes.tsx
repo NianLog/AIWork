@@ -24,6 +24,7 @@ const AnnouncementsPage = lazy(() => import('./pages/AnnouncementsPage'));
 const FeedbackPage = lazy(() => import('./pages/FeedbackPage'));
 const RoadmapPage = lazy(() => import('./pages/RoadmapPage'));
 const StatsPage = lazy(() => import('./pages/StatsPage'));
+const AuditPage = lazy(() => import('./pages/AuditPage'));
 
 /**
  * 会话守卫（批次 F）：/preview 要求登录。沿后台既有惯例「登录/退出必经路由跳转」
@@ -104,6 +105,11 @@ export default function AdminRoutes() {
           path="stats"
           element={<StatsPage />}
           handle={{ title: '使用统计', subtitle: '' }}
+        />
+        <Route
+          path="audit"
+          element={<AuditPage />}
+          handle={{ title: '操作日志', subtitle: '' }}
         />
       </Route>
       <Route path="*" element={<NotFoundPage />} />

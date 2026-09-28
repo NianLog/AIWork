@@ -126,6 +126,7 @@ function stubPortalFetch(options: {
   announcements?: typeof ANNOUNCEMENTS;
   roadmap?: typeof ROADMAP_ITEMS;
   notifications?: Array<{ id: number; title: string; content: string; bizType: string; readFlag: boolean; createTime: number }>;
+  recentActivities?: Array<{ id: number; action: string; operatorNickname: string; createTime: number }>;
 } = {}) {
   const state = {
     apps: [APP_IMAGE, APP_VIDEO] as PortalAppRecord[],
@@ -135,6 +136,7 @@ function stubPortalFetch(options: {
     accessReports: [] as string[],
     notifications: structuredClone(options.notifications ?? []),
     readCalls: [] as string[], // read/read-all 调用记录（含 id）
+    recentActivities: structuredClone(options.recentActivities ?? []),
   };
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
@@ -156,6 +158,9 @@ function stubPortalFetch(options: {
     }
     if (url.includes('/portal-roadmap/list')) {
       return jsonResponse({ code: 0, data: state.roadmap, msg: '' });
+    }
+    if (url.includes('/portal-audit/recent')) {
+      return jsonResponse({ code: 0, data: state.recentActivities, msg: '' });
     }
     if (url.includes('/portal-feedback/submit')) {
       state.feedbackPosts.push(String(init?.body ?? ''));
@@ -661,6 +666,32 @@ describe('消息中心（批次 V）', () => {
 
     expect(await screen.findByText('还没有消息')).toBeTruthy();
     expect(screen.queryByRole('button', { name: '标为已读' })).toBeNull();
+  });
+});
+
+describe('最近动态（批次 U）', () => {
+  const RECENT = [
+    { id: 301, action: '创建了公告「九月发布计划」', operatorNickname: '联调管理员', createTime: 1780000000000 },
+    { id: 302, action: '更新了应用「AI 图像工坊」', operatorNickname: '平台管理员', createTime: 1780086400000 },
+  ];
+
+  it('工作台渲染最近动态：动作、操作人与时间可读', async () => {
+    stubPortalFetch({ recentActivities: RECENT });
+    seedSession();
+    openPortal('/preview');
+
+    const board = await screen.findByRole('region', { name: '最近动态' });
+    expect(board.textContent).toContain('创建了公告「九月发布计划」');
+    expect(board.textContent).toContain('联调管理员');
+  });
+
+  it('暂无动态：工作台不渲染动态卡，公告与应用区不受影响', async () => {
+    stubPortalFetch(); // 默认空动态
+    seedSession();
+    openPortal('/preview');
+
+    await screen.findByRole('button', { name: 'AI 图像工坊' });
+    expect(screen.queryByRole('region', { name: '最近动态' })).toBeNull();
   });
 });
 
