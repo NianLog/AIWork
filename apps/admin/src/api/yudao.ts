@@ -1086,3 +1086,39 @@ export async function updateRoadmapItem(input: RoadmapInput): Promise<void> {
 export async function deleteRoadmapItem(id: number): Promise<void> {
   await request<void>(`/admin-api/portal-roadmap/delete?id=${id}`, { method: 'DELETE' });
 }
+
+/** ===== 使用统计（批次 T）：应用访问日志聚合 ===== */
+
+export interface AccessDailyItem {
+  /** yyyy-MM-dd（后端已按窗口补零，恒连续） */
+  date: string;
+  count: number;
+}
+
+export interface AccessAppItem {
+  appId: string;
+  /** 应用名（应用已删时后端用标识兜底，不静默丢） */
+  name: string;
+  count: number;
+}
+
+export interface AccessStats {
+  daily: AccessDailyItem[];
+  /** 按访问次数降序 */
+  byApp: AccessAppItem[];
+}
+
+/**
+ * 使用统计（每日趋势 + 按应用排行）。days 1-90，窗口由后端校验。
+ * 响应形状在这里归一（同 roadmap/公告的边界防御）：后端未部署批次 T 时
+ * 网关/兜底 stub 会给别的形状，页面不该因此炸掉。
+ */
+export async function fetchAccessStats(days: number): Promise<AccessStats> {
+  const raw = await request<Partial<AccessStats>>(
+    `/admin-api/portal-app-access-log/stats?days=${days}`,
+  );
+  return {
+    daily: Array.isArray(raw.daily) ? raw.daily : [],
+    byApp: Array.isArray(raw.byApp) ? raw.byApp : [],
+  };
+}

@@ -1,6 +1,7 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { LeftArrowOutlined } from 'dd-icons';
+import { reportAppAccess } from '../../api/yudao';
 import AppMount from '../../container/AppMount';
 import { setHostNavigator } from '../../container/hostPortal';
 import { useAppRegistryStore } from '../../store/appRegistryStore';
@@ -53,6 +54,18 @@ export default function SubAppWorkspace() {
     view.status === 'success' && appId
       ? view.data.find((item) => item.appId === appId) ?? null
       : null;
+
+
+  // 使用统计上报（批次 T）：应用解析成功即记一次访问。ref 防重是给
+  // StrictMode 双调用与注册表重拉兜底的（同一次停留只记一次，切换应用再记）；
+  // 上报尽力而为，不 await、不关心结果。
+  const reportAppId = app?.appId ?? null;
+  const reportedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!reportAppId || reportedRef.current === reportAppId) return;
+    reportedRef.current = reportAppId;
+    void reportAppAccess(reportAppId);
+  }, [reportAppId]);
 
   /** 深链直落没有来路可退，退到工作台首页；其余情况都是「退一步」 */
   function exitWorkspace() {

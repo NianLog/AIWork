@@ -130,6 +130,7 @@ function stubPortalFetch(options: {
     announcements: options.announcements ?? [],
     roadmap: options.roadmap ?? [],
     feedbackPosts: [] as string[],
+    accessReports: [] as string[],
   };
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
@@ -156,6 +157,17 @@ function stubPortalFetch(options: {
       state.feedbackPosts.push(String(init?.body ?? ''));
       return jsonResponse({ code: 0, data: 1, msg: '' });
     }
+    if (url.includes('/portal-app-access-log/create')) {
+      state.accessReports.push(url.slice(url.indexOf('appId=') + 'appId='.length));
+      return jsonResponse({ code: 0, data: true, msg: '' });
+    }
+    if (url.includes('/portal-app-access-log/stats')) {
+      return jsonResponse({
+        code: 0,
+        data: { daily: [{ date: '2026-09-28', count: 3 }] },
+        msg: '',
+      });
+    }
     return jsonResponse({ code: 404, msg: '接口不存在', data: null }, 404);
   });
   vi.stubGlobal('fetch', fetchMock);
@@ -163,6 +175,7 @@ function stubPortalFetch(options: {
     fetchMock,
     setApps: (apps: PortalAppRecord[]) => { state.apps = apps; },
     feedbackPosts: () => state.feedbackPosts,
+    accessReports: () => state.accessReports,
   };
 }
 
@@ -386,6 +399,37 @@ describe('子应用工作区', () => {
     expect(screen.getByText(/返回工作台/)).toBeTruthy();
     expect(screen.queryByRole('button', { name: '去登录' })).toBeNull();
   });
+
+  it('使用统计（批次 T）：工作区挂载即上报一次访问', async () => {
+    const { fetchMock } = stubPortalFetch();
+    seedSession();
+    openPortal('/apps/ai-image');
+
+    await waitFor(() => expect(document.querySelector('iframe')).toBeTruthy());
+    await vi.waitFor(() =>
+      expect(
+        fetchMock.mock.calls.filter(([url]) => String(url).includes('/portal-app-access-log/create'))
+          .length,
+      ).toBe(1),
+    );
+    const reportUrl = String(
+      fetchMock.mock.calls.find(([url]) => String(url).includes('/portal-app-access-log/create'))?.[0],
+    );
+    expect(reportUrl).toContain('appId=ai-image');
+  });
+
+  it('使用统计（批次 T）：ghost 应用不上报', async () => {
+    const { fetchMock } = stubPortalFetch();
+    seedSession();
+    openPortal('/apps/ghost');
+
+    expect(await screen.findByRole('heading', { level: 1, name: '这个应用不存在' })).toBeTruthy();
+    // 应用不存在就没有访问事实，门户侧不上报（后端同样丢弃脏标识，双保险）
+    expect(
+      fetchMock.mock.calls.filter(([url]) => String(url).includes('/portal-app-access-log/create'))
+        .length,
+    ).toBe(0);
+  });
 });
 
 describe('公告与反馈（批次 Q）', () => {
@@ -487,6 +531,36 @@ describe('功能进展（批次 R）', () => {
 
     await screen.findByRole('button', { name: 'AI 图像工坊' });
     expect(screen.queryByRole('region', { name: '功能进展速览' })).toBeNull();
+  });
+});
+
+describe('使用统计（批次 T）', () => {
+  it('工作台：有 portal:app:query 的账号显「近 7 天访问」，拉的是 7 天窗口', async () => {
+    const { fetchMock } = stubPortalFetch();
+    const withPerm = { ...SESSION, permissions: [...SESSION.permissions, 'portal:app:query'] };
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify(withPerm));
+    useSessionStore.setState({ session: { ...withPerm } });
+    openPortal('/preview');
+
+    expect(await screen.findByText('近 7 天访问')).toBeTruthy();
+    const statCalls = fetchMock.mock.calls.filter(([url]) =>
+      String(url).includes('/portal-app-access-log/stats'),
+    );
+    expect(statCalls).toHaveLength(1);
+    expect(String(statCalls[0]?.[0])).toContain('days=7');
+  });
+
+  it('工作台：无权限账号不拉统计，统计卡保持原有两格', async () => {
+    const { fetchMock } = stubPortalFetch();
+    seedSession();
+    openPortal('/preview');
+
+    await screen.findByText('可用应用');
+    expect(screen.queryByText('近 7 天访问')).toBeNull();
+    expect(
+      fetchMock.mock.calls.filter(([url]) => String(url).includes('/portal-app-access-log'))
+        .length,
+    ).toBe(0);
   });
 });
 

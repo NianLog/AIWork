@@ -28,6 +28,8 @@ publio OA 完整版）、功能进展是硬编码 TS 数组（改一行要发版
 
 批次 S 已于 2026-09-28 落地（yudao-portal@dc1747e + 本仓同批 PR）：实际用角色/部门/指定用户三维（user_group 未做——BPM 未启用，用户白名单承接内测语义），比例灰度全链退役，实施事实与偏差见 [批次 S 笔记](../../implemented/architecture/2026-09-28-batch-s-canary-rules.md)。
 | **T 使用统计链路** | 访问日志表 + 门户上报端点 + 聚合 API + admin 图表页 + 工作台统计卡（真实数据） | sys_portal_app_access_log | 无 |
+
+批次 T 已于 2026-09-28 落地（yudao-portal@f29b4af + 本仓同批 PR）：上报锚在子应用工作区解析成功即记一次、尽力而为；admin 图表页 /preview/stats 与工作台「近 7 天访问」上线，实施事实与偏差见 [批次 T 笔记](../../implemented/feature/2026-09-28-batch-t-usage-stats.md)。
 | **W 后端代理收口** | /api/{appId}/** 代理端到端验证 + admin 表单 backendApi 说明强化 + 文档 | 验证记录 | 无（地基已有） |
 
 批次 W 已于 2026-09-28 落地（本仓单批，无后端改动）：六场景端到端验证全通，实证暴露并修正了 demo-vue 的裸主机 backendApi（前缀约定同步表单 ui-note 与引导文档 §8.1），验证记录见 [批次 W 笔记](../../implemented/process/2026-09-28-batch-w-proxy-verification.md)。

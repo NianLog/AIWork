@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { SESSION_KEY, fetchEnabledApps, readSession } from './yudao';
+import { SESSION_KEY, fetchAccessStats, fetchEnabledApps, readSession, reportAppAccess } from './yudao';
 import type { ApiError } from './yudao';
 
 /**
@@ -133,5 +133,50 @@ describe('单飞刷新与 401 重试（批次 F）', () => {
 
     expect(calls).toEqual(['list:Bearer at-old', 'refresh', 'list:Bearer at-new']);
     expect((caught as ApiError).code).toBe(401);
+  });
+});
+
+
+describe('使用统计（批次 T）', () => {
+  it('reportAppAccess：POST create?appId=，标识经 encodeURIComponent', async () => {
+    seedSession();
+    const calls: Array<{ url: string; method?: string }> = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        calls.push({ url: String(input), method: init?.method });
+        return jsonResponse({ code: 0, data: true, msg: '' });
+      }),
+    );
+
+    await reportAppAccess('ai-image');
+    expect(calls[0]?.url).toContain('/admin-api/portal-app-access-log/create?appId=ai-image');
+    expect(calls[0]?.method).toBe('POST');
+  });
+
+  it('reportAppAccess：接口炸了也静默（增益数据不拖累加载）', async () => {
+    seedSession();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => jsonResponse({ code: 404, data: null, msg: '接口不存在' }, 404)),
+    );
+
+    await expect(reportAppAccess('ai-image')).resolves.toBeUndefined();
+  });
+
+  it('fetchAccessStats：GET stats?days=7（工作台近 7 天访问）', async () => {
+    seedSession();
+    const calls: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        calls.push(String(input));
+        return jsonResponse({ code: 0, data: { daily: [{ date: '2026-09-28', count: 3 }] }, msg: '' });
+      }),
+    );
+
+    const stats = await fetchAccessStats(7);
+    expect(calls[0]).toContain('/admin-api/portal-app-access-log/stats?days=7');
+    expect(stats.daily[0]?.count).toBe(3);
   });
 });
